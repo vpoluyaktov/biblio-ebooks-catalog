@@ -1,0 +1,114 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strconv"
+
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	Library  LibraryConfig  `yaml:"library"`
+	Auth     AuthConfig     `yaml:"auth"`
+	OPDS     OPDSConfig     `yaml:"opds"`
+}
+
+type ServerConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
+type DatabaseConfig struct {
+	Path string `yaml:"path"`
+}
+
+type LibraryConfig struct {
+	BooksPerPage int `yaml:"books_per_page"`
+}
+
+type AuthConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
+type OPDSConfig struct {
+	ShowCovers      bool `yaml:"show_covers"`
+	ShowAnnotations bool `yaml:"show_annotations"`
+}
+
+func Default() *Config {
+	return &Config{
+		Server: ServerConfig{
+			Host: "0.0.0.0",
+			Port: 9988,
+		},
+		Database: DatabaseConfig{
+			Path: "./data/library.db",
+		},
+		Library: LibraryConfig{
+			BooksPerPage: 50,
+		},
+		Auth: AuthConfig{
+			Enabled: false,
+			User:    "admin",
+		},
+		OPDS: OPDSConfig{
+			ShowCovers:      true,
+			ShowAnnotations: true,
+		},
+	}
+}
+
+func Load(path string) (*Config, error) {
+	cfg := Default()
+
+	if path != "" {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	cfg.loadFromEnv()
+
+	if err := cfg.ensureDirectories(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func (c *Config) loadFromEnv() {
+	if v := os.Getenv("OPDS_SERVER_HOST"); v != "" {
+		c.Server.Host = v
+	}
+	if v := os.Getenv("OPDS_SERVER_PORT"); v != "" {
+		if port, err := strconv.Atoi(v); err == nil {
+			c.Server.Port = port
+		}
+	}
+	if v := os.Getenv("OPDS_DATABASE_PATH"); v != "" {
+		c.Database.Path = v
+	}
+	if v := os.Getenv("OPDS_AUTH_ENABLED"); v == "true" {
+		c.Auth.Enabled = true
+	}
+	if v := os.Getenv("OPDS_AUTH_USER"); v != "" {
+		c.Auth.User = v
+	}
+	if v := os.Getenv("OPDS_AUTH_PASSWORD"); v != "" {
+		c.Auth.Password = v
+	}
+}
+
+func (c *Config) ensureDirectories() error {
+	dir := filepath.Dir(c.Database.Path)
+	return os.MkdirAll(dir, 0755)
+}

@@ -1,0 +1,1515 @@
+// OPDS Server Web UI
+
+const App = {
+  user: null,
+  currentLibrary: null,
+  currentView: 'home',
+  theme: 'dark',
+
+  async init() {
+    this.loadTheme();
+    await this.checkAuth();
+    this.bindEvents();
+    this.router();
+    window.addEventListener('hashchange', () => this.router());
+  },
+
+  loadTheme() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    this.theme = saved;
+    document.documentElement.setAttribute('data-theme', saved);
+  },
+
+  toggleTheme() {
+    this.theme = this.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', this.theme);
+    localStorage.setItem('theme', this.theme);
+  },
+
+  renderHeader(title, extraContent = '') {
+    return `
+      <header class="header">
+        <h1 class="header-title">${title}</h1>
+        <div class="header-actions">
+          ${extraContent}
+          <button type="button" class="theme-toggle" data-action="toggleTheme" title="Toggle theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+    `;
+  },
+
+  async checkAuth() {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      if (data.authenticated) {
+        this.user = data.user;
+      }
+    } catch (e) {
+      console.error('Auth check failed:', e);
+    }
+  },
+
+  async checkSetup() {
+    try {
+      const res = await fetch('/api/setup/check');
+      const data = await res.json();
+      return data.setup_required;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  bindEvents() {
+    document.addEventListener('click', (e) => {
+      const actionEl = e.target.closest('[data-action]');
+      if (actionEl) {
+        const action = actionEl.dataset.action;
+        console.log('Action clicked:', action, 'Method exists:', !!this[action]);
+        if (this[action]) {
+          e.preventDefault();
+          this[action](actionEl);
+        }
+      }
+    });
+
+    document.addEventListener('submit', (e) => {
+      if (e.target.matches('[data-form]')) {
+        e.preventDefault();
+        const form = e.target.dataset.form;
+        if (this[form]) {
+          this[form](e.target);
+        }
+      }
+    });
+  },
+
+  async router() {
+    const hash = window.location.hash.slice(1) || 'home';
+    const [view, ...params] = hash.split('/');
+
+    // Check if setup is required
+    const setupRequired = await this.checkSetup();
+    if (setupRequired && view !== 'setup') {
+      window.location.hash = '#setup';
+      return;
+    }
+
+    // Check auth for protected routes
+    if (!this.user && !['login', 'setup'].includes(view)) {
+      window.location.hash = '#login';
+      return;
+    }
+
+    this.currentView = view;
+    
+    switch (view) {
+      case 'setup':
+        this.renderSetup();
+        break;
+      case 'login':
+        this.renderLogin();
+        break;
+      case 'home':
+        this.renderHome();
+        break;
+      case 'library':
+        this.currentLibrary = parseInt(params[0]) || 1;
+        this.renderLibrary(params[1] || 'authors');
+        break;
+      case 'authors':
+        this.currentLibrary = parseInt(params[0]) || 1;
+        this.renderAuthors(params[1]);
+        break;
+      case 'author':
+        this.renderAuthor(params[0]);
+        break;
+      case 'series':
+        this.currentLibrary = parseInt(params[0]) || 1;
+        this.renderSeries();
+        break;
+      case 'series-books':
+        this.renderSeriesBooks(params[0]);
+        break;
+      case 'genres':
+        this.currentLibrary = parseInt(params[0]) || 1;
+        this.renderGenres();
+        break;
+      case 'genre':
+        this.renderGenreBooks(params[0]);
+        break;
+      case 'search':
+        this.currentLibrary = parseInt(params[0]) || 1;
+        this.renderSearch();
+        break;
+      case 'settings':
+        this.renderSettings();
+        break;
+      case 'libraries':
+        this.renderLibraries();
+        break;
+      default:
+        this.renderHome();
+    }
+  },
+
+  // Render Methods
+  renderSetup() {
+    document.getElementById('app').innerHTML = `
+      <div class="login-page">
+        <div class="login-card">
+          <div class="login-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
+          <h1 class="login-title">Welcome to OPDS Server</h1>
+          <p class="login-subtitle">Create your admin account to get started</p>
+          <form data-form="submitSetup">
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <input type="text" name="username" class="form-input" placeholder="admin" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password</label>
+              <input type="password" name="confirm" class="form-input" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%">Create Account</button>
+            <p id="setup-error" class="text-center text-muted mt-2" style="color:var(--danger)"></p>
+          </form>
+        </div>
+      </div>
+    `;
+  },
+
+  renderLogin() {
+    document.getElementById('app').innerHTML = `
+      <div class="login-page">
+        <button type="button" class="theme-toggle" data-action="toggleTheme" title="Toggle theme" style="position:absolute;top:1rem;right:1rem">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <div class="login-card">
+          <div class="login-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
+          <h1 class="login-title">OPDS Server</h1>
+          <p class="login-subtitle">Sign in to your account</p>
+          <form data-form="submitLogin">
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <input type="text" name="username" class="form-input" placeholder="Username" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%">Sign In</button>
+            <p id="login-error" class="text-center text-muted mt-2" style="color:var(--danger)"></p>
+          </form>
+        </div>
+      </div>
+    `;
+  },
+
+  async renderHome() {
+    const libraries = await this.fetchAPI('/api/libraries');
+    
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('home')}
+        <div class="main">
+          ${this.renderHeader('Dashboard')}
+          <div class="content">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value">${libraries.length}</div>
+                <div class="stat-label">Libraries</div>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">Libraries</h2>
+              </div>
+              <div class="card-body" style="padding:0">
+                ${libraries.length === 0 ? `
+                  <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <h3>No libraries yet</h3>
+                    <p>Import a library using the CLI command</p>
+                  </div>
+                ` : `
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Path</th>
+                        <th>Created</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${libraries.map(lib => `
+                        <tr>
+                          <td><a href="#library/${lib.id}" class="table-link">${lib.name}</a></td>
+                          <td class="text-muted">${lib.path}</td>
+                          <td class="text-muted">${new Date(lib.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <a href="#library/${lib.id}" class="btn btn-sm btn-outline">Browse</a>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  async renderLibrary(tab = 'authors') {
+    const library = await this.fetchAPI(`/api/libraries/${this.currentLibrary}`);
+    
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('library', this.currentLibrary)}
+        <div class="main">
+          <header class="header">
+            <h1 class="header-title">${library.name}</h1>
+            <div class="header-actions">
+              <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" class="form-input" placeholder="Search books..." id="search-input">
+              </div>
+              <button type="button" class="theme-toggle" data-action="toggleTheme" title="Toggle theme">
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              </button>
+            </div>
+          </header>
+          <div class="content" id="library-content">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        window.location.hash = `#search/${this.currentLibrary}?q=${encodeURIComponent(e.target.value)}`;
+      }
+    });
+
+    this.loadLibraryTab(tab);
+  },
+
+  async loadLibraryTab(tab) {
+    const content = document.getElementById('library-content');
+    
+    switch (tab) {
+      case 'authors':
+        await this.loadAuthors(content);
+        break;
+      case 'series':
+        await this.loadSeries(content);
+        break;
+      case 'genres':
+        await this.loadGenres(content);
+        break;
+    }
+  },
+
+  async loadAuthors(container) {
+    const letters = 'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ'.split('');
+    const latinLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    
+    container.innerHTML = `
+      <div class="alphabet-filter">
+        ${[...letters, ...latinLetters].map(l => `
+          <button class="alphabet-btn" data-letter="${l}">${l}</button>
+        `).join('')}
+      </div>
+      <div id="authors-list" class="card">
+        <div class="card-body">
+          <p class="text-muted text-center">Select a letter to browse authors</p>
+        </div>
+      </div>
+    `;
+
+    container.querySelectorAll('.alphabet-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.loadAuthorsByLetter(btn.dataset.letter));
+    });
+  },
+
+  async loadAuthorsByLetter(letter) {
+    document.querySelectorAll('.alphabet-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-letter="${letter}"]`)?.classList.add('active');
+    
+    const listEl = document.getElementById('authors-list');
+    listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    
+    try {
+      // Don't double-encode - the letter is already a string
+      const res = await fetch(`/opds/${this.currentLibrary}/authors/${letter}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const entries = xml.querySelectorAll('entry');
+      
+      if (entries.length === 0) {
+        listEl.innerHTML = '<div class="card-body"><p class="text-muted text-center">No authors found</p></div>';
+        return;
+      }
+      
+      listEl.innerHTML = `
+        <div class="card-body" style="padding:0">
+          ${Array.from(entries).map(entry => {
+            const title = entry.querySelector('title')?.textContent || '';
+            const link = entry.querySelector('link')?.getAttribute('href') || '';
+            const id = link.match(/author\/(\d+)/)?.[1];
+            if (!id) return '';
+            return `
+              <a href="#author/${id}" class="list-item">
+                <span>${title}</span>
+              </a>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (e) {
+      listEl.innerHTML = '<div class="card-body"><p class="text-muted text-center">Failed to load authors</p></div>';
+    }
+  },
+
+  async loadSeries(container) {
+    container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    
+    try {
+      const res = await fetch(`/opds/${this.currentLibrary}/series`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const entries = xml.querySelectorAll('entry');
+      
+      container.innerHTML = `
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Series (${entries.length})</h2>
+          </div>
+          <div class="card-body" style="padding:0">
+            ${Array.from(entries).map(entry => {
+              const title = entry.querySelector('title')?.textContent || '';
+              const link = entry.querySelector('link[type*="acquisition"]')?.getAttribute('href') || '';
+              const id = link.match(/series\/(\d+)/)?.[1];
+              const content = entry.querySelector('content')?.textContent || '';
+              const count = content.match(/(\d+)/)?.[1] || '';
+              return `
+                <a href="#series-books/${id}" class="list-item">
+                  <span style="flex:1">${title}</span>
+                  <span class="badge">${count} books</span>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      container.innerHTML = '<div class="card-body"><p class="text-muted text-center">Failed to load series</p></div>';
+    }
+  },
+
+  async loadGenres(container) {
+    const genres = await this.fetchAPI('/api/genres');
+    const topLevel = genres.filter(g => g.parent_id === 0);
+    
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Genres</h2>
+        </div>
+        <div class="card-body" style="padding:0">
+          ${topLevel.map(genre => {
+            const children = genres.filter(g => g.parent_id === genre.id);
+            return `
+              <div class="list-item" style="flex-direction:column;align-items:flex-start">
+                <strong>${genre.name}</strong>
+                ${children.length > 0 ? `
+                  <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem">
+                    ${children.map(c => `
+                      <a href="#genre/${c.id}" class="badge badge-primary">${c.name}</a>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  },
+
+  async renderAuthor(authorId) {
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('library', this.currentLibrary)}
+        <div class="main">
+          ${this.renderHeader('Author')}
+          <div class="content">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch(`/opds/${this.currentLibrary}/author/${authorId}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const title = xml.querySelector('feed > title')?.textContent || 'Author';
+      const entries = xml.querySelectorAll('entry');
+      
+      document.querySelector('.header-title').textContent = title;
+      document.querySelector('.content').innerHTML = this.renderBookGrid(entries);
+    } catch (e) {
+      document.querySelector('.content').innerHTML = '<p class="text-muted">Failed to load author</p>';
+    }
+  },
+
+  async renderSeriesBooks(seriesId) {
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('library', this.currentLibrary)}
+        <div class="main">
+          ${this.renderHeader('Series')}
+          <div class="content">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch(`/opds/${this.currentLibrary}/series/${seriesId}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const title = xml.querySelector('feed > title')?.textContent || 'Series';
+      const entries = xml.querySelectorAll('entry');
+      
+      document.querySelector('.header-title').textContent = title;
+      document.querySelector('.content').innerHTML = this.renderBookGrid(entries);
+    } catch (e) {
+      document.querySelector('.content').innerHTML = '<p class="text-muted">Failed to load series</p>';
+    }
+  },
+
+  async renderGenreBooks(genreId) {
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('library', this.currentLibrary)}
+        <div class="main">
+          ${this.renderHeader('Genre')}
+          <div class="content">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    try {
+      const res = await fetch(`/opds/${this.currentLibrary}/genres/${genreId}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const title = xml.querySelector('feed > title')?.textContent || 'Genre';
+      const entries = xml.querySelectorAll('entry');
+      
+      document.querySelector('.header-title').textContent = title;
+      document.querySelector('.content').innerHTML = this.renderBookGrid(entries);
+    } catch (e) {
+      document.querySelector('.content').innerHTML = '<p class="text-muted">Failed to load genre</p>';
+    }
+  },
+
+  async renderSearch() {
+    const query = new URLSearchParams(window.location.hash.split('?')[1]).get('q') || '';
+    
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('search', this.currentLibrary)}
+        <div class="main">
+          ${this.renderHeader('Search Results')}
+          <div class="content">
+            <div class="search-box mb-4" style="max-width:100%">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input type="text" class="form-input" placeholder="Search books..." value="${query}" id="search-input">
+            </div>
+            <div id="search-results">
+              ${query ? '<div class="loading"><div class="spinner"></div></div>' : '<p class="text-muted">Enter a search term</p>'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        window.location.hash = `#search/${this.currentLibrary}?q=${encodeURIComponent(e.target.value)}`;
+      }
+    });
+
+    if (query) {
+      this.performSearch(query);
+    }
+  },
+
+  async performSearch(query) {
+    const resultsEl = document.getElementById('search-results');
+    
+    try {
+      const res = await fetch(`/opds/${this.currentLibrary}/search?q=${encodeURIComponent(query)}`);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const entries = xml.querySelectorAll('entry');
+      
+      if (entries.length === 0) {
+        resultsEl.innerHTML = '<p class="text-muted">No books found</p>';
+        return;
+      }
+      
+      resultsEl.innerHTML = this.renderBookGrid(entries);
+    } catch (e) {
+      resultsEl.innerHTML = '<p class="text-muted">Search failed</p>';
+    }
+  },
+
+  async renderSettings() {
+    if (!this.user?.role === 'admin') {
+      window.location.hash = '#home';
+      return;
+    }
+
+    const users = await this.fetchAPI('/api/users');
+    
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('settings')}
+        <div class="main">
+          ${this.renderHeader('Settings')}
+          <div class="content">
+            <div class="card mb-4">
+              <div class="card-header">
+                <h2 class="card-title">Users</h2>
+                <button type="button" class="btn btn-primary btn-sm" data-action="showAddUser">Add User</button>
+              </div>
+              <div class="card-body" style="padding:0">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Role</th>
+                      <th>Created</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${users.map(u => `
+                      <tr>
+                        <td>${u.username}</td>
+                        <td><span class="badge ${u.role === 'admin' ? 'badge-primary' : ''}">${u.role}</span></td>
+                        <td class="text-muted">${new Date(u.created_at).toLocaleDateString()}</td>
+                        <td style="text-align:right">
+                          <button type="button" class="btn btn-sm btn-outline" data-action="showChangePassword" data-id="${u.id}" data-username="${u.username}">Password</button>
+                          ${u.id !== this.user.id ? `
+                            <button type="button" class="btn btn-sm btn-outline" data-action="showChangeRole" data-id="${u.id}" data-username="${u.username}" data-role="${u.role}">Role</button>
+                            <button type="button" class="btn btn-sm btn-danger" data-action="deleteUser" data-id="${u.id}">Delete</button>
+                          ` : ''}
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  async renderLibraries() {
+    if (this.user?.role !== 'admin') {
+      window.location.hash = '#home';
+      return;
+    }
+
+    const libraries = await this.fetchAPI('/api/libraries') || [];
+    
+    // Fetch stats for each library
+    const librariesWithStats = await Promise.all(
+      libraries.map(async lib => {
+        try {
+          const stats = await this.fetchAPI(`/api/libraries/${lib.id}/stats`);
+          return { ...lib, ...stats };
+        } catch (e) {
+          return { ...lib, book_count: 0, author_count: 0, series_count: 0 };
+        }
+      })
+    );
+
+    document.getElementById('app').innerHTML = `
+      <div class="app">
+        ${this.renderSidebar('libraries')}
+        <div class="main">
+          ${this.renderHeader('Library Management')}
+          <div class="content">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">Libraries</h2>
+              </div>
+              <div class="card-body" style="padding:0">
+                ${libraries.length === 0 ? `
+                  <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <h3>No libraries yet</h3>
+                    <p>Import a library using the CLI:<br><code>go run . import --inpx /path/to/file.inpx --name "Library Name" --path /path/to/books</code></p>
+                  </div>
+                ` : `
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Books</th>
+                        <th>OPDS URL</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${librariesWithStats.map(lib => `
+                        <tr>
+                          <td>
+                            <a href="#library/${lib.id}" class="table-link">${lib.name}</a>
+                            <div class="text-muted" style="font-size:0.75rem;max-width:250px;overflow:hidden;text-overflow:ellipsis" title="${lib.path}">${lib.path}</div>
+                          </td>
+                          <td>${lib.book_count?.toLocaleString() || 0}</td>
+                          <td>
+                            <code style="background:var(--bg-tertiary);padding:0.25rem 0.5rem;border-radius:var(--radius);font-size:0.8rem;cursor:pointer" 
+                                  onclick="navigator.clipboard.writeText('${window.location.origin}/opds/${lib.id}');this.title='Copied!'" 
+                                  title="Click to copy">${window.location.origin}/opds/${lib.id}</code>
+                          </td>
+                          <td>
+                            <label class="toggle-switch">
+                              <input type="checkbox" ${lib.enabled ? 'checked' : ''} data-action="toggleLibrary" data-id="${lib.id}">
+                              <span class="badge ${lib.enabled ? 'badge-success' : ''}">${lib.enabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                          </td>
+                          <td>
+                            <div class="flex gap-1">
+                              <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
+                              <button class="btn btn-sm btn-danger" data-action="deleteLibrary" data-id="${lib.id}" data-name="${lib.name}">Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                `}
+              </div>
+            </div>
+            
+            <div class="card mt-4">
+              <div class="card-header">
+                <h2 class="card-title">Import New Library</h2>
+              </div>
+              <div class="card-body">
+                <form data-form="submitImportLibrary">
+                  <div class="form-group">
+                    <label class="form-label">Library Name *</label>
+                    <input type="text" name="name" class="form-input" placeholder="My Library" required>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">INPX File Path (on server) *</label>
+                    <div class="input-with-btn">
+                      <input type="text" name="inpx_path" id="inpx-path-input" class="form-input" placeholder="/data/library/books.inpx" required>
+                      <button type="button" class="btn btn-outline" data-action="browseInpx">Browse...</button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Library Path (folder with ZIP files) *</label>
+                    <div class="input-with-btn">
+                      <input type="text" name="library_path" id="library-path-input" class="form-input" placeholder="/data/library" required>
+                      <button type="button" class="btn btn-outline" data-action="browseLibraryPath">Browse...</button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="display:flex;align-items:center;gap:0.5rem">
+                      <input type="checkbox" name="first_author_only">
+                      <span>First author only</span>
+                    </label>
+                  </div>
+                  <div class="mt-2">
+                    <button type="submit" class="btn btn-primary" id="import-btn">Import Library</button>
+                  </div>
+                  <div id="import-progress" style="display:none;margin-top:1rem">
+                    <div class="progress-bar">
+                      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                    </div>
+                    <div id="import-status" class="text-muted mt-1" style="font-size:0.875rem"></div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  async toggleLibrary(btn) {
+    const id = btn.dataset.id;
+    const enabled = btn.checked;
+    
+    try {
+      await fetch(`/api/libraries/${id}/toggle`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+      this.renderLibraries();
+    } catch (e) {
+      alert('Failed to update library');
+    }
+  },
+
+  async editLibrary(btn) {
+    const id = btn.dataset.id;
+    const currentName = btn.dataset.name;
+    const currentPath = btn.dataset.path;
+    
+    const name = prompt('Library name:', currentName);
+    if (name === null) return;
+    
+    const path = prompt('Library path:', currentPath);
+    if (path === null) return;
+    
+    try {
+      await fetch(`/api/libraries/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, path })
+      });
+      this.renderLibraries();
+    } catch (e) {
+      alert('Failed to update library');
+    }
+  },
+
+  async deleteLibrary(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    
+    if (!confirm(`Are you sure you want to delete the library "${name}"?\n\nThis will remove all books, authors, and series from the database. The actual book files will not be deleted.`)) {
+      return;
+    }
+    
+    try {
+      await fetch(`/api/libraries/${id}`, { method: 'DELETE' });
+      this.renderLibraries();
+    } catch (e) {
+      alert('Failed to delete library');
+    }
+  },
+
+  browseInpx() {
+    this.showFilePicker('inpx-path-input', 'inpx');
+  },
+
+  browseLibraryPath() {
+    this.showFilePicker('library-path-input', 'dir');
+  },
+
+  async submitImportLibrary(form) {
+    const data = new FormData(form);
+    const statusEl = document.getElementById('import-status');
+    const progressEl = document.getElementById('import-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const btnEl = document.getElementById('import-btn');
+    
+    btnEl.disabled = true;
+    btnEl.textContent = 'Importing...';
+    progressEl.style.display = 'block';
+    progressFill.style.width = '0%';
+    statusEl.textContent = 'Starting import...';
+    statusEl.style.color = 'var(--text-muted)';
+    
+    const params = new URLSearchParams({
+      name: data.get('name'),
+      inpx_path: data.get('inpx_path'),
+      library_path: data.get('library_path'),
+      first_author_only: data.get('first_author_only') === 'on' ? 'true' : 'false'
+    });
+
+    try {
+      console.log('Import request:', `/api/libraries/import?${params}`);
+      const response = await fetch(`/api/libraries/import?${params}`, {
+        credentials: 'include'
+      });
+      
+      console.log('Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.log('Error response:', text);
+        try {
+          const err = JSON.parse(text);
+          throw new Error(err.error || 'Import failed');
+        } catch (e) {
+          if (e.message.includes('Import failed') || e.message.includes('authenticated')) {
+            throw e;
+          }
+          throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+        }
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const progress = JSON.parse(line.slice(6));
+            
+            if (progress.total > 0) {
+              const percent = Math.round((progress.current / progress.total) * 100);
+              progressFill.style.width = percent + '%';
+            }
+            
+            statusEl.textContent = progress.message;
+            
+            if (progress.done) {
+              if (progress.error) {
+                statusEl.textContent = `✗ ${progress.error}`;
+                statusEl.style.color = 'var(--danger)';
+                progressFill.style.background = 'var(--danger)';
+                btnEl.disabled = false;
+                btnEl.textContent = 'Import Library';
+              } else {
+                statusEl.textContent = `✓ ${progress.message}`;
+                statusEl.style.color = 'var(--success)';
+                progressFill.style.width = '100%';
+                progressFill.style.background = 'var(--success)';
+                form.reset();
+                setTimeout(() => this.renderLibraries(), 1500);
+              }
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      statusEl.textContent = '✗ ' + e.message;
+      statusEl.style.color = 'var(--danger)';
+      btnEl.disabled = false;
+      btnEl.textContent = 'Import Library';
+    }
+  },
+
+  renderBookGrid(entries) {
+    if (entries.length === 0) {
+      return '<p class="text-muted">No books found</p>';
+    }
+    
+    return `
+      <div class="book-grid">
+        ${Array.from(entries).map(entry => {
+          const title = entry.querySelector('title')?.textContent || 'Untitled';
+          const author = entry.querySelector('author name')?.textContent || '';
+          const format = entry.querySelector('format')?.textContent || 'fb2';
+          
+          // Find acquisition link - try multiple selectors
+          let link = '';
+          const links = entry.querySelectorAll('link');
+          for (const l of links) {
+            const rel = l.getAttribute('rel') || '';
+            if (rel.includes('acquisition')) {
+              link = l.getAttribute('href');
+              break;
+            }
+          }
+          
+          // Extract book ID from link for cover
+          const bookId = link.match(/book\/(\d+)/)?.[1];
+          const libId = link.match(/opds\/(\d+)/)?.[1] || '1';
+          const coverUrl = bookId ? `/opds/${libId}/covers/${bookId}/cover.jpg` : '';
+          
+          return `
+            <div class="book-card">
+              <div class="book-cover" ${coverUrl ? `style="background:none"` : ''}>
+                ${coverUrl ? `<img src="${coverUrl}" onerror="this.parentElement.innerHTML='📚';this.parentElement.style.background='linear-gradient(135deg, var(--primary-light), var(--primary-dark))'">` : '📚'}
+              </div>
+              <div class="book-info">
+                <div class="book-title">${title}</div>
+                <div class="book-author">${author}</div>
+                <div class="flex gap-1 mt-1">
+                  ${link ? `<a href="${link}" class="btn btn-sm btn-primary" download>Download ${format.toUpperCase()}</a>` : '<span class="text-muted">No download</span>'}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  renderSidebar(active, libId = null) {
+    const isAdmin = this.user?.role === 'admin';
+    
+    return `
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span>OPDS Server</span>
+          </div>
+        </div>
+        <nav class="sidebar-nav">
+          <div class="nav-section">Main</div>
+          <a href="#home" class="nav-item ${active === 'home' ? 'active' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9,22 9,12 15,12 15,22"/>
+            </svg>
+            <span>Dashboard</span>
+          </a>
+          
+          ${libId ? `
+            <div class="nav-section">Library</div>
+            <a href="#library/${libId}/authors" class="nav-item ${active === 'library' ? 'active' : ''}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+              </svg>
+              <span>Authors</span>
+            </a>
+            <a href="#library/${libId}/series" class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <span>Series</span>
+            </a>
+            <a href="#library/${libId}/genres" class="nav-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12,2 2,7 12,12 22,7"/>
+                <polyline points="2,17 12,22 22,17"/>
+                <polyline points="2,12 12,17 22,12"/>
+              </svg>
+              <span>Genres</span>
+            </a>
+            <a href="#search/${libId}" class="nav-item ${active === 'search' ? 'active' : ''}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <span>Search</span>
+            </a>
+          ` : ''}
+          
+          ${isAdmin ? `
+            <div class="nav-section">Admin</div>
+            <a href="#libraries" class="nav-item ${active === 'libraries' ? 'active' : ''}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <path d="M8 7h8M8 11h8M8 15h4"/>
+              </svg>
+              <span>Libraries</span>
+            </a>
+            <a href="#settings" class="nav-item ${active === 'settings' ? 'active' : ''}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span>Settings</span>
+            </a>
+          ` : ''}
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-info">
+            <div class="user-avatar">${this.user?.username?.charAt(0).toUpperCase() || 'U'}</div>
+            <div class="user-details">
+              <div class="user-name">${this.user?.username || 'User'}</div>
+              <div class="user-role">${this.user?.role || ''}</div>
+            </div>
+            <button class="btn btn-icon btn-outline" data-action="logout" title="Logout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16,17 21,12 16,7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </aside>
+    `;
+  },
+
+  // Form Handlers
+  async submitSetup(form) {
+    const data = new FormData(form);
+    const username = data.get('username');
+    const password = data.get('password');
+    const confirm = data.get('confirm');
+    
+    if (password !== confirm) {
+      document.getElementById('setup-error').textContent = 'Passwords do not match';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const result = await res.json();
+      if (result.success) {
+        this.user = result.user;
+        window.location.hash = '#home';
+      } else {
+        document.getElementById('setup-error').textContent = result.error || 'Setup failed';
+      }
+    } catch (e) {
+      document.getElementById('setup-error').textContent = 'Setup failed';
+    }
+  },
+
+  async submitLogin(form) {
+    const data = new FormData(form);
+    
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: data.get('username'),
+          password: data.get('password')
+        })
+      });
+      
+      const result = await res.json();
+      if (result.success) {
+        this.user = result.user;
+        window.location.hash = '#home';
+      } else {
+        document.getElementById('login-error').textContent = result.error || 'Login failed';
+      }
+    } catch (e) {
+      document.getElementById('login-error').textContent = 'Login failed';
+    }
+  },
+
+  async logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    this.user = null;
+    window.location.hash = '#login';
+  },
+
+  async deleteUser(btn) {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    
+    const id = btn.dataset.id;
+    await fetch(`/api/users/${id}`, { method: 'DELETE', credentials: 'include' });
+    this.renderSettings();
+  },
+
+  showAddUser() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Add User</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitAddUser">
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <input type="text" name="username" class="form-control" placeholder="Enter username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-control" placeholder="Enter password" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select name="role" class="form-control">
+                <option value="readonly">Read Only</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div id="add-user-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Create User</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitAddUser(form) {
+    const data = new FormData(form);
+    const errorEl = document.getElementById('add-user-error');
+    
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: data.get('username'),
+          password: data.get('password'),
+          role: data.get('role')
+        })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create user');
+      }
+      
+      this.closeModal();
+      this.renderSettings();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    }
+  },
+
+  showChangePassword(btn) {
+    const id = btn.dataset.id;
+    const username = btn.dataset.username;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Change Password: ${username}</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitChangePassword" data-user-id="${id}">
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" name="password" class="form-control" placeholder="Enter new password" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password</label>
+              <input type="password" name="confirm" class="form-control" placeholder="Confirm new password" required autocomplete="new-password">
+            </div>
+            <div id="change-password-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Update Password</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitChangePassword(form) {
+    const data = new FormData(form);
+    const errorEl = document.getElementById('change-password-error');
+    const userId = form.dataset.userId;
+    
+    if (data.get('password') !== data.get('confirm')) {
+      errorEl.textContent = 'Passwords do not match';
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/api/users/${userId}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ password: data.get('password') })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update password');
+      }
+      
+      this.closeModal();
+      this.renderSettings();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    }
+  },
+
+  showChangeRole(btn) {
+    const id = btn.dataset.id;
+    const username = btn.dataset.username;
+    const currentRole = btn.dataset.role;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Change Role: ${username}</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitChangeRole" data-user-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select name="role" class="form-control">
+                <option value="readonly" ${currentRole === 'readonly' ? 'selected' : ''}>Read Only</option>
+                <option value="admin" ${currentRole === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+            </div>
+            <div id="change-role-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Update Role</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitChangeRole(form) {
+    const data = new FormData(form);
+    const errorEl = document.getElementById('change-role-error');
+    const userId = form.dataset.userId;
+    
+    try {
+      const res = await fetch(`/api/users/${userId}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: data.get('role') })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update role');
+      }
+      
+      this.closeModal();
+      this.renderSettings();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    }
+  },
+
+  closeModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
+  },
+
+  // API Helper
+  async fetchAPI(url) {
+    try {
+      const res = await fetch(url);
+      return await res.json();
+    } catch (e) {
+      console.error('API error:', e);
+      return [];
+    }
+  },
+
+  // File/Directory Picker
+  filePickerCallback: null,
+  filePickerType: 'dir',
+
+  async showFilePicker(inputId, type = 'dir') {
+    this.filePickerCallback = (path) => {
+      document.getElementById(inputId).value = path;
+      this.closeFilePicker();
+    };
+    this.filePickerType = type;
+    await this.renderFilePicker('/');
+  },
+
+  async renderFilePicker(path) {
+    const type = this.filePickerType;
+    const res = await this.fetchAPI(`/api/browse?path=${encodeURIComponent(path)}&type=${type}`);
+    
+    const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
+    
+    modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
+    modal.querySelector('.modal-body').innerHTML = `
+      <div class="file-picker">
+        <div class="file-picker-path">
+          <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1">
+          <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
+        </div>
+        <div class="file-picker-list">
+          ${res.parent ? `
+            <div class="file-picker-item" onclick="App.renderFilePicker('${res.parent.replace(/'/g, "\\'")}')">
+              <span class="file-icon">📁</span>
+              <span>..</span>
+            </div>
+          ` : ''}
+          ${res.entries.map(entry => `
+            <div class="file-picker-item ${entry.is_dir ? 'is-dir' : 'is-file'}" 
+                 onclick="App.${entry.is_dir ? 'renderFilePicker' : 'selectFile'}('${entry.path.replace(/'/g, "\\'")}')">
+              <span class="file-icon">${entry.is_dir ? '📁' : '📄'}</span>
+              <span>${entry.name}</span>
+              ${!entry.is_dir && entry.size ? `<span class="file-size">${this.formatSize(entry.size)}</span>` : ''}
+            </div>
+          `).join('')}
+          ${res.entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
+        </div>
+        <div class="file-picker-actions">
+          ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select This Directory</button>` : ''}
+          <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    modal.style.display = 'flex';
+  },
+
+  createFilePickerModal() {
+    const modal = document.createElement('div');
+    modal.id = 'file-picker-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Select Directory</h3>
+          <button class="btn btn-icon" onclick="App.closeFilePicker()">&times;</button>
+        </div>
+        <div class="modal-body"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  },
+
+  navigateToPath() {
+    const path = document.getElementById('picker-path-input').value;
+    this.renderFilePicker(path);
+  },
+
+  selectFile(path) {
+    if (this.filePickerCallback) {
+      this.filePickerCallback(path);
+    }
+  },
+
+  selectCurrentDir() {
+    const path = document.getElementById('picker-path-input').value;
+    if (this.filePickerCallback) {
+      this.filePickerCallback(path);
+    }
+  },
+
+  closeFilePicker() {
+    const modal = document.getElementById('file-picker-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+    this.filePickerCallback = null;
+  },
+
+  formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  }
+};
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => App.init());

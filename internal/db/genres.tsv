@@ -1,0 +1,142 @@
+#parent_id	id	name	code
+0	1	Фантастика	
+1	100	Научная фантастика	sf,sf_writing
+1	101	Фэнтези	sf_fantasy,foreign_fantasy
+1	102	Боевая фантастика	sf_action
+1	103	Ужасы	sf_horror
+1	104	Юмористическая фантастика	sf_humor
+1	105	Альтернативная история	sf_history,fantasy_alt_hist
+1	106	Социальная фантастика	sf_social
+1	107	Космическая фантастика	sf_space,sf_space_opera
+1	108	Любовная фантастика	love_sf,love_fantasy
+1	109	Детская фантастика	child_sf
+1	110	Героическая фантастика	sf_heroic
+1	111	Детективная фантастика	sf_detective,fantasy_det
+1	112	Эпическая фантастика	sf_epic
+1	113	Городское фэнтези	sf_fantasy_city,city_fantasy
+1	114	Постапокалипсис	sf_postapocalyptic
+1	115	Мистика	sf_mystic
+1	116	Киберпанк	sf_cyberpunk
+1	117	Попаданцы	popadanec,popadancy
+1	118	Фантастика: прочее	sf_etc,sf_all
+1	120	Сказочная фантастика	fairy_fantasy
+1	121	ЛитРПГ	sf_litrpg
+0	2	Проза	
+2	200	Современная проза	prose_contemporary
+2	201	Классическая проза	prose_classic
+2	202	Русская классическая проза	prose_rus_classic
+2	203	Советская классическая проза	prose_su_classics
+2	204	Историческая проза	prose_history
+2	205	О войне	prose_military
+2	206	Рассказ	short_story
+2	207	Проза	prose,prose_all
+0	3	Наука, Образование	
+3	300	История	sci_history
+3	301	Психология	sci_psychology
+3	302	Философия	sci_philosophy
+3	303	Технические науки	sci_tech
+3	304	Политика	sci_politics
+3	305	Научная литература	science,sci_all
+3	306	Культурология	sci_culture
+3	307	Литературоведение	sci_philology
+3	308	Языкознание	sci_linguistic
+3	309	Медицина	sci_medicine
+0	4	Детективы и Триллеры	
+4	400	Детективы	detective,det_all
+4	401	Триллер	thriller
+4	402	Классический детектив	det_classic
+4	403	Боевик	det_action
+4	404	Полицейский детектив	det_police
+4	405	Детские остросюжетные	child_det
+4	406	Любовные детективы	love_detective
+4	407	Криминальный детектив	det_crime
+4	408	Исторический детектив	det_history
+4	409	Иронический детектив	det_irony
+4	410	Шпионский детектив	det_espionage
+0	5	Документальная литература	
+5	500	Биографии и Мемуары	nonf_biography
+5	501	Публицистика	nonf_publicism
+5	502	Путешествия и география	adv_geo
+5	503	Научпоп	sci_popular
+5	504	Документальная литература	nonfiction,nonf_all
+0	6	Любовные романы	
+6	600	Короткие любовные романы	love_short
+6	601	Современные любовные романы	love_contemporary
+6	602	Исторические любовные романы	love_history
+6	604	О любви	love,love_all
+6	607	Эротика	love_erotica
+0	7	Детское	
+7	700	Детская литература	children,child_all
+7	701	Сказка	child_tale
+7	702	Детская проза	child_prose
+7	705	Образовательная литература	child_education
+7	706	Детские стихи	child_verse
+7	707	Детские приключения	child_adv
+0	8	Домоводство	
+8	801	Кулинария	home_cooking
+8	802	Здоровье	home_health
+8	803	Хобби и ремесла	home_crafts
+8	804	Спорт	home_sport
+8	805	Домашние животные	home_pets
+8	806	Домоводство	home,home_all
+0	9	Религия и духовность	
+9	900	Эзотерика	religion_esoterics
+9	901	Религия	religion_rel
+9	902	Христианство	religion_christianity
+9	903	Православие	religion_orthodoxy
+9	904	Самосовершенствование	religion_self
+0	10	Приключения	
+10	1000	Приключения	adventure,adv_all
+10	1001	Исторические приключения	adv_history
+10	1005	Морские приключения	adv_maritime
+10	1006	Вестерн	adv_western
+0	11	Прочее	
+11	1100	Газеты и журналы	periodic
+11	1101	Недописанное	unfinished
+11	1102	Фанфик	fanfiction
+11	1112	Неотсортированное	other,other_all
+0	12	Юмор	
+12	1201	Юмористическая проза	humor_prose
+12	1202	Юмор	humor,humor_all
+12	1203	Комедия	comedy
+12	1204	Анекдоты	humor_anecdote
+0	13	Поэзия	
+13	1300	Поэзия	poetry,poetry_all
+13	1303	Лирика	lyrics
+13	1304	В стихах	in_verse
+0	14	Справочная литература	
+14	1400	Энциклопедии	ref_encyc
+14	1401	Справочники	ref_ref
+14	1402	Руководства	ref_guide
+0	15	Техника	
+15	1501	Радиоэлектроника	sci_radio
+15	1502	Транспорт и авиация	sci_transport
+15	1503	Строительство	sci_build
+0	16	Военное дело	
+16	1602	Военная техника	military_weapon
+16	1604	Боевые искусства	military_arts
+16	1606	Военное дело	military,military_all
+0	17	Компьютеры и Интернет	
+17	1700	Компьютерная литература	computers,comp_all
+17	1701	Программирование	comp_programming
+17	1702	ОС и Сети	comp_osnet
+0	18	Драматургия	
+18	1800	Драматургия	dramaturgy,dramaturgy_all
+18	1802	Драма	drama
+18	1803	Трагедия	tragedy
+0	19	Старинное	
+19	1900	Мифы. Легенды. Эпос	antique_myths
+19	1901	Античная литература	antique_ant
+19	1904	Старинная литература	antique,antique_all
+0	20	Деловая литература	
+20	2000	О бизнесе популярно	popular_business
+20	2001	Маркетинг, PR, реклама	marketing
+20	2002	Управление, подбор персонала	management
+20	2003	Экономика	economics,economics_all
+0	21	Фольклор	
+21	2100	Народные сказки	folk_tale
+21	2102	Фольклор	folklore,folklore_all
+0	22	Культура и искусство	
+22	2200	Искусствоведение	art_criticism
+22	2201	Живопись	painting
+22	2205	Музыка	music

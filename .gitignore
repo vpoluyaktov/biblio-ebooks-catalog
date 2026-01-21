@@ -1,0 +1,17 @@
+# Binaries
+opds-server
+*.exe
+
+# Database
+*.db
+
+# IDE
+*.code-workspace
+.vscode/
+.idea/
+
+# Test data
+testdata/
+
+# OS files
+.DS_Store
