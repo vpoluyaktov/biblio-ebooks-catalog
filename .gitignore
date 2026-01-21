@@ -4,6 +4,8 @@ opds-server
 
 # Database
 *.db
+data/library.db-shm
+data/library.db-wal
 
 # IDE
 *.code-workspace
