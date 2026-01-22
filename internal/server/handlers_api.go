@@ -229,11 +229,69 @@ func (s *Server) apiGetBooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	idStr := chi.URLParam(r, "libID")
+	libID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get pagination and filter params
+	limit := 50 // Default limit for virtual scrolling
+	offset := 0
+	filter := r.URL.Query().Get("filter")
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	result, err := s.db.GetAuthorsFiltered(libID, filter, limit, offset)
+	if err != nil {
+		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.jsonResponse(w, result)
 }
 
 func (s *Server) apiGetSeries(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	idStr := chi.URLParam(r, "libID")
+	libID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get pagination and filter params
+	limit := 50 // Default limit for virtual scrolling
+	offset := 0
+	filter := r.URL.Query().Get("filter")
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	result, err := s.db.GetSeriesFiltered(libID, filter, limit, offset)
+	if err != nil {
+		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.jsonResponse(w, result)
 }
 
 func (s *Server) apiGetBook(w http.ResponseWriter, r *http.Request) {

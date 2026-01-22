@@ -18,7 +18,12 @@ type fb2Description struct {
 }
 
 type fb2TitleInfo struct {
-	Coverpage fb2Coverpage `xml:"coverpage"`
+	Coverpage  fb2Coverpage  `xml:"coverpage"`
+	Annotation fb2Annotation `xml:"annotation"`
+}
+
+type fb2Annotation struct {
+	Paragraphs []string `xml:"p"`
 }
 
 type fb2Coverpage struct {
@@ -35,6 +40,26 @@ type fb2Binary struct {
 	ID          string `xml:"id,attr"`
 	ContentType string `xml:"content-type,attr"`
 	Data        string `xml:",chardata"`
+}
+
+// ExtractFB2Annotation extracts the annotation/description from an FB2 file
+func ExtractFB2Annotation(reader io.Reader) (string, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	var doc fb2Document
+	if err := xml.Unmarshal(data, &doc); err != nil {
+		return "", err
+	}
+
+	paragraphs := doc.Description.TitleInfo.Annotation.Paragraphs
+	if len(paragraphs) == 0 {
+		return "", nil
+	}
+
+	return strings.Join(paragraphs, "\n\n"), nil
 }
 
 func ExtractFB2Cover(reader io.Reader) ([]byte, string, error) {

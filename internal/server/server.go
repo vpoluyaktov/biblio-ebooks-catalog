@@ -93,6 +93,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/{libID}/genres/{genreID}", s.handleOPDSGenreBooks)
 		r.Get("/{libID}/book/{bookID}/{format}", s.handleOPDSBook)
 		r.Get("/{libID}/covers/{bookID}/cover.jpg", s.handleOPDSCover)
+		r.Get("/{libID}/annotation/{bookID}", s.handleOPDSAnnotation)
 		r.Get("/{libID}/search", s.handleOPDSSearch)
 		r.Get("/{libID}/opensearch.xml", s.handleOpenSearch)
 	})

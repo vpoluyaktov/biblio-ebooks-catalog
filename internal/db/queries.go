@@ -1,6 +1,9 @@
 package db
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 func (db *DB) GetLibraries() ([]Library, error) {
 	var libraries []Library
@@ -130,6 +133,58 @@ func (db *DB) GetAuthors(libraryID int64, limit, offset int) ([]AuthorWithCount,
 	return authors, err
 }
 
+type AuthorsResult struct {
+	Authors []AuthorWithCount `json:"authors"`
+	Total   int               `json:"total"`
+	Limit   int               `json:"limit"`
+	Offset  int               `json:"offset"`
+	HasMore bool              `json:"has_more"`
+}
+
+func (db *DB) GetAuthorsFiltered(libraryID int64, filter string, limit, offset int) (*AuthorsResult, error) {
+	var total int
+	var authors []AuthorWithCount
+
+	// Build filter condition
+	filterCond := ""
+	args := []interface{}{libraryID}
+	if filter != "" {
+		filterCond = " AND (a.last_name LIKE ? OR a.first_name LIKE ? OR a.middle_name LIKE ?)"
+		filterPattern := "%" + filter + "%"
+		args = append(args, filterPattern, filterPattern, filterPattern)
+	}
+
+	// Get total count
+	countQuery := `SELECT COUNT(DISTINCT a.id) FROM author a WHERE a.library_id = ?` + filterCond
+	err := db.Get(&total, countQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get paginated results
+	query := `
+		SELECT a.*, COUNT(ba.book_id) as book_count
+		FROM author a
+		LEFT JOIN book_author ba ON a.id = ba.author_id
+		WHERE a.library_id = ?` + filterCond + `
+		GROUP BY a.id
+		ORDER BY a.last_name, a.first_name
+		LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	err = db.Select(&authors, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AuthorsResult{
+		Authors: authors,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: offset+len(authors) < total,
+	}, nil
+}
+
 func (db *DB) GetAuthorsByLetter(libraryID int64, letter string) ([]AuthorWithCount, error) {
 	var authors []AuthorWithCount
 	err := db.Select(&authors, `
@@ -172,6 +227,57 @@ func (db *DB) GetSeries(libraryID int64, limit, offset int) ([]SeriesWithCount, 
 		libraryID, limit, offset,
 	)
 	return series, total, err
+}
+
+type SeriesResult struct {
+	Series  []SeriesWithCount `json:"series"`
+	Total   int               `json:"total"`
+	Limit   int               `json:"limit"`
+	Offset  int               `json:"offset"`
+	HasMore bool              `json:"has_more"`
+}
+
+func (db *DB) GetSeriesFiltered(libraryID int64, filter string, limit, offset int) (*SeriesResult, error) {
+	var total int
+	var series []SeriesWithCount
+
+	// Build filter condition
+	filterCond := ""
+	args := []interface{}{libraryID}
+	if filter != "" {
+		filterCond = " AND s.name LIKE ?"
+		args = append(args, "%"+filter+"%")
+	}
+
+	// Get total count
+	countQuery := `SELECT COUNT(*) FROM series s WHERE s.library_id = ?` + filterCond
+	err := db.Get(&total, countQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get paginated results
+	query := `
+		SELECT s.*, COUNT(bs.book_id) as book_count
+		FROM series s
+		LEFT JOIN book_series bs ON s.id = bs.series_id
+		WHERE s.library_id = ?` + filterCond + `
+		GROUP BY s.id
+		ORDER BY s.name
+		LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	err = db.Select(&series, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SeriesResult{
+		Series:  series,
+		Total:   total,
+		Limit:   limit,
+		Offset:  offset,
+		HasMore: offset+len(series) < total,
+	}, nil
 }
 
 func (db *DB) GetSeriesByID(id int64) (*Series, error) {
@@ -265,12 +371,12 @@ func (db *DB) GetBooksByGenre(genreID int, libraryID int64, limit, offset int) (
 }
 
 func (db *DB) SearchBooks(libraryID int64, query string, limit, offset int) ([]Book, int64, error) {
-	// Use multiple case variants for Cyrillic support
+	// Use multiple case variants for Cyrillic support since SQLite LOWER() doesn't work with Cyrillic
 	pattern := "%" + query + "%"
 	patternLower := "%" + strings.ToLower(query) + "%"
 	patternUpper := "%" + strings.ToUpper(query) + "%"
-	// Title case: first letter uppercase, rest lowercase
-	patternTitle := "%" + strings.Title(strings.ToLower(query)) + "%"
+	// Title case: first letter of each word uppercase
+	patternTitle := "%" + toTitleCase(query) + "%"
 
 	var total int64
 	err := db.Get(&total, `
@@ -293,6 +399,21 @@ func (db *DB) SearchBooks(libraryID int64, query string, limit, offset int) ([]B
 		libraryID, pattern, patternLower, patternUpper, patternTitle, limit, offset,
 	)
 	return books, total, err
+}
+
+// toTitleCase converts the first letter of each word to uppercase (works with Cyrillic)
+func toTitleCase(s string) string {
+	runes := []rune(strings.ToLower(s))
+	inWord := false
+	for i, r := range runes {
+		if r == ' ' || r == '\t' || r == '\n' {
+			inWord = false
+		} else if !inWord {
+			runes[i] = unicode.ToUpper(r)
+			inWord = true
+		}
+	}
+	return string(runes)
 }
 
 func (db *DB) GetBookAuthors(bookID int64) ([]Author, error) {

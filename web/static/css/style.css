@@ -1028,3 +1028,475 @@ a:hover {
 .justify-between { justify-content: space-between; }
 .gap-1 { gap: 0.5rem; }
 .gap-2 { gap: 1rem; }
+
+/* ========== FreeLib-style Layout ========== */
+
+/* Top toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar .search-box {
+  position: relative;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 0.5rem;
+}
+
+/* Library selector */
+.library-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.library-selector label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.library-selector select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: var(--bg-tertiary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.tab {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--bg-tertiary);
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* Three-panel layout */
+.browser-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0; /* Critical for flex children to respect overflow */
+}
+
+/* Left panel - Authors/Series list */
+.panel-left {
+  width: 280px;
+  min-width: 200px;
+  max-width: 400px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  min-height: 0; /* Critical for flex children to respect overflow */
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+}
+
+.panel-filter {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.panel-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0; /* Critical for flex children to respect overflow */
+}
+
+/* Load more button in virtual scroll */
+.vs-load-more {
+  padding: 0.25rem 0.5rem;
+}
+
+.vs-loading {
+  padding: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.panel-item {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.panel-item.selected {
+  background: var(--primary);
+  color: #fff;
+}
+
+.panel-item-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+}
+
+.panel-item.selected .panel-item-count {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+/* Center panel - Books table */
+.panel-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 400px;
+  min-height: 0; /* Critical for flex children to respect overflow */
+}
+
+.books-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  min-height: 0; /* Critical for flex children to respect overflow */
+}
+
+.books-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.books-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-tertiary);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.books-table th:hover {
+  background: var(--border);
+}
+
+.books-table:focus {
+  outline: none;
+}
+
+.books-table th.sortable {
+  cursor: pointer;
+  position: relative;
+  padding-right: 1.5rem;
+}
+
+.books-table th.sortable::after {
+  content: '';
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.books-table th.sortable::before {
+  content: '';
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid transparent;
+  border-bottom-color: var(--text-muted);
+  margin-top: -6px;
+}
+
+.books-table th.sorted-asc::after {
+  border-top-color: var(--primary);
+}
+
+.books-table th.sorted-desc::before {
+  border-bottom-color: var(--primary);
+}
+
+.books-table td {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.books-table tr:hover td {
+  background: var(--bg-tertiary);
+}
+
+.books-table tr.selected td {
+  background: var(--primary);
+  color: #fff;
+}
+
+.books-table .col-title {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.books-table .col-size,
+.books-table .col-rating,
+.books-table .col-date {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.books-table .col-author {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.books-table .col-genre {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right panel - Book details */
+.panel-right {
+  width: 320px;
+  min-width: 250px;
+  max-width: 450px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  overflow-y: auto;
+  min-height: 0; /* Critical for flex children to respect overflow */
+}
+
+.book-details {
+  padding: 1rem;
+}
+
+.book-cover-large {
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto 1rem;
+  display: block;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.book-cover-placeholder {
+  width: 150px;
+  height: 200px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-light), var(--primary-dark));
+  border-radius: var(--radius);
+  font-size: 4rem;
+}
+
+.book-title-large {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.book-meta {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.book-meta-row {
+  display: flex;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.book-meta-label {
+  width: 80px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.book-meta-value {
+  flex: 1;
+}
+
+.book-meta-value a {
+  color: var(--primary);
+}
+
+.book-description {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.book-description-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.book-description-text {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.book-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Alphabet filter bar */
+.alphabet-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.alphabet-letter {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  border-radius: 3px;
+}
+
+.alphabet-letter:hover {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.alphabet-letter.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Resizable panels */
+.panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.panel-resizer:hover {
+  background: var(--primary);
+}
+
+/* Status bar */
+.status-bar {
+  padding: 0.375rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* No sidebar layout for browser */
+.app-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Compact header for browser */
+.header-compact {
+  padding: 0 1rem;
+  height: 48px;
+}
+
+.header-compact .header-title {
+  font-size: 1.125rem;
+}

@@ -5,13 +5,32 @@ const App = {
   currentLibrary: null,
   currentView: 'home',
   theme: 'dark',
+  libraries: [],
+  currentTab: 'authors',
+  currentAuthor: null,
+  currentSeries: null,
+  currentBook: null,
+  books: [],
+  authors: [],
+  series: [],
+  sortColumn: 'title',
+  sortDirection: 'asc',
 
   async init() {
     this.loadTheme();
     await this.checkAuth();
+    await this.loadLibraries();
     this.bindEvents();
     this.router();
     window.addEventListener('hashchange', () => this.router());
+  },
+
+  async loadLibraries() {
+    try {
+      this.libraries = await this.fetchAPI('/api/libraries') || [];
+    } catch (e) {
+      this.libraries = [];
+    }
   },
 
   loadTheme() {
@@ -127,6 +146,10 @@ const App = {
         break;
       case 'home':
         this.renderHome();
+        break;
+      case 'browser':
+        if (params[0]) this.currentLibrary = parseInt(params[0]);
+        this.renderBrowser();
         break;
       case 'library':
         this.currentLibrary = parseInt(params[0]) || 1;
@@ -248,65 +271,945 @@ const App = {
   },
 
   async renderHome() {
-    const libraries = await this.fetchAPI('/api/libraries');
-    
+    // If user has libraries, go directly to browser view
+    if (this.libraries.length > 0) {
+      this.currentLibrary = this.libraries[0].id;
+      window.location.hash = `#browser`;
+      return;
+    }
+
+    // Show welcome screen if no libraries
     document.getElementById('app').innerHTML = `
       <div class="app">
         ${this.renderSidebar('home')}
         <div class="main">
           ${this.renderHeader('Dashboard')}
           <div class="content">
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-value">${libraries.length}</div>
-                <div class="stat-label">Libraries</div>
-              </div>
-            </div>
-            
-            <div class="card">
-              <div class="card-header">
-                <h2 class="card-title">Libraries</h2>
-              </div>
-              <div class="card-body" style="padding:0">
-                ${libraries.length === 0 ? `
-                  <div class="empty-state">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                    </svg>
-                    <h3>No libraries yet</h3>
-                    <p>Import a library using the CLI command</p>
-                  </div>
-                ` : `
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Path</th>
-                        <th>Created</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${libraries.map(lib => `
-                        <tr>
-                          <td><a href="#library/${lib.id}" class="table-link">${lib.name}</a></td>
-                          <td class="text-muted">${lib.path}</td>
-                          <td class="text-muted">${new Date(lib.created_at).toLocaleDateString()}</td>
-                          <td>
-                            <a href="#library/${lib.id}" class="btn btn-sm btn-outline">Browse</a>
-                          </td>
-                        </tr>
-                      `).join('')}
-                    </tbody>
-                  </table>
-                `}
-              </div>
+            <div class="empty-state" style="padding:4rem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:64px;height:64px;margin-bottom:1rem">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <h2>Welcome to OPDS Server</h2>
+              <p class="text-muted">No libraries imported yet. Go to Libraries to import your first library.</p>
+              <a href="#libraries" class="btn btn-primary mt-2">Import Library</a>
             </div>
           </div>
         </div>
       </div>
     `;
+  },
+
+  // ========== FreeLib-style Browser View ==========
+  async renderBrowser() {
+    if (!this.currentLibrary && this.libraries.length > 0) {
+      this.currentLibrary = this.libraries[0].id;
+    }
+
+    if (!this.currentLibrary) {
+      window.location.hash = '#home';
+      return;
+    }
+
+    const currentLib = this.libraries.find(l => l.id === this.currentLibrary);
+
+    document.getElementById('app').innerHTML = `
+      <div class="app-browser">
+        <!-- Toolbar with library selector -->
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <div class="app-logo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;color:var(--primary)">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <span style="font-weight:600;font-size:1rem">OPDS Server</span>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="library-selector">
+              <label>Library:</label>
+              <select id="library-select">
+                ${this.libraries.map(lib => `
+                  <option value="${lib.id}" ${lib.id === this.currentLibrary ? 'selected' : ''}>${lib.name}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="toolbar-group" style="margin-left:auto">
+            <div class="search-box" style="width:250px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted)">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input type="text" class="form-input" placeholder="Search..." id="search-input" style="padding-left:32px;height:32px;font-size:0.875rem">
+            </div>
+            <button type="button" class="theme-toggle" data-action="toggleTheme" title="Toggle theme" style="width:32px;height:32px">
+              <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+              <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            ${this.user?.role === 'admin' ? `
+              <a href="#libraries" class="btn btn-sm btn-outline" title="Manage Libraries">⚙️</a>
+            ` : ''}
+            <button class="btn btn-sm btn-outline" data-action="logout" title="Logout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16,17 21,12 16,7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab ${this.currentTab === 'authors' ? 'active' : ''}" data-tab="authors">Authors</button>
+          <button class="tab ${this.currentTab === 'series' ? 'active' : ''}" data-tab="series">Series</button>
+          <button class="tab ${this.currentTab === 'genres' ? 'active' : ''}" data-tab="genres">Genres</button>
+          <button class="tab ${this.currentTab === 'search' ? 'active' : ''}" data-tab="search">Search</button>
+        </div>
+
+        <!-- Three-panel layout -->
+        <div class="browser-layout">
+          <!-- Left panel: Authors/Series list -->
+          <div class="panel-left" id="panel-left">
+            <div class="panel-header">
+              <input type="text" class="panel-filter" placeholder="Filter..." id="panel-filter">
+            </div>
+            <div class="panel-list" id="panel-list">
+              <div class="text-muted text-center" style="padding:2rem">Loading...</div>
+            </div>
+          </div>
+          <div class="panel-resizer" id="resizer-left"></div>
+
+          <!-- Center panel: Books table -->
+          <div class="panel-center">
+            <div class="books-table-wrapper">
+              <table class="books-table" id="books-table">
+                <thead>
+                  <tr>
+                    <th data-sort="author" class="sortable ${this.sortColumn === 'author' ? 'sorted-' + this.sortDirection : ''}">Author</th>
+                    <th data-sort="title" class="sortable ${this.sortColumn === 'title' ? 'sorted-' + this.sortDirection : ''}">Title</th>
+                    <th data-sort="size" class="col-size sortable ${this.sortColumn === 'size' ? 'sorted-' + this.sortDirection : ''}">Size</th>
+                    <th data-sort="date" class="col-date sortable ${this.sortColumn === 'date' ? 'sorted-' + this.sortDirection : ''}">Date</th>
+                    <th data-sort="genre" class="col-genre sortable ${this.sortColumn === 'genre' ? 'sorted-' + this.sortDirection : ''}">Genre</th>
+                    <th data-sort="lang" class="sortable ${this.sortColumn === 'lang' ? 'sorted-' + this.sortDirection : ''}">Lang</th>
+                  </tr>
+                </thead>
+                <tbody id="books-tbody">
+                  <tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Select an author or series</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel-resizer" id="resizer-right"></div>
+          <!-- Right panel: Book details -->
+          <div class="panel-right" id="panel-right">
+            <div class="book-details">
+              <div class="book-cover-placeholder">📚</div>
+              <div class="text-muted text-center">Select a book to view details</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span id="status-left">${currentLib?.name || 'No library'}</span>
+          <span id="status-right"></span>
+        </div>
+      </div>
+    `;
+
+    this.bindBrowserEvents();
+    
+    // Load initial data based on tab
+    this.loadTabContent();
+  },
+
+  bindBrowserEvents() {
+    // Library selector
+    document.getElementById('library-select')?.addEventListener('change', (e) => {
+      this.currentLibrary = parseInt(e.target.value);
+      this.currentAuthor = null;
+      this.currentSeries = null;
+      this.currentBook = null;
+      this.renderBrowser();
+    });
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.currentTab = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.loadTabContent();
+      });
+    });
+
+    // Panel filter with debounce for backend filtering
+    let filterTimeout;
+    document.getElementById('panel-filter')?.addEventListener('input', (e) => {
+      clearTimeout(filterTimeout);
+      filterTimeout = setTimeout(() => {
+        const query = e.target.value.trim();
+        if (this.currentTab === 'authors') {
+          this.filterAuthors(query);
+        } else if (this.currentTab === 'series') {
+          this.filterSeries(query);
+        } else {
+          this.filterPanelList(query);
+        }
+      }, 300); // 300ms debounce
+    });
+
+    // Search input in toolbar
+    document.getElementById('search-input')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && e.target.value.trim()) {
+        this.currentTab = 'search';
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector('[data-tab="search"]')?.classList.add('active');
+        this.performBrowserSearch(e.target.value, 'all');
+      }
+    });
+
+    // Sortable columns
+    document.querySelectorAll('.books-table th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const column = th.dataset.sort;
+        if (this.sortColumn === column) {
+          this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          this.sortColumn = column;
+          this.sortDirection = 'asc';
+        }
+        this.sortAndRenderBooks();
+      });
+    });
+
+    // Panel resizers
+    this.initPanelResizers();
+  },
+
+  initPanelResizers() {
+    const resizerLeft = document.getElementById('resizer-left');
+    const resizerRight = document.getElementById('resizer-right');
+    const panelLeft = document.getElementById('panel-left');
+    const panelRight = document.getElementById('panel-right');
+
+    if (resizerLeft && panelLeft) {
+      this.makeResizable(resizerLeft, panelLeft, 'left');
+    }
+    if (resizerRight && panelRight) {
+      this.makeResizable(resizerRight, panelRight, 'right');
+    }
+  },
+
+  makeResizable(resizer, panel, side) {
+    let startX, startWidth;
+
+    const onMouseMove = (e) => {
+      const dx = e.clientX - startX;
+      let newWidth;
+      if (side === 'left') {
+        newWidth = startWidth + dx;
+      } else {
+        newWidth = startWidth - dx;
+      }
+      // Clamp width
+      newWidth = Math.max(200, Math.min(500, newWidth));
+      panel.style.width = newWidth + 'px';
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    resizer.addEventListener('mousedown', (e) => {
+      startX = e.clientX;
+      startWidth = panel.offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  },
+
+  sortAndRenderBooks() {
+    if (this.books.length === 0) return;
+
+    // Sort books
+    this.books.sort((a, b) => {
+      let valA = a[this.sortColumn] || '';
+      let valB = b[this.sortColumn] || '';
+
+      // Handle size sorting (parse numeric value)
+      if (this.sortColumn === 'size') {
+        valA = this.parseSizeToBytes(valA);
+        valB = this.parseSizeToBytes(valB);
+      }
+
+      if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = valB.toLowerCase();
+      }
+
+      let result = 0;
+      if (valA < valB) result = -1;
+      else if (valA > valB) result = 1;
+
+      return this.sortDirection === 'asc' ? result : -result;
+    });
+
+    // Update header classes
+    document.querySelectorAll('.books-table th[data-sort]').forEach(th => {
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (th.dataset.sort === this.sortColumn) {
+        th.classList.add('sorted-' + this.sortDirection);
+      }
+    });
+
+    // Re-render table body
+    this.renderBooksTable();
+  },
+
+  parseSizeToBytes(sizeStr) {
+    if (!sizeStr) return 0;
+    const match = sizeStr.match(/(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)/i);
+    if (!match) return 0;
+    const value = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+    const multipliers = { 'B': 1, 'KB': 1024, 'MB': 1024*1024, 'GB': 1024*1024*1024 };
+    return value * (multipliers[unit] || 1);
+  },
+
+  renderBooksTable() {
+    const tbody = document.getElementById('books-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = this.books.map((book, idx) => `
+      <tr data-book-idx="${idx}">
+        <td class="col-author" title="${book.author}">${book.author}</td>
+        <td class="col-title" title="${book.title}">${book.title}</td>
+        <td class="col-size">${book.size}</td>
+        <td class="col-date">${book.date}</td>
+        <td class="col-genre" title="${book.genre}">${book.genre}</td>
+        <td>${book.lang}</td>
+      </tr>
+    `).join('');
+
+    // Bind row click
+    tbody.querySelectorAll('tr').forEach(row => {
+      row.addEventListener('click', () => {
+        this.selectBookRow(row);
+      });
+    });
+
+    // Make table focusable for keyboard navigation
+    const table = document.getElementById('books-table');
+    if (table && !table.hasAttribute('tabindex')) {
+      table.setAttribute('tabindex', '0');
+      table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
+    }
+  },
+
+  selectBookRow(row) {
+    const tbody = document.getElementById('books-tbody');
+    if (!tbody || !row) return;
+    
+    tbody.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+    row.classList.add('selected');
+    
+    // Scroll row into view
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    
+    const idx = parseInt(row.dataset.bookIdx);
+    if (!isNaN(idx) && this.books[idx]) {
+      this.showBookDetails(this.books[idx]);
+    }
+  },
+
+  handleBooksKeyboard(e) {
+    const tbody = document.getElementById('books-tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr[data-book-idx]'));
+    if (rows.length === 0) return;
+
+    const selectedRow = tbody.querySelector('tr.selected');
+    let currentIdx = selectedRow ? rows.indexOf(selectedRow) : -1;
+    let newIdx = currentIdx;
+
+    switch (e.key) {
+      case 'ArrowUp':
+        e.preventDefault();
+        newIdx = Math.max(0, currentIdx - 1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        newIdx = Math.min(rows.length - 1, currentIdx + 1);
+        break;
+      case 'PageUp':
+        e.preventDefault();
+        newIdx = Math.max(0, currentIdx - 10);
+        break;
+      case 'PageDown':
+        e.preventDefault();
+        newIdx = Math.min(rows.length - 1, currentIdx + 10);
+        break;
+      case 'Home':
+        e.preventDefault();
+        newIdx = 0;
+        break;
+      case 'End':
+        e.preventDefault();
+        newIdx = rows.length - 1;
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (this.currentBook && this.currentBook.downloadLink) {
+          window.location.href = this.currentBook.downloadLink;
+        }
+        return;
+      default:
+        return;
+    }
+
+    if (newIdx !== currentIdx && rows[newIdx]) {
+      this.selectBookRow(rows[newIdx]);
+    }
+  },
+
+  loadTabContent() {
+    const panelList = document.getElementById('panel-list');
+    const panelFilter = document.getElementById('panel-filter');
+    
+    // Clear filter
+    if (panelFilter) panelFilter.value = '';
+    
+    if (this.currentTab === 'authors') {
+      this.loadAuthorsList();
+    } else if (this.currentTab === 'series') {
+      this.loadSeriesList();
+    } else if (this.currentTab === 'genres') {
+      this.loadGenresList();
+    } else if (this.currentTab === 'search') {
+      this.showSearchPanel();
+    }
+  },
+
+  // Virtual scrolling state
+  vsAuthors: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  vsSeries: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  VS_PAGE_SIZE: 50,
+  VS_ITEM_HEIGHT: 33, // pixels per item
+
+  async loadAuthorsList() {
+    // Reset virtual scroll state
+    this.vsAuthors = { items: [], total: 0, offset: 0, loading: false, filter: '' };
+    
+    const panelList = document.getElementById('panel-list');
+    panelList.innerHTML = '<div class="text-muted text-center" style="padding:1rem">Loading...</div>';
+
+    // Setup scroll event on panel-list itself
+    panelList.addEventListener('scroll', () => this.onAuthorsScroll());
+
+    // Load first batch
+    await this.loadAuthorsPage();
+  },
+
+  async loadAuthorsPage() {
+    if (this.vsAuthors.loading) return;
+    this.vsAuthors.loading = true;
+
+    try {
+      const filter = encodeURIComponent(this.vsAuthors.filter);
+      const res = await fetch(`/api/libraries/${this.currentLibrary}/authors?limit=${this.VS_PAGE_SIZE}&offset=${this.vsAuthors.offset}&filter=${filter}`);
+      const data = await res.json();
+
+      if (this.vsAuthors.offset === 0) {
+        this.vsAuthors.items = [];
+      }
+
+      // Map authors to display format
+      const newItems = (data.authors || []).map(a => ({
+        id: a.id,
+        name: [a.last_name, a.first_name, a.middle_name].filter(Boolean).join(' ').trim() || 'Unknown',
+        book_count: a.BookCount || a.book_count || 0
+      }));
+
+      this.vsAuthors.items.push(...newItems);
+      this.vsAuthors.total = data.total;
+      this.vsAuthors.offset += newItems.length;
+
+      this.renderAuthorsVirtualList();
+      document.getElementById('status-right').textContent = `${this.vsAuthors.total} authors`;
+    } catch (e) {
+      console.error('Failed to load authors:', e);
+    } finally {
+      this.vsAuthors.loading = false;
+    }
+  },
+
+  renderAuthorsVirtualList() {
+    const panelList = document.getElementById('panel-list');
+    if (!panelList) return;
+
+    panelList.innerHTML = this.vsAuthors.items.map(author => `
+      <div class="panel-item" data-author-id="${author.id}">
+        <span>${author.name}</span>
+        ${author.book_count ? `<span class="panel-item-count">${author.book_count}</span>` : ''}
+      </div>
+    `).join('');
+
+    // Add "load more" button if there's more data
+    if (this.vsAuthors.offset < this.vsAuthors.total) {
+      panelList.innerHTML += `
+        <div class="vs-load-more">
+          <button class="btn btn-sm btn-outline" id="load-more-authors" style="width:100%;margin:0.5rem 0">
+            Load more (${this.vsAuthors.offset} of ${this.vsAuthors.total})
+          </button>
+        </div>
+      `;
+      document.getElementById('load-more-authors')?.addEventListener('click', () => this.loadAuthorsPage());
+    }
+
+    // Bind click events
+    panelList.querySelectorAll('.panel-item').forEach(item => {
+      item.addEventListener('click', () => {
+        panelList.querySelectorAll('.panel-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        this.loadBooksByAuthor(item.dataset.authorId);
+      });
+    });
+  },
+
+  onAuthorsScroll() {
+    const panelList = document.getElementById('panel-list');
+    if (!panelList) return;
+
+    // Load more when near bottom
+    const threshold = 100;
+    if (panelList.scrollTop + panelList.clientHeight >= panelList.scrollHeight - threshold) {
+      if (this.vsAuthors.offset < this.vsAuthors.total && !this.vsAuthors.loading) {
+        this.loadAuthorsPage();
+      }
+    }
+  },
+
+  async filterAuthors(query) {
+    this.vsAuthors.filter = query;
+    this.vsAuthors.offset = 0;
+    this.vsAuthors.items = [];
+    await this.loadAuthorsPage();
+  },
+
+  showSearchPanel() {
+    const panelList = document.getElementById('panel-list');
+    panelList.innerHTML = `
+      <div style="padding:1rem">
+        <div class="form-group" style="margin-bottom:0.75rem">
+          <label class="form-label" style="font-size:0.75rem;margin-bottom:0.25rem">Search by:</label>
+          <select id="search-type" class="form-input" style="font-size:0.875rem;padding:0.5rem">
+            <option value="all">All fields</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+            <option value="series">Series</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.75rem">
+          <input type="text" id="search-query" class="form-input" placeholder="Enter search term..." style="font-size:0.875rem;padding:0.5rem">
+        </div>
+        <button class="btn btn-primary btn-sm" id="search-btn" style="width:100%">Search</button>
+        <div id="search-results-list" style="margin-top:1rem"></div>
+      </div>
+    `;
+
+    // Bind search events
+    const searchBtn = document.getElementById('search-btn');
+    const searchQuery = document.getElementById('search-query');
+    const searchType = document.getElementById('search-type');
+
+    searchBtn?.addEventListener('click', () => {
+      const query = searchQuery.value.trim();
+      const type = searchType.value;
+      if (query) {
+        this.performBrowserSearch(query, type);
+      }
+    });
+
+    searchQuery?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const query = searchQuery.value.trim();
+        const type = searchType.value;
+        if (query) {
+          this.performBrowserSearch(query, type);
+        }
+      }
+    });
+  },
+
+  async loadSeriesList() {
+    // Reset virtual scroll state
+    this.vsSeries = { items: [], total: 0, offset: 0, loading: false, filter: '' };
+    
+    const panelList = document.getElementById('panel-list');
+    panelList.innerHTML = '<div class="text-muted text-center" style="padding:1rem">Loading...</div>';
+
+    // Setup scroll event on panel-list itself
+    panelList.addEventListener('scroll', () => this.onSeriesScroll());
+
+    // Load first batch
+    await this.loadSeriesPage();
+  },
+
+  async loadSeriesPage() {
+    if (this.vsSeries.loading) return;
+    this.vsSeries.loading = true;
+
+    try {
+      const filter = encodeURIComponent(this.vsSeries.filter);
+      const res = await fetch(`/api/libraries/${this.currentLibrary}/series?limit=${this.VS_PAGE_SIZE}&offset=${this.vsSeries.offset}&filter=${filter}`);
+      const data = await res.json();
+
+      if (this.vsSeries.offset === 0) {
+        this.vsSeries.items = [];
+      }
+
+      // Map series to display format
+      const newItems = (data.series || []).map(s => ({
+        id: s.id,
+        name: s.name || 'Unknown',
+        book_count: s.BookCount || s.book_count || 0
+      }));
+
+      this.vsSeries.items.push(...newItems);
+      this.vsSeries.total = data.total;
+      this.vsSeries.offset += newItems.length;
+
+      this.renderSeriesVirtualList();
+      document.getElementById('status-right').textContent = `${this.vsSeries.total} series`;
+    } catch (e) {
+      console.error('Failed to load series:', e);
+    } finally {
+      this.vsSeries.loading = false;
+    }
+  },
+
+  renderSeriesVirtualList() {
+    const panelList = document.getElementById('panel-list');
+    if (!panelList) return;
+
+    panelList.innerHTML = this.vsSeries.items.map(s => `
+      <div class="panel-item" data-series-id="${s.id}">
+        <span>${s.name}</span>
+        ${s.book_count ? `<span class="panel-item-count">${s.book_count}</span>` : ''}
+      </div>
+    `).join('');
+
+    // Add "load more" button if there's more data
+    if (this.vsSeries.offset < this.vsSeries.total) {
+      panelList.innerHTML += `
+        <div class="vs-load-more">
+          <button class="btn btn-sm btn-outline" id="load-more-series" style="width:100%;margin:0.5rem 0">
+            Load more (${this.vsSeries.offset} of ${this.vsSeries.total})
+          </button>
+        </div>
+      `;
+      document.getElementById('load-more-series')?.addEventListener('click', () => this.loadSeriesPage());
+    }
+
+    // Bind click events
+    panelList.querySelectorAll('.panel-item').forEach(item => {
+      item.addEventListener('click', () => {
+        panelList.querySelectorAll('.panel-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        this.loadBooksBySeries(item.dataset.seriesId);
+      });
+    });
+  },
+
+  onSeriesScroll() {
+    const panelList = document.getElementById('panel-list');
+    if (!panelList) return;
+
+    // Load more when near bottom
+    const threshold = 100;
+    if (panelList.scrollTop + panelList.clientHeight >= panelList.scrollHeight - threshold) {
+      if (this.vsSeries.offset < this.vsSeries.total && !this.vsSeries.loading) {
+        this.loadSeriesPage();
+      }
+    }
+  },
+
+  async filterSeries(query) {
+    this.vsSeries.filter = query;
+    this.vsSeries.offset = 0;
+    this.vsSeries.items = [];
+    await this.loadSeriesPage();
+  },
+
+  async loadGenresList() {
+    const panelList = document.getElementById('panel-list');
+    panelList.innerHTML = '<div class="text-muted text-center" style="padding:2rem">Loading...</div>';
+
+    try {
+      const genres = await this.fetchAPI('/api/genres');
+      const topLevel = genres.filter(g => g.parent_id === 0);
+
+      panelList.innerHTML = topLevel.map(genre => {
+        const children = genres.filter(g => g.parent_id === genre.id);
+        return `
+          <div class="panel-item" style="flex-direction:column;align-items:flex-start">
+            <strong style="margin-bottom:0.25rem">${genre.name}</strong>
+            ${children.length > 0 ? `
+              <div style="display:flex;flex-wrap:wrap;gap:0.25rem">
+                ${children.map(c => `
+                  <span class="badge" style="cursor:pointer;font-size:0.7rem" data-genre-id="${c.id}">${c.name}</span>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      panelList.querySelectorAll('[data-genre-id]').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.loadBooksByGenre(item.dataset.genreId);
+        });
+      });
+    } catch (e) {
+      panelList.innerHTML = '<div class="text-muted text-center" style="padding:2rem">Failed to load</div>';
+    }
+  },
+
+  async loadBooksByAuthor(authorId) {
+    this.currentAuthor = authorId;
+    await this.loadBooks(`/opds/${this.currentLibrary}/author/${authorId}`);
+  },
+
+  async loadBooksBySeries(seriesId) {
+    this.currentSeries = seriesId;
+    await this.loadBooks(`/opds/${this.currentLibrary}/series/${seriesId}`);
+  },
+
+  async loadBooksByGenre(genreId) {
+    await this.loadBooks(`/opds/${this.currentLibrary}/genres/${genreId}`);
+  },
+
+  async performBrowserSearch(query, type = 'all') {
+    if (!query.trim()) return;
+    
+    // Build search URL with type parameter
+    let searchUrl = `/opds/${this.currentLibrary}/search?q=${encodeURIComponent(query)}`;
+    if (type && type !== 'all') {
+      searchUrl += `&type=${type}`;
+    }
+    
+    await this.loadBooks(searchUrl);
+  },
+
+  async loadBooks(url) {
+    const tbody = document.getElementById('books-tbody');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center" style="padding:2rem">Loading...</td></tr>';
+
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      const entries = xml.querySelectorAll('entry');
+
+      this.books = Array.from(entries).map(entry => {
+        const title = entry.querySelector('title')?.textContent || 'Untitled';
+        const author = entry.querySelector('author name')?.textContent || '';
+        const content = entry.querySelector('content')?.textContent || '';
+        const updated = entry.querySelector('updated')?.textContent || '';
+        
+        // Get language from dc:language element
+        const lang = entry.querySelector('language')?.textContent || 
+                     entry.querySelector('[*|language]')?.textContent || 'ru';
+        
+        // Get format from dc:format element
+        const format = entry.querySelector('format')?.textContent || 
+                       entry.querySelector('[*|format]')?.textContent || '';
+        
+        // Get size from dc:extent element
+        const extent = entry.querySelector('extent')?.textContent || 
+                       entry.querySelector('[*|extent]')?.textContent || '';
+        
+        // Get genres from category elements
+        const categories = entry.querySelectorAll('category');
+        const genres = Array.from(categories).map(c => c.getAttribute('label') || c.getAttribute('term')).filter(Boolean);
+        const genre = genres.join(', ');
+        
+        // Find acquisition link
+        let downloadLink = '';
+        const links = entry.querySelectorAll('link');
+        for (const l of links) {
+          const rel = l.getAttribute('rel') || '';
+          if (rel.includes('acquisition')) {
+            downloadLink = l.getAttribute('href');
+            break;
+          }
+        }
+        
+        const bookId = downloadLink.match(/book\/(\d+)/)?.[1];
+        
+        // Use extent for size, fallback to format
+        const size = extent || format.toUpperCase() || '';
+
+        return { 
+          id: bookId, 
+          title, 
+          author, 
+          size, 
+          date: updated ? new Date(updated).toLocaleDateString() : '',
+          genre,
+          lang,
+          downloadLink,
+          content
+        };
+      });
+
+      if (this.books.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">No books found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = this.books.map((book, idx) => `
+        <tr data-book-idx="${idx}">
+          <td class="col-author" title="${book.author}">${book.author}</td>
+          <td class="col-title" title="${book.title}">${book.title}</td>
+          <td class="col-size">${book.size}</td>
+          <td class="col-date">${book.date}</td>
+          <td class="col-genre" title="${book.genre}">${book.genre}</td>
+          <td>${book.lang}</td>
+        </tr>
+      `).join('');
+
+      // Bind row click
+      tbody.querySelectorAll('tr').forEach(row => {
+        row.addEventListener('click', () => {
+          this.selectBookRow(row);
+        });
+      });
+
+      // Make table focusable for keyboard navigation
+      const table = document.getElementById('books-table');
+      if (table && !table.hasAttribute('tabindex')) {
+        table.setAttribute('tabindex', '0');
+        table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
+      }
+
+      document.getElementById('status-right').textContent = `${this.books.length} books`;
+
+      // Auto-select first book and focus table
+      if (this.books.length > 0) {
+        const firstRow = tbody.querySelector('tr');
+        if (firstRow) {
+          this.selectBookRow(firstRow);
+          table?.focus();
+        }
+      }
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
+    }
+  },
+
+  async showBookDetails(book) {
+    this.currentBook = book;
+    const panel = document.getElementById('panel-right');
+    const coverUrl = book.id ? `/opds/${this.currentLibrary}/covers/${book.id}/cover.jpg` : '';
+
+    // Fetch annotation from the book file if not already present
+    let description = book.content || '';
+    if (!description && book.id) {
+      try {
+        const res = await fetch(`/opds/${this.currentLibrary}/annotation/${book.id}`);
+        if (res.ok) {
+          description = await res.text();
+        }
+      } catch (e) {
+        // Annotation not available
+      }
+    }
+
+    panel.innerHTML = `
+      <div class="book-details">
+        ${coverUrl ? `
+          <img src="${coverUrl}" class="book-cover-large" onerror="this.outerHTML='<div class=\\'book-cover-placeholder\\'>📚</div>'">
+        ` : `
+          <div class="book-cover-placeholder">📚</div>
+        `}
+        <div class="book-title-large">${book.title}</div>
+        <div class="book-meta">
+          <div class="book-meta-row">
+            <span class="book-meta-label">Author:</span>
+            <span class="book-meta-value">${book.author}</span>
+          </div>
+          ${book.genre ? `
+            <div class="book-meta-row">
+              <span class="book-meta-label">Genre:</span>
+              <span class="book-meta-value">${book.genre}</span>
+            </div>
+          ` : ''}
+          ${book.size ? `
+            <div class="book-meta-row">
+              <span class="book-meta-label">Size:</span>
+              <span class="book-meta-value">${book.size}</span>
+            </div>
+          ` : ''}
+          ${book.lang ? `
+            <div class="book-meta-row">
+              <span class="book-meta-label">Language:</span>
+              <span class="book-meta-value">${book.lang}</span>
+            </div>
+          ` : ''}
+          ${book.date ? `
+            <div class="book-meta-row">
+              <span class="book-meta-label">Date:</span>
+              <span class="book-meta-value">${book.date}</span>
+            </div>
+          ` : ''}
+        </div>
+        ${description ? `
+          <div class="book-description">
+            <div class="book-description-label">Description:</div>
+            <div class="book-description-text">${description}</div>
+          </div>
+        ` : ''}
+        <div class="book-actions">
+          ${book.downloadLink ? `
+            <a href="${book.downloadLink}" class="btn btn-primary btn-sm" download>Download</a>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  },
+
+  filterPanelList(query) {
+    const items = document.querySelectorAll('#panel-list .panel-item');
+    const q = query.toLowerCase();
+    items.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? '' : 'none';
+    });
   },
 
   async renderLibrary(tab = 'authors') {
