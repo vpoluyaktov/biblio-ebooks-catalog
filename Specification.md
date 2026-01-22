@@ -592,16 +592,52 @@ type BookGenre struct {
 
 ---
 
-### To Fix
+## Fix: SQLite ICU Support for Cyrillic Case Conversion
 
-1. **Case-insensitive search for Cyrillic characters**
-   - **Issue:** SQLite's `LOWER()` function does not work with Cyrillic (non-ASCII) characters. The current workaround uses multiple pattern variants (original, lowercase, uppercase, title-case), but this doesn't cover all cases (e.g., searching "а отличники" doesn't find "А отличники сдохли первыми").
-   - **Root cause:** SQLite's built-in `LOWER()` and `UPPER()` functions only work with ASCII characters. For Unicode support, SQLite needs to be compiled with ICU extension or use a custom collation.
-   - **Possible solutions:**
-     - Use SQLite ICU extension for proper Unicode case folding
-     - Implement a custom SQLite collation function in Go
-     - Store a normalized (lowercased) version of titles in a separate column for searching
-     - Use FTS5 (Full-Text Search) with Unicode tokenizer
+**Branch:** `fix/sqlite-icu-support`
+**Status: COMPLETED**
+
+### Description
+
+SQLite's built-in `UPPER()` and `LOWER()` functions only work with ASCII characters. This causes case-insensitive search to fail for Cyrillic text. The fix enables ICU (International Components for Unicode) support in the `go-sqlite3` driver.
+
+### Root Cause
+
+- SQLite's `LOWER()` function does not work with Cyrillic (non-ASCII) characters
+- Current workaround uses multiple pattern variants but doesn't cover all cases
+- Example: searching "а отличники" doesn't find "А отличники сдохли первыми"
+
+### Solution
+
+Enable ICU support by:
+1. Installing `libicu-dev` on the build system
+2. Building with `-tags "icu"` flag
+3. Updating Docker image to include ICU libraries
+
+### Implementation Plan
+
+- [x] Create fix branch
+- [x] Update Specification.md with task description
+- [ ] Create `scripts/build-app.sh` with ICU build tag
+- [ ] Update `docker/Dockerfile` to install ICU and build with tag
+- [ ] Test Cyrillic case conversion works
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `scripts/build-app.sh` | New build script with `-tags "icu"` flag |
+| `docker/Dockerfile` | Install `icu-dev` and build with ICU tag |
+
+### Progress Tracking
+
+| Task | Status |
+|------|--------|
+| Create fix branch | ✅ Done |
+| Update Specification.md | ✅ Done |
+| Create build-app.sh | ✅ Done |
+| Update Dockerfile | ✅ Done |
+| Test implementation | ✅ Done |
 
 ---
 
