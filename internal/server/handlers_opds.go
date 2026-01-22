@@ -404,6 +404,48 @@ func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
 	w.Write(coverData)
 }
 
+func (s *Server) handleOPDSAnnotation(w http.ResponseWriter, r *http.Request) {
+	libID := s.getLibraryID(r)
+	bookIDStr := chi.URLParam(r, "bookID")
+	bookID, _ := strconv.ParseInt(bookIDStr, 10, 64)
+
+	book, err := s.db.GetBook(bookID)
+	if err != nil {
+		http.Error(w, "Book not found", http.StatusNotFound)
+		return
+	}
+
+	library, err := s.db.GetLibrary(libID)
+	if err != nil {
+		http.Error(w, "Library not found", http.StatusNotFound)
+		return
+	}
+
+	// Only FB2 files have embedded annotations
+	if book.Format != "fb2" {
+		http.Error(w, "Annotation not available", http.StatusNotFound)
+		return
+	}
+
+	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+	reader, _, err := bf.GetReader()
+	if err != nil {
+		http.Error(w, "Failed to read book", http.StatusInternalServerError)
+		return
+	}
+	defer reader.Close()
+
+	annotation, err := bookfile.ExtractFB2Annotation(reader)
+	if err != nil || annotation == "" {
+		http.Error(w, "Annotation not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write([]byte(annotation))
+}
+
 func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := fmt.Sprintf("/opds/%d", libID)

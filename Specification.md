@@ -548,35 +548,59 @@ type BookGenre struct {
 ---
 
 ### Phase 4: Web UI (MEDIUM PRIORITY)
-**Status: NOT STARTED**
+**Status: COMPLETED**
 
-- [ ] HTML templates with Go template engine
-- [ ] Custom CSS (light/dark mode, responsive)
-- [ ] Main layout (header, tabs, three-panel)
-- [ ] Authors tab with alphabet filter
-- [ ] Series tab
-- [ ] Genres tab (hierarchical)
-- [ ] Search tab with filters
-- [ ] Book list table (sortable)
-- [ ] Book details panel
-- [ ] Settings page
-- [ ] Library management UI
+- [x] Single-page application with JavaScript
+- [x] Custom CSS (light/dark mode, responsive)
+- [x] FreeLib-style three-panel layout
+- [x] Library selector dropdown in toolbar
+- [x] Authors tab with virtual scrolling and backend filtering
+- [x] Series tab with virtual scrolling and backend filtering
+- [x] Genres tab
+- [x] Search tab with author/title/series filters
+- [x] Book list table with sortable columns (Author, Title, Size, Date, Genre, Lang)
+- [x] Book details panel with cover, metadata, and description
+- [x] Keyboard navigation for books list (↑↓, PageUp/Down, Home/End, Enter to download)
+- [x] Settings page with user management (admin only)
+- [x] Library management UI
 
-**Deliverable:** Full web interface for browsing library
+**Deliverable:** Full web interface for browsing library ✓
 
 ---
 
 ### Phase 5: Enhancements (LOW PRIORITY)
 **Status: PARTIAL**
 
-- [ ] Cover image extraction from FB2/EPUB
+- [x] Cover image extraction from FB2 files
+- [ ] Cover image extraction from EPUB files
 - [ ] Cover caching
-- [ ] Annotation extraction
+- [x] Annotation/description extraction from FB2 files (on-demand via API)
 - [x] Book file download with proper MIME types
-- [x] OPDS search with case-insensitive Cyrillic support
+- [x] OPDS search (partial case-insensitive support)
 - [ ] Tag management
 - [x] Library delete CLI command (`go run . delete-library --id <id>`)
 - [x] Library delete API endpoint (`DELETE /api/libraries/{id}`)
+- [x] Resizable panels in Web UI
+- [x] Book size displayed in OPDS feed (dc:extent)
+- [x] Genre displayed from OPDS category elements
+
+**New API Endpoints:**
+- `GET /opds/{libID}/annotation/{bookID}` - Extract annotation from FB2 book file
+- `GET /api/libraries/{libID}/authors?limit=N&offset=N&filter=X` - Paginated/filtered authors
+- `GET /api/libraries/{libID}/series?limit=N&offset=N&filter=X` - Paginated/filtered series
+
+---
+
+### To Fix
+
+1. **Case-insensitive search for Cyrillic characters**
+   - **Issue:** SQLite's `LOWER()` function does not work with Cyrillic (non-ASCII) characters. The current workaround uses multiple pattern variants (original, lowercase, uppercase, title-case), but this doesn't cover all cases (e.g., searching "а отличники" doesn't find "А отличники сдохли первыми").
+   - **Root cause:** SQLite's built-in `LOWER()` and `UPPER()` functions only work with ASCII characters. For Unicode support, SQLite needs to be compiled with ICU extension or use a custom collation.
+   - **Possible solutions:**
+     - Use SQLite ICU extension for proper Unicode case folding
+     - Implement a custom SQLite collation function in Go
+     - Store a normalized (lowercased) version of titles in a separate column for searching
+     - Use FTS5 (Full-Text Search) with Unicode tokenizer
 
 ---
 
