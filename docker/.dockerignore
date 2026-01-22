@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+opds-server
+*.exe
+
+# Test data
+testdata/
+
+# Local data
+data/
+books/
+*.db
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yaml
+.dockerignore

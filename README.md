@@ -28,10 +28,33 @@ A lightweight OPDS (Open Publication Distribution System) catalog server for e-b
 
 ## Installation
 
-### Prerequisites
-- Go 1.21 or later
+### Option 1: Docker (Recommended)
 
-### Build from source
+```bash
+git clone https://github.com/vpoluyaktov/opds-server.git
+cd opds-server/docker
+
+# Create directories for data and books
+mkdir -p data books
+
+# Copy your INPX and ZIP files to the books directory
+cp /path/to/your/library.inpx books/
+cp /path/to/your/*.zip books/
+
+# Start the server
+docker-compose up -d
+```
+
+The server will be available at `http://localhost:9988`.
+
+**Volume mounts:**
+- `./docker/data` - Database and configuration (persisted)
+- `./docker/books` - Your book library (INPX and ZIP files)
+
+### Option 2: Build from source
+
+**Prerequisites:** Go 1.21 or later
+
 ```bash
 git clone https://github.com/vpoluyaktov/opds-server.git
 cd opds-server
