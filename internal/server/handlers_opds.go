@@ -536,6 +536,20 @@ func (s *Server) addBookToFeed(feed *opds.Feed, book db.Book, libID int64, baseU
 		// TODO: get sequence number from book_series table
 	}
 
+	// Extract annotation from FB2 file
+	var annotation string
+	if book.Format == "fb2" {
+		library, err := s.db.GetLibrary(libID)
+		if err == nil {
+			bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+			reader, _, err := bf.GetReader()
+			if err == nil {
+				annotation, _ = bookfile.ExtractFB2Annotation(reader)
+				reader.Close()
+			}
+		}
+	}
+
 	entry := opds.BookEntry{
 		ID:          book.ID,
 		Title:       book.Title,
@@ -547,6 +561,7 @@ func (s *Server) addBookToFeed(feed *opds.Feed, book db.Book, libID int64, baseU
 		Format:      book.Format,
 		Size:        book.Size,
 		AddedAt:     book.AddedAt,
+		Annotation:  annotation,
 		DownloadURL: fmt.Sprintf("%s/book/%d/%s", baseURL, book.ID, book.Format),
 		CoverURL:    fmt.Sprintf("%s/covers/%d/cover.jpg", baseURL, book.ID),
 	}
