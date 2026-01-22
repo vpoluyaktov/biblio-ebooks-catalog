@@ -31,11 +31,10 @@ COPY --from=builder /app/biblio-opds-server .
 COPY --from=builder /app/web ./web
 COPY --from=builder /app/internal/db/genres.tsv ./internal/db/genres.tsv
 
-# Create directories for data and books
-RUN mkdir -p /data /books
+# Create directories for database and books
+RUN mkdir -p /db /books
 
-# Environment variables
-ENV OPDS_DATABASE_PATH=/data/opds.db
+ENV OPDS_DATABASE_PATH=/db/opds.db
 ENV OPDS_SERVER_HOST=0.0.0.0
 ENV OPDS_SERVER_PORT=9988
 

@@ -47,7 +47,7 @@ func Default() *Config {
 			Port: 9988,
 		},
 		Database: DatabaseConfig{
-			Path: "./data/library.db",
+			Path: "./db/opds.db",
 		},
 		Library: LibraryConfig{
 			BooksPerPage: 50,
