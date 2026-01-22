@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Build script for opds-server
+# Build script for biblio-opds-server
 # Builds with ICU support for proper Unicode case conversion in SQLite
 
 set -e
 
-echo "🔨 Building opds-server..."
+echo "🔨 Building biblio-opds-server..."
 
 # Get version information
 VERSION=$(cat VERSION 2>/dev/null || echo "0.1.0")
@@ -34,9 +34,9 @@ LDFLAGS="-X main.Version=$VERSION -X main.BuildDate=$BUILD_DATE -X main.GitCommi
 # Build with ICU support for Unicode case conversion
 # Requires: libicu-dev (apt) or icu4c (brew)
 echo "  Building with ICU support..."
-CGO_ENABLED=1 go build -tags "icu" -ldflags "$LDFLAGS" -o opds-server .
+CGO_ENABLED=1 go build -tags "icu" -ldflags "$LDFLAGS" -o biblio-opds-server .
 
-echo "✅ Build complete: opds-server"
+echo "✅ Build complete: biblio-opds-server"
 echo ""
 echo "Note: ICU support requires libicu libraries at runtime."
 echo "  - Linux: apt install libicu-dev"

@@ -1,9 +1,9 @@
 services:
-  opds-server:
+  biblio-opds-server:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: opds-server
+    container_name: biblio-opds-server
     restart: unless-stopped
     ports:
       - "9988:9988"

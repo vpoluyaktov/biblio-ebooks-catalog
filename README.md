@@ -1,4 +1,6 @@
-# OPDS Server
+# Biblio OPDS Server
+
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
 A lightweight OPDS (Open Publication Distribution System) catalog server for e-book libraries, written in Go. Import your FB2 book collections from INPX files and serve them via OPDS protocol to e-readers and reading apps.
 
@@ -31,8 +33,8 @@ A lightweight OPDS (Open Publication Distribution System) catalog server for e-b
 ### Option 1: Docker (Recommended)
 
 ```bash
-git clone https://github.com/vpoluyaktov/opds-server.git
-cd opds-server/docker
+git clone https://github.com/vpoluyaktov/biblio-opds-server.git
+cd biblio-opds-server/docker
 
 # Create directories for data and books
 mkdir -p data books
@@ -56,24 +58,24 @@ The server will be available at `http://localhost:9988`.
 **Prerequisites:** Go 1.21 or later
 
 ```bash
-git clone https://github.com/vpoluyaktov/opds-server.git
-cd opds-server
-go build -o opds-server .
+git clone https://github.com/vpoluyaktov/biblio-opds-server.git
+cd biblio-opds-server
+go build -o biblio-opds-server .
 ```
 
 ## Usage
 
 ### Start the server
 ```bash
-./opds-server
+./biblio-opds-server
 ```
 
 The server starts on `http://0.0.0.0:9988` by default.
 
 ### Command line options
 ```bash
-./opds-server --help
-./opds-server --restart  # Kill existing process on port and restart
+./biblio-opds-server --help
+./biblio-opds-server --restart  # Kill existing process on port and restart
 ```
 
 ### First-time setup
@@ -92,7 +94,7 @@ Configure your e-reader with this URL and your credentials.
 ## Project Structure
 
 ```
-opds-server/
+biblio-opds-server/
 ├── main.go                 # Entry point
 ├── internal/
 │   ├── db/                 # Database layer (SQLite)

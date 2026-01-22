@@ -1,4 +1,6 @@
-# opds-server Specification
+# Biblio OPDS Server Specification
+
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
 A Go-based web server for managing e-book libraries, ported from the freeLib Qt/C++ application.
 
@@ -293,9 +295,9 @@ Field order in .inp files:
 ### Project Structure
 
 ```
-opds-server/
+biblio-opds-server/
 ├── cmd/
-│   └── opds-server/
+│   └── biblio-opds-server/
 │       └── main.go              # Application entry point, CLI
 ├── internal/
 │   ├── config/
@@ -756,7 +758,7 @@ Based on the original desktop application, the web interface will replicate the 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  [Logo] opds-server    [Library Selector ▼]    [Settings ⚙]  [Language] │
+│  [Logo] biblio-opds-server    [Library Selector ▼]    [Settings ⚙]  [Language] │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  [Authors] [Series] [Genres] [Search]                                   │
 ├─────────────────────────────────────────────────────────────────────────┤
