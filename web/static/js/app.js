@@ -717,6 +717,12 @@ const App = {
   vsSeries: { items: [], total: 0, offset: 0, loading: false, filter: '' },
   VS_PAGE_SIZE: 50,
   VS_ITEM_HEIGHT: 33, // pixels per item
+  panelScrollHandler: null, // Store bound scroll handler for cleanup
+  
+  // Books pagination state
+  booksNextUrl: null,
+  booksLoading: false,
+  booksScrollHandler: null,
 
   async loadAuthorsList() {
     // Reset virtual scroll state
@@ -725,8 +731,8 @@ const App = {
     const panelList = document.getElementById('panel-list');
     panelList.innerHTML = '<div class="text-muted text-center" style="padding:1rem">Loading...</div>';
 
-    // Setup scroll event on panel-list itself
-    panelList.addEventListener('scroll', () => this.onAuthorsScroll());
+    // Setup scroll event with cleanup of previous handler
+    this.setupPanelScrollHandler(panelList);
 
     // Load first batch
     await this.loadAuthorsPage();
@@ -870,8 +876,8 @@ const App = {
     const panelList = document.getElementById('panel-list');
     panelList.innerHTML = '<div class="text-muted text-center" style="padding:1rem">Loading...</div>';
 
-    // Setup scroll event on panel-list itself
-    panelList.addEventListener('scroll', () => this.onSeriesScroll());
+    // Setup scroll event with cleanup of previous handler
+    this.setupPanelScrollHandler(panelList);
 
     // Load first batch
     await this.loadSeriesPage();
@@ -956,6 +962,26 @@ const App = {
     }
   },
 
+  // Unified scroll handler that checks currentTab to prevent cross-tab data loading
+  setupPanelScrollHandler(panelList) {
+    // Remove previous scroll handler if exists
+    if (this.panelScrollHandler) {
+      panelList.removeEventListener('scroll', this.panelScrollHandler);
+    }
+    
+    // Create new bound handler
+    this.panelScrollHandler = () => {
+      if (this.currentTab === 'authors') {
+        this.onAuthorsScroll();
+      } else if (this.currentTab === 'series') {
+        this.onSeriesScroll();
+      }
+      // Genres tab doesn't need scroll loading - it loads all at once
+    };
+    
+    panelList.addEventListener('scroll', this.panelScrollHandler);
+  },
+
   async filterSeries(query) {
     this.vsSeries.filter = query;
     this.vsSeries.offset = 0;
@@ -966,6 +992,12 @@ const App = {
   async loadGenresList() {
     const panelList = document.getElementById('panel-list');
     panelList.innerHTML = '<div class="text-muted text-center" style="padding:2rem">Loading...</div>';
+
+    // Remove scroll handler - genres don't use virtual scrolling
+    if (this.panelScrollHandler) {
+      panelList.removeEventListener('scroll', this.panelScrollHandler);
+      this.panelScrollHandler = null;
+    }
 
     try {
       const genres = await this.fetchAPI('/api/genres');
@@ -993,6 +1025,9 @@ const App = {
           this.loadBooksByGenre(item.dataset.genreId);
         });
       });
+
+      // Update status bar with genre count
+      document.getElementById('status-right').textContent = `${genres.length} genres`;
     } catch (e) {
       panelList.innerHTML = '<div class="text-muted text-center" style="padding:2rem">Failed to load</div>';
     }
@@ -1024,9 +1059,17 @@ const App = {
     await this.loadBooks(searchUrl);
   },
 
-  async loadBooks(url) {
+  async loadBooks(url, append = false) {
     const tbody = document.getElementById('books-tbody');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center" style="padding:2rem">Loading...</td></tr>';
+    
+    if (!append) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Loading...</td></tr>';
+      this.books = [];
+      this.booksNextUrl = null;
+    }
+    
+    if (this.booksLoading) return;
+    this.booksLoading = true;
 
     try {
       const res = await fetch(url);
@@ -1034,8 +1077,18 @@ const App = {
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
       const entries = xml.querySelectorAll('entry');
+      
+      // Parse pagination links
+      const links = xml.querySelectorAll('feed > link');
+      this.booksNextUrl = null;
+      for (const link of links) {
+        if (link.getAttribute('rel') === 'next') {
+          this.booksNextUrl = link.getAttribute('href');
+          break;
+        }
+      }
 
-      this.books = Array.from(entries).map(entry => {
+      const newBooks = Array.from(entries).map(entry => {
         const title = entry.querySelector('title')?.textContent || 'Untitled';
         const author = entry.querySelector('author name')?.textContent || '';
         const content = entry.querySelector('content')?.textContent || '';
@@ -1086,41 +1139,33 @@ const App = {
           content
         };
       });
+      
+      // Append or replace books
+      if (append) {
+        this.books.push(...newBooks);
+      } else {
+        this.books = newBooks;
+      }
 
       if (this.books.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">No books found</td></tr>';
         return;
       }
 
-      tbody.innerHTML = this.books.map((book, idx) => `
-        <tr data-book-idx="${idx}">
-          <td class="col-author" title="${book.author}">${book.author}</td>
-          <td class="col-title" title="${book.title}">${book.title}</td>
-          <td class="col-size">${book.size}</td>
-          <td class="col-date">${book.date}</td>
-          <td class="col-genre" title="${book.genre}">${book.genre}</td>
-          <td>${book.lang}</td>
-        </tr>
-      `).join('');
+      this.renderBooksTableFull();
 
-      // Bind row click
-      tbody.querySelectorAll('tr').forEach(row => {
-        row.addEventListener('click', () => {
-          this.selectBookRow(row);
-        });
-      });
+      // Setup scroll handler for loading more books
+      this.setupBooksScrollHandler();
 
-      // Make table focusable for keyboard navigation
-      const table = document.getElementById('books-table');
-      if (table && !table.hasAttribute('tabindex')) {
-        table.setAttribute('tabindex', '0');
-        table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
-      }
+      // Update status with pagination info
+      const statusText = this.booksNextUrl 
+        ? `${this.books.length} books (scroll for more)`
+        : `${this.books.length} books`;
+      document.getElementById('status-right').textContent = statusText;
 
-      document.getElementById('status-right').textContent = `${this.books.length} books`;
-
-      // Auto-select first book and focus table
-      if (this.books.length > 0) {
+      // Auto-select first book and focus table (only on initial load)
+      if (!append && this.books.length > 0) {
+        const table = document.getElementById('books-table');
         const firstRow = tbody.querySelector('tr');
         if (firstRow) {
           this.selectBookRow(firstRow);
@@ -1128,8 +1173,69 @@ const App = {
         }
       }
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
+      console.error('Failed to load books:', e);
+      if (!append) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
+      }
+    } finally {
+      this.booksLoading = false;
     }
+  },
+  
+  renderBooksTableFull() {
+    const tbody = document.getElementById('books-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = this.books.map((book, idx) => `
+      <tr data-book-idx="${idx}">
+        <td class="col-author" title="${this.escapeHtml(book.author)}">${this.escapeHtml(book.author)}</td>
+        <td class="col-title" title="${this.escapeHtml(book.title)}">${this.escapeHtml(book.title)}</td>
+        <td class="col-size">${book.size}</td>
+        <td class="col-date">${book.date}</td>
+        <td class="col-genre" title="${this.escapeHtml(book.genre)}">${this.escapeHtml(book.genre)}</td>
+        <td>${book.lang}</td>
+      </tr>
+    `).join('');
+
+    // Bind row click
+    tbody.querySelectorAll('tr').forEach(row => {
+      row.addEventListener('click', () => {
+        this.selectBookRow(row);
+      });
+    });
+
+    // Make table focusable for keyboard navigation
+    const table = document.getElementById('books-table');
+    if (table && !table.hasAttribute('tabindex')) {
+      table.setAttribute('tabindex', '0');
+      table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
+    }
+  },
+  
+  escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  },
+  
+  setupBooksScrollHandler() {
+    const wrapper = document.querySelector('.books-table-wrapper');
+    if (!wrapper) return;
+    
+    // Remove previous handler
+    if (this.booksScrollHandler) {
+      wrapper.removeEventListener('scroll', this.booksScrollHandler);
+    }
+    
+    this.booksScrollHandler = () => {
+      if (!this.booksNextUrl || this.booksLoading) return;
+      
+      const threshold = 100;
+      if (wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - threshold) {
+        this.loadBooks(this.booksNextUrl, true);
+      }
+    };
+    
+    wrapper.addEventListener('scroll', this.booksScrollHandler);
   },
 
   async showBookDetails(book) {

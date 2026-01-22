@@ -80,8 +80,9 @@ func (s *Server) setupRoutes() {
 	s.router.Get("/", s.handleIndex)
 	s.router.Get("/library/{libID}", s.handleLibrary)
 
-	// OPDS routes (require Basic Auth for e-readers)
+	// OPDS routes (support both session auth for web UI and Basic Auth for e-readers)
 	s.router.Route("/opds", func(r chi.Router) {
+		r.Use(s.auth.SessionMiddleware)
 		r.Use(s.auth.BasicAuthMiddleware)
 		r.Get("/{libID}", s.handleOPDSRoot)
 		r.Get("/{libID}/authors", s.handleOPDSAuthors)

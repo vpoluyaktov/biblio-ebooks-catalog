@@ -346,6 +346,30 @@ func (db *DB) GetBooksBySeries(seriesID int64) ([]Book, error) {
 	return books, err
 }
 
+func (db *DB) GetBooksBySeriesPaginated(seriesID int64, limit, offset int) ([]Book, int64, error) {
+	var total int64
+	err := db.Get(&total, `
+		SELECT COUNT(*) FROM book b
+		JOIN book_series bs ON b.id = bs.book_id
+		WHERE bs.series_id = ? AND b.deleted = 0`,
+		seriesID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var books []Book
+	err = db.Select(&books, `
+		SELECT b.* FROM book b
+		JOIN book_series bs ON b.id = bs.book_id
+		WHERE bs.series_id = ? AND b.deleted = 0
+		ORDER BY bs.seq_num, b.title
+		LIMIT ? OFFSET ?`,
+		seriesID, limit, offset,
+	)
+	return books, total, err
+}
+
 func (db *DB) GetBooksByGenre(genreID int, libraryID int64, limit, offset int) ([]Book, int64, error) {
 	var total int64
 	err := db.Get(&total, `

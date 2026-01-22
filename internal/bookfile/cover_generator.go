@@ -25,8 +25,8 @@ const (
 
 	// Frame boundaries (scaled from 845x1196 template with ~60px borders)
 	// Added extra padding to ensure text never touches the ornate border
-	frameLeft   = 35
-	frameRight  = 265
+	frameLeft   = 50
+	frameRight  = 250
 	frameTop    = 35
 	frameBottom = 391
 	frameWidth  = frameRight - frameLeft // ~230px usable width
@@ -139,7 +139,7 @@ func drawTitle(dc *gg.Context, title string) {
 	dc.SetColor(goldColor)
 
 	// Wrap text to fit within the frame with padding
-	maxWidth := float64(frameWidth) - 20
+	maxWidth := float64(frameWidth) - 40
 	lines := wrapText(dc, title, maxWidth)
 
 	// Center title vertically in the frame area, shifted down by 10%
@@ -159,7 +159,7 @@ func drawAuthor(dc *gg.Context, author string) {
 		return
 	}
 
-	fontSize := 22.0
+	fontSize := 24.0
 	face := truetype.NewFace(italicFont, &truetype.Options{Size: fontSize})
 	dc.SetFontFace(face)
 	dc.SetColor(goldColor)

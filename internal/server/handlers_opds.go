@@ -130,7 +130,14 @@ func (s *Server) handleOPDSAuthor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	books, _, err := s.db.GetBooksByAuthor(authorID, 1000, 0)
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		page, _ = strconv.Atoi(p)
+	}
+	limit := s.config.Library.BooksPerPage
+	offset := (page - 1) * limit
+
+	books, total, err := s.db.GetBooksByAuthor(authorID, limit, offset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -140,8 +147,12 @@ func (s *Server) handleOPDSAuthor(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("urn:opds-server:author:%d", authorID),
 		author.FullName(),
 	)
-	feed.AddLink("self", fmt.Sprintf("%s/author/%d", baseURL, authorID), "application/atom+xml;profile=opds-catalog")
+	selfURL := fmt.Sprintf("%s/author/%d", baseURL, authorID)
+	feed.AddLink("self", selfURL, "application/atom+xml;profile=opds-catalog")
 	feed.AddLink("up", baseURL+"/authors", "application/atom+xml;profile=opds-catalog")
+
+	totalPages := (int(total) + limit - 1) / limit
+	feed.AddPagination(selfURL, page, totalPages)
 
 	for _, book := range books {
 		s.addBookToFeed(feed, book, libID, baseURL)
@@ -201,7 +212,14 @@ func (s *Server) handleOPDSSeriesBooks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	books, err := s.db.GetBooksBySeries(seriesID)
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		page, _ = strconv.Atoi(p)
+	}
+	limit := s.config.Library.BooksPerPage
+	offset := (page - 1) * limit
+
+	books, total, err := s.db.GetBooksBySeriesPaginated(seriesID, limit, offset)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -211,8 +229,12 @@ func (s *Server) handleOPDSSeriesBooks(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("urn:opds-server:series:%d", seriesID),
 		series.Name,
 	)
-	feed.AddLink("self", fmt.Sprintf("%s/series/%d", baseURL, seriesID), "application/atom+xml;profile=opds-catalog")
+	selfURL := fmt.Sprintf("%s/series/%d", baseURL, seriesID)
+	feed.AddLink("self", selfURL, "application/atom+xml;profile=opds-catalog")
 	feed.AddLink("up", baseURL+"/series", "application/atom+xml;profile=opds-catalog")
+
+	totalPages := (int(total) + limit - 1) / limit
+	feed.AddPagination(selfURL, page, totalPages)
 
 	for _, book := range books {
 		s.addBookToFeed(feed, book, libID, baseURL)
