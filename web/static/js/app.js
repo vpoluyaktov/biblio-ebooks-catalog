@@ -333,6 +333,7 @@ const App = {
                   <option value="${lib.id}" ${lib.id === this.currentLibrary ? 'selected' : ''}>${lib.name}</option>
                 `).join('')}
               </select>
+              <span id="library-stats" class="library-stats"></span>
             </div>
           </div>
           <div class="toolbar-group" style="margin-left:auto">
@@ -447,6 +448,9 @@ const App = {
       this.currentBook = null;
       this.renderBrowser();
     });
+
+    // Load library stats
+    this.loadLibraryStats();
 
     // Tabs
     document.querySelectorAll('.tab').forEach(tab => {
@@ -723,6 +727,22 @@ const App = {
   booksNextUrl: null,
   booksLoading: false,
   booksScrollHandler: null,
+
+  async loadLibraryStats() {
+    if (!this.currentLibrary) return;
+    
+    try {
+      const res = await fetch(`/api/libraries/${this.currentLibrary}/stats`);
+      const data = await res.json();
+      
+      const statsEl = document.getElementById('library-stats');
+      if (statsEl && data.book_count !== undefined) {
+        statsEl.textContent = `(${data.book_count.toLocaleString()} books)`;
+      }
+    } catch (e) {
+      console.error('Failed to load library stats:', e);
+    }
+  },
 
   async loadAuthorsList() {
     // Reset virtual scroll state

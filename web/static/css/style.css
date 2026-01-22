@@ -1077,6 +1077,8 @@ a:hover {
 }
 
 .library-selector select {
+  min-width: 200px;
+  max-width: 400px;
   padding: 0.5rem 2rem 0.5rem 0.75rem;
   font-size: 0.875rem;
   background: var(--bg-tertiary);
@@ -1088,6 +1090,12 @@ a:hover {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.5rem center;
+}
+
+.library-stats {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-left: 0.25rem;
 }
 
 /* Tabs */
