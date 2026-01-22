@@ -934,3 +934,53 @@ func GeneratePlaceholderCover(title, author string) ([]byte, error)
 | Refine text layout and positioning | ✅ Done |
 | Adjust font color for better contrast | ✅ Done |
 | Test with sample books | ✅ Done |
+
+---
+
+## Feature: JS Cache Buster
+
+**Branch:** `feature/js-cache-buster`
+**Status: COMPLETED**
+
+### Description
+
+Implement cache busting for JavaScript files to prevent browsers from serving stale cached versions after updates. This is achieved by appending a version hash query parameter to JS file URLs.
+
+### Requirements
+
+1. Compute a hash of JS file contents at server startup
+2. Append version query parameter to JS script URLs in HTML templates
+3. Hash should change when JS file content changes
+4. No impact on static file serving (query params are ignored by file server)
+
+### Implementation Plan
+
+- [x] Create feature branch
+- [x] Update Specification.md with task description
+- [ ] Modify `handlers_web.go` to compute file hash and use templating
+- [ ] Update `index.html` to use template variable for version
+- [ ] Test cache busting works correctly
+
+### Technical Design
+
+```go
+// Compute MD5 hash of static files at startup
+// Inject hash as query parameter: /static/js/app.js?v=abc123
+```
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `internal/server/handlers_web.go` | Add hash computation and template rendering |
+| `web/templates/index.html` | Add version query parameter to script/css URLs |
+
+### Progress Tracking
+
+| Task | Status |
+|------|--------|
+| Create feature branch | ✅ Done |
+| Update Specification.md | ✅ Done |
+| Modify handlers_web.go | ✅ Done |
+| Update index.html template | ✅ Done |
+| Test implementation | ✅ Done |
