@@ -1,4 +1,4 @@
-// OPDS Server Web UI
+// Biblio OPDS Server Web UI
 
 const App = {
   user: null,
@@ -202,7 +202,7 @@ const App = {
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
             </svg>
           </div>
-          <h1 class="login-title">Welcome to OPDS Server</h1>
+          <h1 class="login-title">Welcome to Biblio OPDS Server</h1>
           <p class="login-subtitle">Create your admin account to get started</p>
           <form data-form="submitSetup">
             <div class="form-group">
@@ -251,7 +251,7 @@ const App = {
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
             </svg>
           </div>
-          <h1 class="login-title">OPDS Server</h1>
+          <h1 class="login-title">Biblio OPDS Server</h1>
           <p class="login-subtitle">Sign in to your account</p>
           <form data-form="submitLogin">
             <div class="form-group">
@@ -290,7 +290,7 @@ const App = {
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
               </svg>
-              <h2>Welcome to OPDS Server</h2>
+              <h2>Welcome to Biblio OPDS Server</h2>
               <p class="text-muted">No libraries imported yet. Go to Libraries to import your first library.</p>
               <a href="#libraries" class="btn btn-primary mt-2">Import Library</a>
             </div>
@@ -323,7 +323,7 @@ const App = {
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
               </svg>
-              <span style="font-weight:600;font-size:1rem">OPDS Server</span>
+              <span style="font-weight:600;font-size:1rem">Biblio OPDS Server</span>
             </div>
             <div class="toolbar-divider"></div>
             <div class="library-selector">
