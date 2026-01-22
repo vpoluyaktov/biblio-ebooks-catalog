@@ -11,7 +11,7 @@ services:
       # Database and configuration storage
       - ./data:/data
       # Books library folder (contains INPX and ZIP files)
-      - ./books:/books
+      - /data/EBooks/FB2/:/books
     environment:
       - OPDS_DATABASE_PATH=/data/opds.db
       - OPDS_SERVER_HOST=0.0.0.0
