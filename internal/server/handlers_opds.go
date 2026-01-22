@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"opds-server/internal/bookfile"
-	"opds-server/internal/db"
-	"opds-server/internal/opds"
+	"biblio-opds-server/internal/bookfile"
+	"biblio-opds-server/internal/db"
+	"biblio-opds-server/internal/opds"
 )
 
 func (s *Server) writeOPDS(w http.ResponseWriter, feed *opds.Feed) {

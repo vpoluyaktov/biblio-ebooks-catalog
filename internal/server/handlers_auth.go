@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"opds-server/internal/auth"
-	"opds-server/internal/db"
+	"biblio-opds-server/internal/auth"
+	"biblio-opds-server/internal/db"
 )
 
 type LoginRequest struct {

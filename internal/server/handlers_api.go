@@ -12,8 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"opds-server/internal/db"
-	"opds-server/internal/importer"
+	"biblio-opds-server/internal/db"
+	"biblio-opds-server/internal/importer"
 )
 
 // API handlers for opds-server

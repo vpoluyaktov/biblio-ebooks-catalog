@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"opds-server/internal/auth"
-	"opds-server/internal/config"
-	"opds-server/internal/db"
-	"opds-server/internal/importer"
-	"opds-server/internal/server"
+	"biblio-opds-server/internal/auth"
+	"biblio-opds-server/internal/config"
+	"biblio-opds-server/internal/db"
+	"biblio-opds-server/internal/importer"
+	"biblio-opds-server/internal/server"
 )
 
 // Run with: go run .

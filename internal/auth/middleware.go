@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"opds-server/internal/db"
+	"biblio-opds-server/internal/db"
 )
 
 type contextKey string

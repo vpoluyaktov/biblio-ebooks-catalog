@@ -1,4 +1,4 @@
-module opds-server
+module biblio-opds-server
 
 go 1.24.0
 

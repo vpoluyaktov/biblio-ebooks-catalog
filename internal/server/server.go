@@ -6,9 +6,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"opds-server/internal/auth"
-	"opds-server/internal/config"
-	"opds-server/internal/db"
+	"biblio-opds-server/internal/auth"
+	"biblio-opds-server/internal/config"
+	"biblio-opds-server/internal/db"
 )
 
 type Server struct {
