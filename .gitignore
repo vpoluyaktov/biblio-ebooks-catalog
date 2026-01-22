@@ -17,3 +17,5 @@ testdata/
 
 # OS files
 .DS_Store
+data/
+books/
