@@ -1020,3 +1020,52 @@ Implement cache busting for JavaScript files to prevent browsers from serving st
 | Modify handlers_web.go | ✅ Done |
 | Update index.html template | ✅ Done |
 | Test implementation | ✅ Done |
+
+---
+
+## Feature: Flying Popup Notifications
+
+**Branch:** `feature/flying-popup-notifications`
+**Status: COMPLETED**
+
+### Description
+
+Add toast-style flying popup notifications to provide visual feedback when loading more items during virtual scrolling. Similar to the notification system in abb_tts application.
+
+### Requirements
+
+1. Toast notifications appear in bottom-right corner
+2. Auto-dismiss after a few seconds with fade-out animation
+3. Support different types: success, info, error
+4. Show notification when loading next batch of authors/series/books
+5. Slide-in animation from right side
+
+### Implementation Plan
+
+- [x] Create feature branch
+- [x] Update Specification.md with task description
+- [ ] Add toast CSS styles to `style.css`
+- [ ] Add `showToast()` function to `app.js`
+- [ ] Add toast container to `index.html`
+- [ ] Trigger toast when loading more items in virtual scroll
+- [ ] Test notifications
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `web/static/css/style.css` | Add toast notification styles |
+| `web/static/js/app.js` | Add showToast function and trigger on scroll load |
+| `web/templates/index.html` | Add toast container div |
+
+### Progress Tracking
+
+| Task | Status |
+|------|--------|
+| Create feature branch | ✅ Done |
+| Update Specification.md | ✅ Done |
+| Add toast CSS styles | ✅ Done |
+| Add showToast function | ✅ Done |
+| Add toast container | ✅ Done |
+| Trigger on scroll load | ✅ Done |
+| Test implementation | ✅ Done |

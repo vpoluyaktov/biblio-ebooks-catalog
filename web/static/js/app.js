@@ -741,6 +741,10 @@ const App = {
   async loadAuthorsPage() {
     if (this.vsAuthors.loading) return;
     this.vsAuthors.loading = true;
+    const isLoadingMore = this.vsAuthors.offset > 0;
+
+    // Show loading toast
+    this.showToast(isLoadingMore ? 'Loading more authors...' : 'Loading authors...', 'loading');
 
     try {
       const filter = encodeURIComponent(this.vsAuthors.filter);
@@ -764,8 +768,10 @@ const App = {
 
       this.renderAuthorsVirtualList();
       document.getElementById('status-right').textContent = `${this.vsAuthors.total} authors`;
+
     } catch (e) {
       console.error('Failed to load authors:', e);
+      this.showToast('Failed to load authors', 'error');
     } finally {
       this.vsAuthors.loading = false;
     }
@@ -886,6 +892,10 @@ const App = {
   async loadSeriesPage() {
     if (this.vsSeries.loading) return;
     this.vsSeries.loading = true;
+    const isLoadingMore = this.vsSeries.offset > 0;
+
+    // Show loading toast
+    this.showToast(isLoadingMore ? 'Loading more series...' : 'Loading series...', 'loading');
 
     try {
       const filter = encodeURIComponent(this.vsSeries.filter);
@@ -909,8 +919,10 @@ const App = {
 
       this.renderSeriesVirtualList();
       document.getElementById('status-right').textContent = `${this.vsSeries.total} series`;
+
     } catch (e) {
       console.error('Failed to load series:', e);
+      this.showToast('Failed to load series', 'error');
     } finally {
       this.vsSeries.loading = false;
     }
@@ -1062,8 +1074,11 @@ const App = {
   async loadBooks(url, append = false) {
     const tbody = document.getElementById('books-tbody');
     
+    // Show loading toast
+    this.showToast(append ? 'Loading more books...' : 'Loading books...', 'loading');
+
     if (!append) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Loading...</td></tr>';
+      tbody.innerHTML = '';
       this.books = [];
       this.booksNextUrl = null;
     }
@@ -1172,11 +1187,13 @@ const App = {
           table?.focus();
         }
       }
+
     } catch (e) {
       console.error('Failed to load books:', e);
       if (!append) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
       }
+      this.showToast('Failed to load books', 'error');
     } finally {
       this.booksLoading = false;
     }
@@ -2517,6 +2534,35 @@ const App = {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  },
+
+  showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    const icons = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️',
+      loading: '⏳'
+    };
+    
+    toast.innerHTML = `
+      <span>${icons[type] || icons.info}</span>
+      <span>${this.escapeHtml(message)}</span>
+    `;
+    
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 1500);
   }
 };
 
