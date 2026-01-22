@@ -574,6 +574,7 @@ type BookGenre struct {
 - [x] Cover image extraction from FB2 files
 - [ ] Cover image extraction from EPUB files
 - [ ] Cover caching
+- [ ] **Placeholder cover generation for books without covers**
 - [x] Annotation/description extraction from FB2 files (on-demand via API)
 - [x] Book file download with proper MIME types
 - [x] OPDS search (partial case-insensitive support)
@@ -859,3 +860,77 @@ On screens < 900px:
 4. Integration with external metadata sources (Google Books, OpenLibrary)
 5. Mobile-responsive web interface
 6. WebSocket for real-time updates during import
+
+---
+
+## Feature: Placeholder Cover Generation
+
+**Branch:** `feature/generate-placeholder-covers`
+**Status: COMPLETED**
+
+### Description
+
+Generate placeholder book cover images on-the-fly for books that don't have embedded cover images. The generated cover should look like a stylized book cover with the author name and book title displayed on it.
+
+### Requirements
+
+1. Generate a book-like image (approximately 300x450 pixels, standard book cover ratio)
+2. Display the book title prominently
+3. Display the author name
+4. Use a visually appealing design with colors based on the book title (for variety)
+5. Support Unicode text (Cyrillic, etc.)
+6. Return JPEG image with proper caching headers
+
+### Implementation Plan
+
+- [ ] Add image generation dependency (`github.com/fogleman/gg` for 2D graphics)
+- [ ] Create `internal/bookfile/cover_generator.go` with placeholder cover generation logic
+- [ ] Implement text wrapping for long titles/author names
+- [ ] Generate deterministic colors based on book title hash (for visual variety)
+- [ ] Modify `handleOPDSCover` in `internal/server/handlers_opds.go` to fall back to generated cover
+- [ ] Embed a font that supports Cyrillic characters
+- [ ] Test with books that have no covers
+
+### Technical Design
+
+```go
+// internal/bookfile/cover_generator.go
+
+// GeneratePlaceholderCover creates a book cover image with title and author
+func GeneratePlaceholderCover(title, author string) ([]byte, error)
+```
+
+**Cover Design:**
+- Background: Ornate book cover template (`BookCover.png`) with decorative gold border
+- Title: Bold gold text (Cormorant-Bold), centered vertically with 10% downward offset, with word wrapping
+- Author: Italic gold text (Cormorant-Italic) at top of frame area
+- Text color: Bright gold/yellow (RGB 255, 225, 140) for contrast with dark background
+- Font: Cormorant font family with full Cyrillic support
+- Frame padding: 35px borders to ensure text never touches ornate frame
+- Output: 300x426 pixel JPEG image
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `go.mod` | Added `github.com/fogleman/gg` dependency |
+| `internal/bookfile/cover_generator.go` | New file - cover generation using template image |
+| `internal/bookfile/cover_generator_test.go` | New file - unit tests |
+| `internal/bookfile/images/BookCover.png` | Template image with ornate border |
+| `internal/bookfile/fonts/Cormorant-Bold.ttf` | Embedded bold font with Cyrillic support |
+| `internal/bookfile/fonts/Cormorant-Italic.ttf` | Embedded italic font for author names |
+| `internal/server/handlers_opds.go` | Modified `handleOPDSCover` to fall back to generated covers |
+
+### Progress Tracking
+
+| Task | Status |
+|------|--------|
+| Create feature branch | ✅ Done |
+| Update Specification.md | ✅ Done |
+| Add gg library dependency | ✅ Done |
+| Create cover_generator.go | ✅ Done |
+| Embed Cyrillic fonts (Cormorant Bold/Italic) | ✅ Done |
+| Modify handleOPDSCover handler | ✅ Done |
+| Refine text layout and positioning | ✅ Done |
+| Adjust font color for better contrast | ✅ Done |
+| Test with sample books | ✅ Done |

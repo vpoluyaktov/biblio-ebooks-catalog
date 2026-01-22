@@ -379,24 +379,33 @@ func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only FB2 files have embedded covers
-	if book.Format != "fb2" {
-		http.Error(w, "Cover not available", http.StatusNotFound)
-		return
+	var coverData []byte
+	var contentType string
+
+	// Try to extract cover from FB2 files
+	if book.Format == "fb2" {
+		bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+		reader, _, err := bf.GetReader()
+		if err == nil {
+			coverData, contentType, _ = bookfile.ExtractFB2Cover(reader)
+			reader.Close()
+		}
 	}
 
-	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
-	reader, _, err := bf.GetReader()
-	if err != nil {
-		http.Error(w, "Failed to read book", http.StatusInternalServerError)
-		return
-	}
-	defer reader.Close()
+	// If no embedded cover found, generate a placeholder
+	if coverData == nil {
+		authors, _ := s.db.GetBookAuthors(book.ID)
+		var authorName string
+		if len(authors) > 0 {
+			authorName = authors[0].FullName()
+		}
 
-	coverData, contentType, err := bookfile.ExtractFB2Cover(reader)
-	if err != nil || coverData == nil {
-		http.Error(w, "Cover not found", http.StatusNotFound)
-		return
+		coverData, err = bookfile.GeneratePlaceholderCover(book.Title, authorName)
+		if err != nil {
+			http.Error(w, "Failed to generate cover", http.StatusInternalServerError)
+			return
+		}
+		contentType = "image/jpeg"
 	}
 
 	w.Header().Set("Content-Type", contentType)
