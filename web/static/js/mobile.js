@@ -68,7 +68,8 @@ const MobileUI = {
         break;
       case 'genres':
         container.innerHTML = this.renderGenres();
-        this.loadGenres();
+        const parentGenreId = params.parentGenreId || 0;
+        this.loadGenres(parentGenreId);
         break;
       case 'search':
         container.innerHTML = this.renderSearch();
@@ -308,6 +309,7 @@ const MobileUI = {
   },
 
   renderGenres() {
+    const title = this.params?.parentGenreName || 'Genres';
     return `
       <div class="mobile-screen">
         <div class="mobile-header">
@@ -316,7 +318,7 @@ const MobileUI = {
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
-          <div class="mobile-header-title">Genres</div>
+          <div class="mobile-header-title">${title}</div>
           <button type="button" class="mobile-icon-btn" data-action="toggleTheme">
             <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"></circle>
@@ -335,13 +337,9 @@ const MobileUI = {
           </button>
         </div>
 
-        <div class="mobile-filter-box">
-          <input type="text" placeholder="Filter genres..." id="mobile-filter-input">
-        </div>
-
         <div class="mobile-content">
           <div class="mobile-list" id="mobile-genres-list">
-            <div class="mobile-loading">Loading genres...</div>
+            <div class="mobile-loading">Loading...</div>
           </div>
         </div>
       </div>
@@ -751,7 +749,7 @@ const MobileUI = {
     }
   },
 
-  async loadGenres() {
+  async loadGenres(parentId = 0) {
     try {
       // Ensure library is set
       if (!App.currentLibrary && App.libraries.length > 0) {
@@ -768,29 +766,43 @@ const MobileUI = {
       const list = document.getElementById('mobile-genres-list');
       if (!list) return;
 
-      // Filter top-level genres only
-      const topLevelGenres = genres.filter(g => g.parent_id === 0);
+      // Filter genres by parent_id
+      const filteredGenres = genres.filter(g => g.parent_id === parentId);
       
-      if (topLevelGenres.length === 0) {
+      if (filteredGenres.length === 0) {
         list.innerHTML = '<div class="mobile-empty">No genres found</div>';
         return;
       }
 
-      list.innerHTML = topLevelGenres.map(genre => `
-        <div class="mobile-list-item" data-genre-id="${genre.id}" data-genre-name="${genre.name}">
-          <div class="mobile-list-item-text">
-            <div class="mobile-list-item-title">${genre.name}</div>
+      list.innerHTML = filteredGenres.map(genre => {
+        // Check if this genre has children
+        const hasChildren = genres.some(g => g.parent_id === genre.id);
+        
+        return `
+          <div class="mobile-list-item" data-genre-id="${genre.id}" data-genre-name="${genre.name}" data-has-children="${hasChildren}">
+            <div class="mobile-list-item-text">
+              <div class="mobile-list-item-title">${genre.name}</div>
+            </div>
+            <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </div>
-          <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       list.querySelectorAll('[data-genre-id]').forEach(item => {
         item.addEventListener('click', () => {
-          const genreId = item.dataset.genreId;
-          this.navigateTo('books', { selectedGenre: genreId });
+          const genreId = parseInt(item.dataset.genreId);
+          const genreName = item.dataset.genreName;
+          const hasChildren = item.dataset.hasChildren === 'true';
+          
+          if (hasChildren) {
+            // Navigate to child genres
+            this.navigateTo('genres', { parentGenreId: genreId, parentGenreName: genreName });
+          } else {
+            // Navigate to books for this genre
+            this.navigateTo('books', { selectedGenre: genreName });
+          }
         });
       });
     } catch (e) {
