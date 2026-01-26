@@ -142,13 +142,26 @@ go run . --port 9903
 
 ## Web UI Features
 
+### Desktop Experience
 - **Three-panel layout**: Navigation, book list, book details
 - **Tabs**: Authors, Series, Genres, Search
 - **Virtual scrolling** for large lists
-- **Keyboard navigation** in book list
-- **Resizable panels**
+- **Keyboard navigation** in book list (Arrow keys, Page Up/Down, Home/End, Enter)
+- **Resizable panels** with drag handles
+- **Sortable columns** in book table
 - **Light/dark mode** support
-- **Responsive design** for mobile
+
+### Mobile-Friendly Design
+- **Responsive breakpoints**: Optimized for tablets (≤1024px), mobile (≤768px), and small devices (≤480px)
+- **Collapsible side panels**: Left (navigation) and right (book details) panels slide in from edges
+- **Floating action buttons**: Touch-friendly circular buttons to toggle panels
+- **Touch-optimized UI**: 44px minimum touch targets, larger tap areas
+- **Adaptive layout**: Single-column view on mobile, hidden columns for better readability
+- **Mobile overlay**: Semi-transparent backdrop when panels are open
+- **Landscape support**: Optimized panel widths for landscape orientation
+- **Scrollable tabs**: Horizontal scroll for tab navigation on narrow screens
+- **Compact toolbar**: Auto-hiding labels and responsive search box
+- **Auto-close panels**: Panels close automatically after selection for better UX
 
 ## Supported Book Formats
 
@@ -193,6 +206,12 @@ opds-server:
 - Virtual scrolling for large libraries
 - Search functionality
 - SQLite with ICU support for Cyrillic
+- **Mobile-responsive UI** (2026-01-25)
+  - Responsive CSS with mobile breakpoints (768px, 480px)
+  - Collapsible side panels with floating action buttons
+  - Touch-friendly interface (44px minimum touch targets)
+  - Adaptive layouts for portrait and landscape orientations
+  - Desktop UI preserved and unchanged
 
 ### Future Enhancements
 
@@ -217,4 +236,4 @@ opds-server:
 
 ---
 
-*Last updated: 2026-01-23*
+*Last updated: 2026-01-25*

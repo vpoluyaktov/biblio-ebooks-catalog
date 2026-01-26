@@ -383,6 +383,9 @@ const App = {
 
         <!-- Three-panel layout -->
         <div class="browser-layout">
+          <!-- Mobile overlay -->
+          <div class="mobile-overlay" id="mobile-overlay"></div>
+
           <!-- Left panel: Authors/Series list -->
           <div class="panel-left" id="panel-left">
             <div class="panel-header">
@@ -423,6 +426,21 @@ const App = {
               <div class="text-muted text-center">Select a book to view details</div>
             </div>
           </div>
+
+          <!-- Mobile panel toggle buttons -->
+          <button class="mobile-panel-toggle left" id="mobile-toggle-left" title="Show navigation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <button class="mobile-panel-toggle right" id="mobile-toggle-right" title="Show book details">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
+            </svg>
+          </button>
         </div>
 
         <!-- Status bar -->
@@ -504,6 +522,9 @@ const App = {
 
     // Panel resizers
     this.initPanelResizers();
+
+    // Mobile panel toggles
+    this.initMobilePanelToggles();
   },
 
   initPanelResizers() {
@@ -551,6 +572,62 @@ const App = {
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
     });
+  },
+
+  initMobilePanelToggles() {
+    const toggleLeft = document.getElementById('mobile-toggle-left');
+    const toggleRight = document.getElementById('mobile-toggle-right');
+    const panelLeft = document.getElementById('panel-left');
+    const panelRight = document.getElementById('panel-right');
+    const overlay = document.getElementById('mobile-overlay');
+
+    if (!toggleLeft || !toggleRight || !panelLeft || !panelRight || !overlay) return;
+
+    // Toggle left panel (authors/series)
+    toggleLeft.addEventListener('click', () => {
+      const isOpen = panelLeft.classList.contains('mobile-open');
+      if (isOpen) {
+        this.closeMobilePanels();
+      } else {
+        this.closeMobilePanels();
+        panelLeft.classList.add('mobile-open');
+        overlay.classList.add('active');
+      }
+    });
+
+    // Toggle right panel (book details)
+    toggleRight.addEventListener('click', () => {
+      const isOpen = panelRight.classList.contains('mobile-open');
+      if (isOpen) {
+        this.closeMobilePanels();
+      } else {
+        this.closeMobilePanels();
+        panelRight.classList.add('mobile-open');
+        overlay.classList.add('active');
+      }
+    });
+
+    // Close panels when clicking overlay
+    overlay.addEventListener('click', () => {
+      this.closeMobilePanels();
+    });
+
+    // Close left panel when selecting an item (for better UX)
+    panelLeft.addEventListener('click', (e) => {
+      if (e.target.closest('.panel-item')) {
+        setTimeout(() => this.closeMobilePanels(), 300);
+      }
+    });
+  },
+
+  closeMobilePanels() {
+    const panelLeft = document.getElementById('panel-left');
+    const panelRight = document.getElementById('panel-right');
+    const overlay = document.getElementById('mobile-overlay');
+    
+    if (panelLeft) panelLeft.classList.remove('mobile-open');
+    if (panelRight) panelRight.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('active');
   },
 
   sortAndRenderBooks() {
