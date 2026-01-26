@@ -860,11 +860,8 @@ const MobileUI = {
         const sizeBytes = parseInt(lengthAttr);
         const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
         
-        // Get cover link
-        const coverLink = Array.from(entry.querySelectorAll('link')).find(
-          link => link.getAttribute('rel') === 'http://opds-spec.org/image'
-        );
-        const coverUrl = coverLink?.getAttribute('href') || '';
+        // Construct cover URL like desktop UI does
+        const coverUrl = bookId ? `/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
         
         return {
           id: bookId,
@@ -995,10 +992,8 @@ const MobileUI = {
         const sizeBytes = parseInt(lengthAttr);
         const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
         
-        const coverLink = Array.from(entry.querySelectorAll('link')).find(
-          link => link.getAttribute('rel') === 'http://opds-spec.org/image'
-        );
-        const coverUrl = coverLink?.getAttribute('href') || '';
+        // Construct cover URL like desktop UI does
+        const coverUrl = bookId ? `/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
         
         return {
           id: bookId,
