@@ -860,8 +860,25 @@ const MobileUI = {
         const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
         if (seriesMatch) series = seriesMatch[1].trim();
         
+        // Extract genre from content
+        let genre = '';
+        const genreMatch = content.match(/Genre:\s*([^<\n]+)/);
+        if (genreMatch) genre = genreMatch[1].trim();
+        
+        // Extract annotation from content (everything after genre line)
+        let annotation = '';
+        const lines = content.split('\n');
+        const genreLineIndex = lines.findIndex(line => line.includes('Genre:'));
+        if (genreLineIndex >= 0 && genreLineIndex < lines.length - 1) {
+          annotation = lines.slice(genreLineIndex + 1).join('\n').trim();
+        }
+        
         // Extract language from dcterms:language
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
+        
+        // Extract date
+        const updated = entry.querySelector('updated')?.textContent || '';
+        const date = updated ? new Date(updated).toLocaleDateString() : '';
         
         // Get download link and extract file size
         const downloadLink = Array.from(entry.querySelectorAll('link')).find(
@@ -880,7 +897,10 @@ const MobileUI = {
           title,
           author,
           series,
+          genre,
+          annotation,
           lang,
+          date,
           size,
           download_url: downloadUrl,
           cover_url: coverUrl
@@ -994,7 +1014,21 @@ const MobileUI = {
         const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
         if (seriesMatch) series = seriesMatch[1].trim();
         
+        let genre = '';
+        const genreMatch = content.match(/Genre:\s*([^<\n]+)/);
+        if (genreMatch) genre = genreMatch[1].trim();
+        
+        let annotation = '';
+        const lines = content.split('\n');
+        const genreLineIndex = lines.findIndex(line => line.includes('Genre:'));
+        if (genreLineIndex >= 0 && genreLineIndex < lines.length - 1) {
+          annotation = lines.slice(genreLineIndex + 1).join('\n').trim();
+        }
+        
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
+        
+        const updated = entry.querySelector('updated')?.textContent || '';
+        const date = updated ? new Date(updated).toLocaleDateString() : '';
         
         const downloadLink = Array.from(entry.querySelectorAll('link')).find(
           link => link.getAttribute('type')?.includes('application/')
@@ -1012,7 +1046,10 @@ const MobileUI = {
           title,
           author,
           series,
+          genre,
+          annotation,
           lang,
+          date,
           size,
           download_url: downloadUrl,
           cover_url: coverUrl
