@@ -848,11 +848,17 @@ const MobileUI = {
         const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
         if (seriesMatch) series = seriesMatch[1].trim();
         
-        // Get download link
+        // Extract language from dcterms:language
+        const lang = entry.querySelector('language, [*|language]')?.textContent || '';
+        
+        // Get download link and extract file size
         const downloadLink = Array.from(entry.querySelectorAll('link')).find(
           link => link.getAttribute('type')?.includes('application/')
         );
         const downloadUrl = downloadLink?.getAttribute('href') || '';
+        const lengthAttr = downloadLink?.getAttribute('length') || '0';
+        const sizeBytes = parseInt(lengthAttr);
+        const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
         
         // Get cover link
         const coverLink = Array.from(entry.querySelectorAll('link')).find(
@@ -865,6 +871,8 @@ const MobileUI = {
           title,
           author,
           series,
+          lang,
+          size,
           download_url: downloadUrl,
           cover_url: coverUrl
         };
@@ -891,8 +899,8 @@ const MobileUI = {
             <div class="mobile-book-item-author">${book.author}</div>
             ${book.series ? `<div class="mobile-book-item-series">${book.series}</div>` : ''}
             <div class="mobile-book-item-meta">
-              <span>${book.lang?.toUpperCase() || 'N/A'}</span>
-              <span>${book.size || 'N/A'}</span>
+              ${book.lang ? `<span>${book.lang.toUpperCase()}</span>` : ''}
+              ${book.size ? `<span>${book.size}</span>` : ''}
             </div>
           </div>
           <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -931,6 +939,14 @@ const MobileUI = {
         item.style.display = 'none';
       }
     });
+  },
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   },
 
   async performSearch() {
