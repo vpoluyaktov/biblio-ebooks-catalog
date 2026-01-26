@@ -28,6 +28,7 @@ const MobileUI = {
   navigateTo(screen, data = {}) {
     this.history.push({ screen: this.screen, data: this.getCurrentData() });
     this.screen = screen;
+    this.params = data;
     Object.assign(this, data);
     this.render();
   },
