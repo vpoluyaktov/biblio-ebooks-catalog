@@ -68,7 +68,7 @@ const MobileUI = {
         break;
       case 'genres':
         container.innerHTML = this.renderGenres();
-        const parentGenreId = params.parentGenreId || 0;
+        const parentGenreId = this.params?.parentGenreId || 0;
         this.loadGenres(parentGenreId);
         break;
       case 'search':

@@ -21,14 +21,20 @@ func computeStaticVersion() string {
 	staticVersionOnce.Do(func() {
 		h := md5.New()
 
-		// Hash JS file
+		// Hash all JS files
 		if jsContent, err := os.ReadFile("web/static/js/app.js"); err == nil {
 			h.Write(jsContent)
 		}
+		if mobileJsContent, err := os.ReadFile("web/static/js/mobile.js"); err == nil {
+			h.Write(mobileJsContent)
+		}
 
-		// Hash CSS file
+		// Hash all CSS files
 		if cssContent, err := os.ReadFile("web/static/css/style.css"); err == nil {
 			h.Write(cssContent)
+		}
+		if mobileCssContent, err := os.ReadFile("web/static/css/mobile.css"); err == nil {
+			h.Write(mobileCssContent)
 		}
 
 		// Use first 8 characters of hash for brevity
