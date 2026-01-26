@@ -780,7 +780,6 @@ const MobileUI = {
         <div class="mobile-list-item" data-genre-id="${genre.id}" data-genre-name="${genre.name}">
           <div class="mobile-list-item-text">
             <div class="mobile-list-item-title">${genre.name}</div>
-            <div class="mobile-list-item-subtitle">${genre.book_count || 0} book${(genre.book_count || 0) !== 1 ? 's' : ''}</div>
           </div>
           <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"></polyline>
