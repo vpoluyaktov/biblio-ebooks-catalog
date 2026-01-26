@@ -477,15 +477,45 @@ const MobileUI = {
             </div>
             <div class="mobile-book-info">
               <h2 class="mobile-book-title">${book.title}</h2>
-              <div class="mobile-book-author">${book.author}</div>
               ${book.series ? `<div class="mobile-book-series">${book.series}</div>` : ''}
-              <div class="mobile-book-meta">
-                <span>${book.lang?.toUpperCase() || 'N/A'}</span>
-                <span>${book.size || 'N/A'}</span>
-                ${book.date ? `<span>${book.date}</span>` : ''}
+              
+              <div class="mobile-book-details">
+                <div class="mobile-book-detail-row">
+                  <span class="mobile-book-detail-label">Author:</span>
+                  <span class="mobile-book-detail-value">${book.author}</span>
+                </div>
+                ${book.genre ? `
+                  <div class="mobile-book-detail-row">
+                    <span class="mobile-book-detail-label">Genre:</span>
+                    <span class="mobile-book-detail-value">${book.genre}</span>
+                  </div>
+                ` : ''}
+                ${book.size ? `
+                  <div class="mobile-book-detail-row">
+                    <span class="mobile-book-detail-label">Size:</span>
+                    <span class="mobile-book-detail-value">${book.size}</span>
+                  </div>
+                ` : ''}
+                ${book.lang ? `
+                  <div class="mobile-book-detail-row">
+                    <span class="mobile-book-detail-label">Language:</span>
+                    <span class="mobile-book-detail-value">${book.lang}</span>
+                  </div>
+                ` : ''}
+                ${book.date ? `
+                  <div class="mobile-book-detail-row">
+                    <span class="mobile-book-detail-label">Date:</span>
+                    <span class="mobile-book-detail-value">${book.date}</span>
+                  </div>
+                ` : ''}
               </div>
-              ${book.genre ? `<div class="mobile-book-genre">${book.genre}</div>` : ''}
-              ${book.annotation ? `<div class="mobile-book-annotation">${book.annotation}</div>` : ''}
+              
+              ${book.annotation ? `
+                <div class="mobile-book-description">
+                  <div class="mobile-book-description-label">DESCRIPTION:</div>
+                  <div class="mobile-book-description-text">${book.annotation}</div>
+                </div>
+              ` : ''}
             </div>
             <div class="mobile-book-actions">
               <a href="${book.download_url || '#'}" class="mobile-btn-primary mobile-btn-download" ${!book.download_url ? 'style="opacity:0.5;pointer-events:none"' : ''}>
