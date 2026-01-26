@@ -223,10 +223,22 @@ opds-server:
   - Full-screen views for all sections
   - Desktop UI completely preserved and unchanged
 
+### In Progress 🚧
+
+- **EPUB Library Import** (2026-01-26)
+  - Feature branch: `feature/EPUB_Import`
+  - Goal: Import EPUB files similar to FB2 import functionality
+  - Test data: Python script to fetch 100 EPUB books from Project Gutenberg
+  - Tasks:
+    - [x] Create test data fetcher script (`scripts/fetch_gutenberg_epubs.py`)
+    - [ ] EPUB metadata extraction (title, author, series, description)
+    - [ ] EPUB cover extraction
+    - [ ] EPUB library import command
+    - [ ] Integration with existing book serving infrastructure
+
 ### Future Enhancements
 
 - OPDS2 JSON feed
-- EPUB cover extraction
 - Format conversion (FB2 → EPUB)
 - Reading progress tracking
 
@@ -246,4 +258,4 @@ opds-server:
 
 ---
 
-*Last updated: 2026-01-25*
+*Last updated: 2026-01-26*
