@@ -583,15 +583,18 @@ const App = {
 
     if (!toggleLeft || !toggleRight || !panelLeft || !panelRight || !overlay) return;
 
-    // Toggle left panel (authors/series)
+    // Toggle left panel (authors/series) - starts open by default
     toggleLeft.addEventListener('click', () => {
-      const isOpen = panelLeft.classList.contains('mobile-open');
-      if (isOpen) {
-        this.closeMobilePanels();
+      const isClosed = panelLeft.classList.contains('mobile-closed');
+      if (isClosed) {
+        // Open left panel
+        panelLeft.classList.remove('mobile-closed');
+        panelRight.classList.remove('mobile-open');
+        overlay.classList.remove('hidden');
       } else {
-        this.closeMobilePanels();
-        panelLeft.classList.add('mobile-open');
-        overlay.classList.add('active');
+        // Close left panel
+        panelLeft.classList.add('mobile-closed');
+        overlay.classList.add('hidden');
       }
     });
 
@@ -599,23 +602,33 @@ const App = {
     toggleRight.addEventListener('click', () => {
       const isOpen = panelRight.classList.contains('mobile-open');
       if (isOpen) {
-        this.closeMobilePanels();
+        // Close right panel
+        panelRight.classList.remove('mobile-open');
+        // Restore left panel
+        panelLeft.classList.remove('mobile-closed');
+        overlay.classList.remove('hidden');
       } else {
-        this.closeMobilePanels();
+        // Open right panel, close left
+        panelLeft.classList.add('mobile-closed');
         panelRight.classList.add('mobile-open');
-        overlay.classList.add('active');
+        overlay.classList.remove('hidden');
       }
     });
 
-    // Close panels when clicking overlay
+    // Close panels when clicking overlay - return to default state (left open)
     overlay.addEventListener('click', () => {
-      this.closeMobilePanels();
+      panelLeft.classList.remove('mobile-closed');
+      panelRight.classList.remove('mobile-open');
+      overlay.classList.remove('hidden');
     });
 
-    // Close left panel when selecting an item (for better UX)
+    // Close left panel when selecting an item, show books
     panelLeft.addEventListener('click', (e) => {
       if (e.target.closest('.panel-item')) {
-        setTimeout(() => this.closeMobilePanels(), 300);
+        setTimeout(() => {
+          panelLeft.classList.add('mobile-closed');
+          overlay.classList.add('hidden');
+        }, 300);
       }
     });
   },
@@ -625,9 +638,10 @@ const App = {
     const panelRight = document.getElementById('panel-right');
     const overlay = document.getElementById('mobile-overlay');
     
-    if (panelLeft) panelLeft.classList.remove('mobile-open');
+    // Return to default state: left panel open, right panel closed
+    if (panelLeft) panelLeft.classList.remove('mobile-closed');
     if (panelRight) panelRight.classList.remove('mobile-open');
-    if (overlay) overlay.classList.remove('active');
+    if (overlay) overlay.classList.remove('hidden');
   },
 
   sortAndRenderBooks() {

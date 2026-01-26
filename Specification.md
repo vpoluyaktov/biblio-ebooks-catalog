@@ -153,6 +153,7 @@ go run . --port 9903
 
 ### Mobile-Friendly Design
 - **Responsive breakpoints**: Optimized for tablets (≤1024px), mobile (≤768px), and small devices (≤480px)
+- **Smart default state**: Authors/series list visible by default on mobile for immediate access
 - **Collapsible side panels**: Left (navigation) and right (book details) panels slide in from edges
 - **Floating action buttons**: Touch-friendly circular buttons to toggle panels
 - **Touch-optimized UI**: 44px minimum touch targets, larger tap areas
@@ -161,7 +162,7 @@ go run . --port 9903
 - **Landscape support**: Optimized panel widths for landscape orientation
 - **Scrollable tabs**: Horizontal scroll for tab navigation on narrow screens
 - **Compact toolbar**: Auto-hiding labels and responsive search box
-- **Auto-close panels**: Panels close automatically after selection for better UX
+- **Auto-close panels**: Left panel closes automatically after selection to show books table
 
 ## Supported Book Formats
 
