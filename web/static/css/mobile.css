@@ -419,6 +419,7 @@
 /* Mobile book detail */
 .mobile-book-detail {
   padding: 1rem;
+  padding-bottom: 100px;
 }
 
 .mobile-book-cover {
