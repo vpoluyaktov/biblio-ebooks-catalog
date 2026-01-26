@@ -15,12 +15,23 @@ const App = {
   series: [],
   sortColumn: 'title',
   sortDirection: 'asc',
+  
+  // Mobile navigation state
+  mobileScreen: 'home', // home, authors, series, genres, search, books, book-detail, config
+  mobileHistory: [],
+  isMobile: false,
 
   async init() {
     this.loadTheme();
     await this.checkAuth();
     await this.loadLibraries();
     this.bindEvents();
+    
+    // Initialize mobile UI if available
+    if (typeof MobileUI !== 'undefined') {
+      MobileUI.init();
+    }
+    
     this.router();
     window.addEventListener('hashchange', () => this.router());
   },
@@ -308,6 +319,12 @@ const App = {
 
     if (!this.currentLibrary) {
       window.location.hash = '#home';
+      return;
+    }
+
+    // Check if mobile and use mobile UI
+    if (this.isMobile && typeof MobileUI !== 'undefined') {
+      MobileUI.render();
       return;
     }
 

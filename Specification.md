@@ -151,18 +151,25 @@ go run . --port 9903
 - **Sortable columns** in book table
 - **Light/dark mode** support
 
-### Mobile-Friendly Design
-- **Responsive breakpoints**: Optimized for tablets (≤1024px), mobile (≤768px), and small devices (≤480px)
-- **Smart default state**: Authors/series list visible by default on mobile for immediate access
-- **Collapsible side panels**: Left (navigation) and right (book details) panels slide in from edges
-- **Floating action buttons**: Touch-friendly circular buttons to toggle panels
-- **Touch-optimized UI**: 44px minimum touch targets, larger tap areas
-- **Adaptive layout**: Single-column view on mobile, hidden columns for better readability
-- **Mobile overlay**: Semi-transparent backdrop when panels are open
-- **Landscape support**: Optimized panel widths for landscape orientation
-- **Scrollable tabs**: Horizontal scroll for tab navigation on narrow screens
-- **Compact toolbar**: Auto-hiding labels and responsive search box
-- **Auto-close panels**: Left panel closes automatically after selection to show books table
+### Mobile-Friendly Design (Navigation-Based Architecture)
+- **Separate mobile UI**: Completely independent mobile interface (≤768px) with navigation-based screens
+- **Home screen menu**: Central hub with options for Authors, Series, Genres, Advanced Search, and Configuration
+- **Screen-based navigation**: Each section is a full-screen view with back button navigation
+- **Navigation flow**:
+  - Home → Authors → Books → Book Detail
+  - Home → Series → Books → Book Detail
+  - Home → Genres → Books → Book Detail
+  - Home → Advanced Search → Results → Book Detail
+  - Home → Configuration (library selection, admin, logout)
+- **Touch-optimized UI**: 44px minimum touch targets, large tap areas, smooth transitions
+- **Virtual scrolling**: Efficient rendering of large lists (authors, series, books)
+- **Filter functionality**: Real-time filtering on all list screens
+- **Global search**: Quick search from home screen
+- **Book details**: Full-screen view with cover image, metadata, and download button
+- **Theme support**: Dark/light mode toggle available on all screens
+- **Safe area support**: Respects device notches and safe areas
+- **History management**: Back button navigation with screen history stack
+- **Responsive images**: Optimized book cover loading and display
 
 ## Supported Book Formats
 
@@ -207,12 +214,14 @@ opds-server:
 - Virtual scrolling for large libraries
 - Search functionality
 - SQLite with ICU support for Cyrillic
-- **Mobile-responsive UI** (2026-01-25)
-  - Responsive CSS with mobile breakpoints (768px, 480px)
-  - Collapsible side panels with floating action buttons
-  - Touch-friendly interface (44px minimum touch targets)
-  - Adaptive layouts for portrait and landscape orientations
-  - Desktop UI preserved and unchanged
+- **Mobile-native UI** (2026-01-25)
+  - Complete navigation-based mobile interface (≤768px)
+  - Separate mobile.js and mobile.css modules
+  - Home screen with menu-driven navigation
+  - Screen-based architecture with history management
+  - Touch-optimized with 44px minimum touch targets
+  - Full-screen views for all sections
+  - Desktop UI completely preserved and unchanged
 
 ### Future Enhancements
 
