@@ -7,6 +7,12 @@ const MobileUI = {
   selectedSeries: null,
   selectedGenre: null,
   selectedBook: null,
+  
+  // Virtual scrolling state
+  vsAuthors: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  vsSeries: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  vsGenres: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  VS_PAGE_SIZE: 50,
 
   init() {
     // Set initial mobile state
@@ -64,7 +70,7 @@ const MobileUI = {
         this.loadAuthors();
         break;
       case 'series':
-        container.innerHTML = this.renderSeriesList();
+        container.innerHTML = this.renderSeriesScreen();
         this.loadSeries();
         break;
       case 'genres':
@@ -268,7 +274,7 @@ const MobileUI = {
     `;
   },
 
-  renderSeriesList() {
+  renderSeriesScreen() {
     return `
       <div class="mobile-screen">
         <div class="mobile-header">
@@ -670,7 +676,19 @@ const MobileUI = {
   },
 
   async loadAuthors(filter = '') {
+    // Reset virtual scroll state when filter changes
+    if (filter !== this.vsAuthors.filter) {
+      this.vsAuthors = { items: [], total: 0, offset: 0, loading: false, filter };
+    }
+    await this.loadAuthorsPage();
+  },
+
+  async loadAuthorsPage() {
+    if (this.vsAuthors.loading) return;
+    
     try {
+      this.vsAuthors.loading = true;
+      
       // Ensure library is set
       if (!App.currentLibrary && App.libraries.length > 0) {
         App.currentLibrary = App.libraries[0].id;
@@ -679,60 +697,108 @@ const MobileUI = {
       if (!App.currentLibrary) {
         const list = document.getElementById('mobile-authors-list');
         if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        this.vsAuthors.loading = false;
         return;
       }
 
-      // Use same API call as desktop UI
-      const url = `/api/libraries/${App.currentLibrary}/authors?limit=50&offset=0&filter=${encodeURIComponent(filter)}`;
+      const url = `/api/libraries/${App.currentLibrary}/authors?limit=${this.VS_PAGE_SIZE}&offset=${this.vsAuthors.offset}&filter=${encodeURIComponent(this.vsAuthors.filter)}`;
       const data = await App.fetchAPI(url);
-      const list = document.getElementById('mobile-authors-list');
-      if (!list) return;
-
-      const authors = data?.authors || [];
-      console.log('Authors loaded:', authors.length, 'filter:', filter);
       
-      if (authors.length === 0) {
-        list.innerHTML = '<div class="mobile-empty">No authors found</div>';
-        return;
-      }
-
-      list.innerHTML = authors.map(author => {
-        const fullName = [author.last_name, author.first_name, author.middle_name]
-          .filter(n => n && n.trim())
-          .join(' ') || 'Unknown Author';
-        return `
-          <div class="mobile-list-item" data-author-id="${author.id}">
-            <div class="mobile-list-item-text">
-              <div class="mobile-list-item-title">${fullName}</div>
-              <div class="mobile-list-item-subtitle">${author.BookCount} book${author.BookCount !== 1 ? 's' : ''}</div>
-            </div>
-            <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </div>
-        `;
-      }).join('');
-
-      // Bind click events
-      list.querySelectorAll('[data-author-id]').forEach(item => {
-        item.addEventListener('click', () => {
-          const authorId = parseInt(item.dataset.authorId);
-          const author = authors.find(a => a.id === authorId);
-          if (author) {
-            author.name = [author.last_name, author.first_name, author.middle_name]
-              .filter(n => n && n.trim())
-              .join(' ') || 'Unknown Author';
-            this.navigateTo('books', { selectedAuthor: author });
-          }
-        });
-      });
+      const newAuthors = data?.authors || [];
+      this.vsAuthors.total = data?.total || 0;
+      this.vsAuthors.items.push(...newAuthors);
+      this.vsAuthors.offset += newAuthors.length;
+      
+      this.renderAuthorsList();
+      this.vsAuthors.loading = false;
     } catch (e) {
       console.error('Failed to load authors:', e);
+      this.vsAuthors.loading = false;
     }
   },
 
+  renderAuthorsList() {
+    const list = document.getElementById('mobile-authors-list');
+    if (!list) return;
+
+    if (this.vsAuthors.items.length === 0) {
+      list.innerHTML = '<div class="mobile-empty">No authors found</div>';
+      return;
+    }
+
+    list.innerHTML = this.vsAuthors.items.map(author => {
+      const fullName = [author.last_name, author.first_name, author.middle_name]
+        .filter(n => n && n.trim())
+        .join(' ') || 'Unknown Author';
+      return `
+        <div class="mobile-list-item" data-author-id="${author.id}">
+          <div class="mobile-list-item-text">
+            <div class="mobile-list-item-title">${fullName}</div>
+            <div class="mobile-list-item-subtitle">${author.BookCount} book${author.BookCount !== 1 ? 's' : ''}</div>
+          </div>
+          <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+      `;
+    }).join('');
+
+    // Bind click events
+    list.querySelectorAll('[data-author-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        const authorId = parseInt(item.dataset.authorId);
+        const author = this.vsAuthors.items.find(a => a.id === authorId);
+        if (author) {
+          author.name = [author.last_name, author.first_name, author.middle_name]
+            .filter(n => n && n.trim())
+            .join(' ') || 'Unknown Author';
+          this.navigateTo('books', { selectedAuthor: author });
+        }
+      });
+    });
+    
+    // Setup scroll handler for automatic loading
+    this.setupAuthorsScrollHandler();
+  },
+
+  setupAuthorsScrollHandler() {
+    const list = document.getElementById('mobile-authors-list');
+    if (!list) return;
+    
+    const content = list.closest('.mobile-content');
+    if (!content) return;
+    
+    // Remove previous handler if exists
+    if (this.authorsScrollHandler) {
+      content.removeEventListener('scroll', this.authorsScrollHandler);
+    }
+    
+    this.authorsScrollHandler = () => {
+      const threshold = 100;
+      if (content.scrollTop + content.clientHeight >= content.scrollHeight - threshold) {
+        if (this.vsAuthors.offset < this.vsAuthors.total && !this.vsAuthors.loading) {
+          this.loadAuthorsPage();
+        }
+      }
+    };
+    
+    content.addEventListener('scroll', this.authorsScrollHandler);
+  },
+
   async loadSeries(filter = '') {
+    // Reset virtual scroll state when filter changes
+    if (filter !== this.vsSeries.filter) {
+      this.vsSeries = { items: [], total: 0, offset: 0, loading: false, filter };
+    }
+    await this.loadSeriesPage();
+  },
+
+  async loadSeriesPage() {
+    if (this.vsSeries.loading) return;
+    
     try {
+      this.vsSeries.loading = true;
+      
       // Ensure library is set
       if (!App.currentLibrary && App.libraries.length > 0) {
         App.currentLibrary = App.libraries[0].id;
@@ -741,43 +807,81 @@ const MobileUI = {
       if (!App.currentLibrary) {
         const list = document.getElementById('mobile-series-list');
         if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        this.vsSeries.loading = false;
         return;
       }
 
-      // Use same API call as desktop UI
-      const url = `/api/libraries/${App.currentLibrary}/series?limit=50&offset=0&filter=${encodeURIComponent(filter)}`;
+      const url = `/api/libraries/${App.currentLibrary}/series?limit=${this.VS_PAGE_SIZE}&offset=${this.vsSeries.offset}&filter=${encodeURIComponent(this.vsSeries.filter)}`;
       const data = await App.fetchAPI(url);
-      const list = document.getElementById('mobile-series-list');
-      if (!list) return;
-
-      const series = data?.series || [];
-      if (series.length === 0) {
-        list.innerHTML = '<div class="mobile-empty">No series found</div>';
-        return;
-      }
-
-      list.innerHTML = series.map(s => `
-        <div class="mobile-list-item" data-series-id="${s.id}">
-          <div class="mobile-list-item-text">
-            <div class="mobile-list-item-title">${s.name}</div>
-            <div class="mobile-list-item-subtitle">${s.BookCount} book${s.BookCount !== 1 ? 's' : ''}</div>
-          </div>
-          <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      `).join('');
-
-      list.querySelectorAll('[data-series-id]').forEach(item => {
-        item.addEventListener('click', () => {
-          const seriesId = parseInt(item.dataset.seriesId);
-          const selectedSeries = series.find(s => s.id === seriesId);
-          this.navigateTo('books', { selectedSeries });
-        });
-      });
+      
+      const newSeries = data?.series || [];
+      this.vsSeries.total = data?.total || 0;
+      this.vsSeries.items.push(...newSeries);
+      this.vsSeries.offset += newSeries.length;
+      
+      this.renderSeriesList();
+      this.vsSeries.loading = false;
     } catch (e) {
       console.error('Failed to load series:', e);
+      this.vsSeries.loading = false;
     }
+  },
+
+  renderSeriesList() {
+    const list = document.getElementById('mobile-series-list');
+    if (!list) return;
+
+    if (this.vsSeries.items.length === 0) {
+      list.innerHTML = '<div class="mobile-empty">No series found</div>';
+      return;
+    }
+
+    list.innerHTML = this.vsSeries.items.map(s => `
+      <div class="mobile-list-item" data-series-id="${s.id}">
+        <div class="mobile-list-item-text">
+          <div class="mobile-list-item-title">${s.name}</div>
+          <div class="mobile-list-item-subtitle">${s.BookCount} book${s.BookCount !== 1 ? 's' : ''}</div>
+        </div>
+        <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('[data-series-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        const seriesId = parseInt(item.dataset.seriesId);
+        const selectedSeries = this.vsSeries.items.find(s => s.id === seriesId);
+        this.navigateTo('books', { selectedSeries });
+      });
+    });
+    
+    // Setup scroll handler for automatic loading
+    this.setupSeriesScrollHandler();
+  },
+
+  setupSeriesScrollHandler() {
+    const list = document.getElementById('mobile-series-list');
+    if (!list) return;
+    
+    const content = list.closest('.mobile-content');
+    if (!content) return;
+    
+    // Remove previous handler if exists
+    if (this.seriesScrollHandler) {
+      content.removeEventListener('scroll', this.seriesScrollHandler);
+    }
+    
+    this.seriesScrollHandler = () => {
+      const threshold = 100;
+      if (content.scrollTop + content.clientHeight >= content.scrollHeight - threshold) {
+        if (this.vsSeries.offset < this.vsSeries.total && !this.vsSeries.loading) {
+          this.loadSeriesPage();
+        }
+      }
+    };
+    
+    content.addEventListener('scroll', this.seriesScrollHandler);
   },
 
   async loadGenres(parentId = 0) {

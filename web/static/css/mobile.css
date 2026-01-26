@@ -6,8 +6,8 @@
 }
 
 @media (max-width: 768px) {
-  /* Hide desktop UI on mobile */
-  #app {
+  /* Hide desktop UI on mobile, except login page */
+  #app:not(:has(.login-page)) {
     display: none !important;
   }
   
@@ -21,6 +21,11 @@
     bottom: 0;
     background: var(--bg);
     overflow: hidden;
+  }
+  
+  /* Hide mobile UI when login page is shown */
+  #app:has(.login-page) ~ #mobile-container {
+    display: none !important;
   }
 }
 
@@ -576,6 +581,18 @@
 .mobile-btn-secondary svg {
   width: 20px;
   height: 20px;
+}
+
+/* Mobile load more */
+.mobile-load-more {
+  padding: 1rem;
+  text-align: center;
+}
+
+.mobile-load-more button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 0.875rem;
 }
 
 .mobile-btn-download {
