@@ -802,7 +802,7 @@ const MobileUI = {
             this.navigateTo('genres', { parentGenreId: genreId, parentGenreName: genreName });
           } else {
             // Navigate to books for this genre
-            this.navigateTo('books', { selectedGenre: genreName });
+            this.navigateTo('books', { selectedGenre: genreId });
           }
         });
       });
