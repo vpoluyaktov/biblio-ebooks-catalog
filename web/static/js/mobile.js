@@ -618,6 +618,17 @@ const MobileUI = {
 
   async loadAuthors() {
     try {
+      // Ensure library is set
+      if (!App.currentLibrary && App.libraries.length > 0) {
+        App.currentLibrary = App.libraries[0].id;
+      }
+      
+      if (!App.currentLibrary) {
+        const list = document.getElementById('mobile-authors-list');
+        if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        return;
+      }
+
       const authors = await App.fetchAPI(`/api/libraries/${App.currentLibrary}/authors`);
       const list = document.getElementById('mobile-authors-list');
       if (!list) return;
@@ -654,6 +665,17 @@ const MobileUI = {
 
   async loadSeries() {
     try {
+      // Ensure library is set
+      if (!App.currentLibrary && App.libraries.length > 0) {
+        App.currentLibrary = App.libraries[0].id;
+      }
+      
+      if (!App.currentLibrary) {
+        const list = document.getElementById('mobile-series-list');
+        if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        return;
+      }
+
       const series = await App.fetchAPI(`/api/libraries/${App.currentLibrary}/series`);
       const list = document.getElementById('mobile-series-list');
       if (!list) return;
@@ -689,6 +711,17 @@ const MobileUI = {
 
   async loadGenres() {
     try {
+      // Ensure library is set
+      if (!App.currentLibrary && App.libraries.length > 0) {
+        App.currentLibrary = App.libraries[0].id;
+      }
+      
+      if (!App.currentLibrary) {
+        const list = document.getElementById('mobile-genres-list');
+        if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        return;
+      }
+
       const genres = await App.fetchAPI(`/api/libraries/${App.currentLibrary}/genres`);
       const list = document.getElementById('mobile-genres-list');
       if (!list) return;
@@ -723,6 +756,17 @@ const MobileUI = {
 
   async loadBooks() {
     try {
+      // Ensure library is set
+      if (!App.currentLibrary && App.libraries.length > 0) {
+        App.currentLibrary = App.libraries[0].id;
+      }
+      
+      if (!App.currentLibrary) {
+        const list = document.getElementById('mobile-books-list');
+        if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        return;
+      }
+
       let books = [];
       
       if (this.selectedAuthor) {
@@ -796,6 +840,17 @@ const MobileUI = {
     if (!query) return;
 
     try {
+      // Ensure library is set
+      if (!App.currentLibrary && App.libraries.length > 0) {
+        App.currentLibrary = App.libraries[0].id;
+      }
+      
+      if (!App.currentLibrary) {
+        const results = document.getElementById('mobile-search-results');
+        if (results) results.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        return;
+      }
+
       const books = await App.fetchAPI(`/api/libraries/${App.currentLibrary}/search?q=${encodeURIComponent(query)}`);
       const results = document.getElementById('mobile-search-results');
       if (!results) return;
