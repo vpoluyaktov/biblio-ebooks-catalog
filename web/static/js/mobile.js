@@ -885,23 +885,17 @@ const MobileUI = {
         const author = entry.querySelector('author name')?.textContent || 'Unknown';
         const content = entry.querySelector('content')?.textContent || '';
         
-        // Extract series from content if present
+        // Content is the annotation/description
+        const annotation = content.trim();
+        
+        // Extract series from content if present (some feeds may have it)
         let series = '';
         const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
         if (seriesMatch) series = seriesMatch[1].trim();
         
-        // Extract genre from content
-        let genre = '';
-        const genreMatch = content.match(/Genre:\s*([^<\n]+)/);
-        if (genreMatch) genre = genreMatch[1].trim();
-        
-        // Extract annotation from content (everything after genre line)
-        let annotation = '';
-        const lines = content.split('\n');
-        const genreLineIndex = lines.findIndex(line => line.includes('Genre:'));
-        if (genreLineIndex >= 0 && genreLineIndex < lines.length - 1) {
-          annotation = lines.slice(genreLineIndex + 1).join('\n').trim();
-        }
+        // Extract genre from category element
+        const genreElement = entry.querySelector('category');
+        const genre = genreElement?.getAttribute('label') || genreElement?.getAttribute('term') || '';
         
         // Extract language from dcterms:language
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
@@ -1040,20 +1034,17 @@ const MobileUI = {
         const author = entry.querySelector('author name')?.textContent || 'Unknown';
         const content = entry.querySelector('content')?.textContent || '';
         
+        // Content is the annotation/description
+        const annotation = content.trim();
+        
+        // Extract series from content if present (some feeds may have it)
         let series = '';
         const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
         if (seriesMatch) series = seriesMatch[1].trim();
         
-        let genre = '';
-        const genreMatch = content.match(/Genre:\s*([^<\n]+)/);
-        if (genreMatch) genre = genreMatch[1].trim();
-        
-        let annotation = '';
-        const lines = content.split('\n');
-        const genreLineIndex = lines.findIndex(line => line.includes('Genre:'));
-        if (genreLineIndex >= 0 && genreLineIndex < lines.length - 1) {
-          annotation = lines.slice(genreLineIndex + 1).join('\n').trim();
-        }
+        // Extract genre from category element
+        const genreElement = entry.querySelector('category');
+        const genre = genreElement?.getAttribute('label') || genreElement?.getAttribute('term') || '';
         
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
         
