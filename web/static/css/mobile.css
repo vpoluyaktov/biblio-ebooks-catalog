@@ -659,3 +659,55 @@
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
+
+/* Mobile login screen */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 1rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+  
+  .login-card {
+    padding: 1.5rem;
+    margin: 0;
+    max-width: 100%;
+  }
+  
+  .login-logo {
+    margin-bottom: 1.5rem;
+  }
+  
+  .login-logo svg {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .login-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-group {
+    margin-bottom: 1rem;
+  }
+  
+  .form-label {
+    font-size: 0.875rem;
+  }
+  
+  .form-input {
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .btn {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+}
