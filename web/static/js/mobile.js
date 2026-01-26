@@ -965,11 +965,57 @@ const MobileUI = {
         return;
       }
 
-      const books = await App.fetchAPI(`/api/libraries/${App.currentLibrary}/search?q=${encodeURIComponent(query)}`);
+      // Use OPDS search endpoint like desktop UI
+      const opdsUrl = `/opds/${App.currentLibrary}/search?q=${encodeURIComponent(query)}`;
+      const response = await fetch(opdsUrl);
+      const text = await response.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      
+      // Parse OPDS entries
+      const entries = xml.querySelectorAll('entry');
+      const books = Array.from(entries).map(entry => {
+        const id = entry.querySelector('id')?.textContent || '';
+        const bookId = id.split(':').pop();
+        const title = entry.querySelector('title')?.textContent || 'Unknown';
+        const author = entry.querySelector('author name')?.textContent || 'Unknown';
+        const content = entry.querySelector('content')?.textContent || '';
+        
+        let series = '';
+        const seriesMatch = content.match(/Series:\s*([^<\n]+)/);
+        if (seriesMatch) series = seriesMatch[1].trim();
+        
+        const lang = entry.querySelector('language, [*|language]')?.textContent || '';
+        
+        const downloadLink = Array.from(entry.querySelectorAll('link')).find(
+          link => link.getAttribute('type')?.includes('application/')
+        );
+        const downloadUrl = downloadLink?.getAttribute('href') || '';
+        const lengthAttr = downloadLink?.getAttribute('length') || '0';
+        const sizeBytes = parseInt(lengthAttr);
+        const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
+        
+        const coverLink = Array.from(entry.querySelectorAll('link')).find(
+          link => link.getAttribute('rel') === 'http://opds-spec.org/image'
+        );
+        const coverUrl = coverLink?.getAttribute('href') || '';
+        
+        return {
+          id: bookId,
+          title,
+          author,
+          series,
+          lang,
+          size,
+          download_url: downloadUrl,
+          cover_url: coverUrl
+        };
+      });
+
       const results = document.getElementById('mobile-search-results');
       if (!results) return;
 
-      if (!books || books.length === 0) {
+      if (books.length === 0) {
         results.innerHTML = '<div class="mobile-empty">No results found</div>';
         return;
       }
@@ -986,6 +1032,10 @@ const MobileUI = {
             <div class="mobile-book-item-title">${book.title}</div>
             <div class="mobile-book-item-author">${book.author}</div>
             ${book.series ? `<div class="mobile-book-item-series">${book.series}</div>` : ''}
+            <div class="mobile-book-item-meta">
+              ${book.lang ? `<span>${book.lang.toUpperCase()}</span>` : ''}
+              ${book.size ? `<span>${book.size}</span>` : ''}
+            </div>
           </div>
           <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"></polyline>
@@ -995,20 +1045,27 @@ const MobileUI = {
 
       results.querySelectorAll('[data-book-id]').forEach(item => {
         item.addEventListener('click', () => {
-          const bookId = parseInt(item.dataset.bookId);
-          const book = books.find(b => b.id === bookId);
-          this.navigateTo('book-detail', { selectedBook: book });
+          const bookId = item.dataset.bookId;
+          const book = books.find(b => String(b.id) === String(bookId));
+          if (book) {
+            this.navigateTo('book-detail', { selectedBook: book });
+          }
         });
       });
     } catch (e) {
       console.error('Search failed:', e);
+      const results = document.getElementById('mobile-search-results');
+      if (results) results.innerHTML = '<div class="mobile-empty">Search failed. Please try again.</div>';
     }
   },
 
   async performGlobalSearch(query) {
     if (!query) return;
     this.navigateTo('search');
-    document.getElementById('mobile-search-query').value = query;
-    await this.performSearch();
+    const searchInput = document.getElementById('mobile-search-query');
+    if (searchInput) {
+      searchInput.value = query;
+      await this.performSearch();
+    }
   }
 };
