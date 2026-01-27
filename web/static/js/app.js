@@ -2288,7 +2288,15 @@ const App = {
     const id = btn.dataset.libraryId;
     const name = btn.dataset.libraryName;
     
-    if (!confirm(`Are you sure you want to delete the library "${name}"?\n\nThis will remove all books, authors, and series from the database. The actual book files will not be deleted.`)) {
+    const confirmed = await this.showDangerDialog(
+      `Delete Library "${name}"?`,
+      `This will remove all books, authors, and series from the database.`,
+      `The actual book files will not be deleted.`,
+      'Delete Library',
+      'Cancel'
+    );
+    
+    if (!confirmed) {
       return;
     }
     
@@ -3010,6 +3018,43 @@ const App = {
       `;
       
       window.warningDialogResolve = resolve;
+      document.body.appendChild(modal);
+    });
+  },
+
+  showDangerDialog(title, message, details, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-dialog" style="max-width: 500px;">
+          <div class="modal-header" style="background: var(--danger); color: white;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem;">⚠️</span>
+              ${title}
+            </h3>
+            <button type="button" class="modal-close" style="color: white;" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(false);">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 1rem; font-weight: 500; margin-bottom: 1rem; color: var(--text);">
+              ${message}
+            </p>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+              ${details}
+            </p>
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(false);">
+                ${cancelText}
+              </button>
+              <button type="button" class="btn btn-danger" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(true);">
+                ${confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      window.dangerDialogResolve = resolve;
       document.body.appendChild(modal);
     });
   }
