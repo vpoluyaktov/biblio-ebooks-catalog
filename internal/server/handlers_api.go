@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -156,6 +158,10 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
+	// Create context that cancels when client disconnects
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
 	// Import with progress callback
 	imp := importer.New(s.db)
 	imp.SetProgressCallback(func(current, total int, message string) {
@@ -176,6 +182,17 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 		libID, err = imp.ImportINPX(inpxPath, name, libraryPath, firstAuthorOnly)
 	} else {
 		// Scan import (for EPUB/FB2 files)
+		// Create library BEFORE scanning so it exists even if scan is interrupted
+		libID, err = imp.CreateLibraryForImport(name, libraryPath, firstAuthorOnly)
+		if err != nil {
+			sendProgress(ImportProgress{
+				Done:  true,
+				Error: "Failed to create library: " + err.Error(),
+			})
+			return
+		}
+
+		// Now scan the directory with cancellation support
 		scanner := importer.NewScanner(libraryPath, 4) // Use 4 workers
 		scanner.SetProgressCallback(func(current, total int, message string) {
 			sendProgress(ImportProgress{
@@ -185,15 +202,25 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 				Done:    false,
 			})
 		})
-		books, scanErr := scanner.ScanDirectory()
+		books, scanErr := scanner.ScanDirectoryWithContext(ctx)
 		if scanErr != nil {
+			if scanErr == context.Canceled {
+				sendProgress(ImportProgress{
+					Done:  true,
+					Error: "Import canceled by user",
+				})
+				log.Printf("Import canceled by user for library: %s", name)
+				return
+			}
 			sendProgress(ImportProgress{
 				Done:  true,
 				Error: "Scan failed: " + scanErr.Error(),
 			})
 			return
 		}
-		libID, err = imp.ImportScannedBooks(books, name, libraryPath, firstAuthorOnly)
+
+		// Import books to the already-created library with cancellation support
+		err = imp.ImportBooksToLibraryWithContext(ctx, libID, books)
 	}
 
 	if err != nil {

@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -70,6 +71,11 @@ func (s *Scanner) SetProgressCallback(cb ProgressCallback) {
 
 // ScanDirectory scans the library directory and returns all found books
 func (s *Scanner) ScanDirectory() ([]*ScannedBook, error) {
+	return s.ScanDirectoryWithContext(context.Background())
+}
+
+// ScanDirectoryWithContext scans the library directory with cancellation support
+func (s *Scanner) ScanDirectoryWithContext(ctx context.Context) ([]*ScannedBook, error) {
 	// First pass: find all book files
 	filePaths, err := s.findBookFiles()
 	if err != nil {
@@ -84,7 +90,10 @@ func (s *Scanner) ScanDirectory() ([]*ScannedBook, error) {
 	s.reportProgress(0, len(filePaths), fmt.Sprintf("Found %d files, starting parsing...", len(filePaths)))
 
 	// Second pass: parse metadata with worker pool
-	books := s.parseFilesParallel(filePaths)
+	books, err := s.parseFilesParallelWithContext(ctx, filePaths)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Printf("Parsing complete: %d books successfully parsed", len(books))
 	return books, nil
@@ -124,6 +133,12 @@ func (s *Scanner) findBookFiles() ([]string, error) {
 
 // parseFilesParallel parses files using a worker pool for parallel processing
 func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
+	books, _ := s.parseFilesParallelWithContext(context.Background(), filePaths)
+	return books
+}
+
+// parseFilesParallelWithContext parses files with cancellation support
+func (s *Scanner) parseFilesParallelWithContext(ctx context.Context, filePaths []string) ([]*ScannedBook, error) {
 	jobs := make(chan string, len(filePaths))
 	results := make(chan []*ScannedBook, len(filePaths))
 
@@ -135,19 +150,37 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 		go func() {
 			defer wg.Done()
 			for path := range jobs {
+				// Check for cancellation
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
 				booksFromFile := s.parseFile(path)
 				if len(booksFromFile) > 0 {
-					results <- booksFromFile
+					select {
+					case results <- booksFromFile:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
 	}
 
-	// Send jobs
-	for _, path := range filePaths {
-		jobs <- path
-	}
-	close(jobs)
+	// Send jobs with cancellation check
+	go func() {
+		for _, path := range filePaths {
+			select {
+			case jobs <- path:
+			case <-ctx.Done():
+				close(jobs)
+				return
+			}
+		}
+		close(jobs)
+	}()
 
 	// Wait for workers and close results
 	go func() {
@@ -160,16 +193,22 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 	parsed := 0
 	total := len(filePaths)
 
-	for booksFromFile := range results {
-		books = append(books, booksFromFile...)
-		parsed++
+	for {
+		select {
+		case <-ctx.Done():
+			return books, ctx.Err()
+		case booksFromFile, ok := <-results:
+			if !ok {
+				return books, nil
+			}
+			books = append(books, booksFromFile...)
+			parsed++
 
-		if parsed%10 == 0 || parsed == total {
-			s.reportProgress(parsed, total, fmt.Sprintf("Parsed %d/%d archives, %d books found...", parsed, total, len(books)))
+			if parsed%10 == 0 || parsed == total {
+				s.reportProgress(parsed, total, fmt.Sprintf("Parsed %d/%d archives, %d books found...", parsed, total, len(books)))
+			}
 		}
 	}
-
-	return books
 }
 
 // parseFile parses a single book file and extracts metadata
@@ -226,8 +265,96 @@ func (s *Scanner) parseFile(path string) []*ScannedBook {
 	return []*ScannedBook{book}
 }
 
+// CreateLibraryForImport creates a library entry before scanning/importing
+// This ensures the library exists even if the import is interrupted
+func (imp *Importer) CreateLibraryForImport(libraryName, libraryPath string, firstAuthorOnly bool) (int64, error) {
+	imp.libraryPath = libraryPath
+	imp.firstAuthorOnly = firstAuthorOnly
+
+	// Load genre codes
+	if err := imp.loadGenreCodes(); err != nil {
+		return 0, fmt.Errorf("failed to load genre codes: %w", err)
+	}
+
+	// Create library
+	libID, err := imp.createLibrary(libraryName, libraryPath, "")
+	if err != nil {
+		return 0, fmt.Errorf("failed to create library: %w", err)
+	}
+	imp.libraryID = libID
+
+	log.Printf("Created library %d: %s", libID, libraryName)
+	return libID, nil
+}
+
+// ImportBooksToLibrary imports books to an existing library
+func (imp *Importer) ImportBooksToLibrary(libraryID int64, books []*ScannedBook) error {
+	return imp.ImportBooksToLibraryWithContext(context.Background(), libraryID, books)
+}
+
+// ImportBooksToLibraryWithContext imports books with cancellation support
+func (imp *Importer) ImportBooksToLibraryWithContext(ctx context.Context, libraryID int64, books []*ScannedBook) error {
+	imp.libraryID = libraryID
+
+	log.Printf("Starting import of %d books to library %d...", len(books), libraryID)
+	imp.reportProgress(0, len(books), "Starting import...")
+
+	// Import books in batches
+	batchSize := 100
+	imported := 0
+	skipped := 0
+
+	for i := 0; i < len(books); i += batchSize {
+		// Check for cancellation before each batch
+		select {
+		case <-ctx.Done():
+			log.Printf("Import canceled after %d books imported", imported)
+			return ctx.Err()
+		default:
+		}
+
+		end := i + batchSize
+		if end > len(books) {
+			end = len(books)
+		}
+		batch := books[i:end]
+
+		count, err := imp.importBookBatch(batch)
+		if err != nil {
+			log.Printf("Warning: batch import error: %v", err)
+		}
+
+		imported += count
+		skipped += (len(batch) - count)
+
+		imp.reportProgress(end, len(books), fmt.Sprintf("Imported %d books, skipped %d...", imported, skipped))
+	}
+
+	log.Printf("Import complete: %d books imported, %d skipped", imported, skipped)
+	imp.reportProgress(len(books), len(books), fmt.Sprintf("Complete! %d books imported, %d skipped", imported, skipped))
+
+	return nil
+}
+
 // ImportScannedBooks imports scanned books into the database
+// This is a convenience method that creates the library and imports books in one call
 func (imp *Importer) ImportScannedBooks(books []*ScannedBook, libraryName, libraryPath string, firstAuthorOnly bool) (int64, error) {
+	// Create library first
+	libID, err := imp.CreateLibraryForImport(libraryName, libraryPath, firstAuthorOnly)
+	if err != nil {
+		return 0, err
+	}
+
+	// Import books to the library
+	if err := imp.ImportBooksToLibrary(libID, books); err != nil {
+		return libID, err // Return library ID even on error so it can be found
+	}
+
+	return libID, nil
+}
+
+// Legacy method kept for backward compatibility
+func (imp *Importer) importScannedBooksLegacy(books []*ScannedBook, libraryName, libraryPath string, firstAuthorOnly bool) (int64, error) {
 	imp.libraryPath = libraryPath
 	imp.firstAuthorOnly = firstAuthorOnly
 
