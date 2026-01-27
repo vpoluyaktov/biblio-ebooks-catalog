@@ -19,3 +19,4 @@ testdata/
 .DS_Store
 data/
 books/
+db/
