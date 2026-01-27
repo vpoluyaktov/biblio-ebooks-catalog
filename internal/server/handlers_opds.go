@@ -13,6 +13,7 @@ import (
 	"biblio-opds-server/internal/bookfile"
 	"biblio-opds-server/internal/db"
 	"biblio-opds-server/internal/opds"
+	"biblio-opds-server/internal/parser"
 )
 
 func (s *Server) writeOPDS(w http.ResponseWriter, feed *opds.Feed) {
@@ -426,7 +427,7 @@ func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		}
 
-		metadata, err := bookfile.ParseEPUBMetadata(fullPath)
+		metadata, err := parser.Parse("epub", fullPath)
 		if err == nil && metadata.CoverData != nil {
 			coverData = metadata.CoverData
 			contentType = metadata.CoverType
@@ -499,7 +500,7 @@ func (s *Server) handleOPDSAnnotation(w http.ResponseWriter, r *http.Request) {
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		}
 
-		metadata, err := bookfile.ParseEPUBMetadata(fullPath)
+		metadata, err := parser.Parse("epub", fullPath)
 		if err != nil || metadata.Description == "" {
 			http.Error(w, "Annotation not found", http.StatusNotFound)
 			return

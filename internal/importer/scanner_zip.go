@@ -2,15 +2,14 @@ package importer
 
 import (
 	"archive/zip"
+	"biblio-opds-server/internal/parser"
 	"io"
 	"log"
 	"strings"
-
-	"biblio-opds-server/internal/bookfile"
 )
 
 // parseZipArchive extracts and parses all FB2 files from a ZIP archive
-func (s *Scanner) parseZipArchive(zipPath, relPath string, zipSize int64) []*ScannedBook {
+func (s *Scanner) parseZipArchive(zipPath, relPath string) []*ScannedBook {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		log.Printf("Warning: failed to open ZIP %s: %v", zipPath, err)
@@ -66,11 +65,11 @@ func (s *Scanner) parseZipArchive(zipPath, relPath string, zipSize int64) []*Sca
 	return books
 }
 
-// parseFB2MetadataFromReader wraps the bookfile parser
-func parseFB2MetadataFromReader(r io.Reader) (*bookfile.EPUBMetadata, error) {
+// parseFB2MetadataFromReader wraps the parser
+func parseFB2MetadataFromReader(r io.Reader) (*parser.Metadata, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	return bookfile.ParseFB2MetadataFromBytes(data)
+	return parser.ParseFromBytes("fb2", data)
 }

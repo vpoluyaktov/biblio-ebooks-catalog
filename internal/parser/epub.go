@@ -1,18 +1,12 @@
-package bookfile
+package parser
 
 import (
 	"archive/zip"
-	"bytes"
-	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/encoding/unicode"
 )
 
 // EPUBMetadata represents metadata extracted from an EPUB file
@@ -300,201 +294,64 @@ func ExtractEPUBCover(filePath string) ([]byte, string, error) {
 	return metadata.CoverData, metadata.CoverType, nil
 }
 
-// fb2MetadataDocument extends the existing fb2Document with additional metadata fields
-type fb2MetadataDocument struct {
-	XMLName     xml.Name `xml:"FictionBook"`
-	Description struct {
-		TitleInfo struct {
-			fb2TitleInfo
-			Author struct {
-				FirstName  string `xml:"first-name"`
-				LastName   string `xml:"last-name"`
-				MiddleName string `xml:"middle-name"`
-			} `xml:"author"`
-			BookTitle string   `xml:"book-title"`
-			Genres    []string `xml:"genre"`
-			Lang      string   `xml:"lang"`
-			Sequence  struct {
-				Name   string `xml:"name,attr"`
-				Number int    `xml:"number,attr"`
-			} `xml:"sequence"`
-		} `xml:"title-info"`
-	} `xml:"description"`
-	Binaries []fb2Binary `xml:"binary"`
-}
+// EPUBParser implements the Parser interface for EPUB files
+type EPUBParser struct{}
 
-// ParseFB2Metadata extracts metadata from a FB2 file
-func ParseFB2Metadata(filePath string) (*EPUBMetadata, error) {
-	f, err := os.Open(filePath)
+// Parse extracts metadata from an EPUB file
+func (p *EPUBParser) Parse(filePath string) (*Metadata, error) {
+	epubMeta, err := ParseEPUBMetadata(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+		return nil, err
 	}
-	defer f.Close()
-
-	return parseFB2Metadata(f)
+	return epubMetadataToMetadata(epubMeta), nil
 }
 
-// ParseFB2MetadataFromZip extracts metadata from a FB2 file inside a ZIP archive
-func ParseFB2MetadataFromZip(zipPath string) (*EPUBMetadata, error) {
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open ZIP: %w", err)
-	}
-	defer r.Close()
-
-	// Find the FB2 file (should be the first .fb2 file)
-	var fb2File *zip.File
-	for _, f := range r.File {
-		if strings.HasSuffix(strings.ToLower(f.Name), ".fb2") {
-			fb2File = f
-			break
-		}
-	}
-
-	if fb2File == nil {
-		return nil, fmt.Errorf("no FB2 file found in archive")
-	}
-
-	rc, err := fb2File.Open()
-	if err != nil {
-		return nil, fmt.Errorf("failed to open FB2 file: %w", err)
-	}
-	defer rc.Close()
-
-	return parseFB2Metadata(rc)
+// ParseFromBytes extracts metadata from EPUB bytes
+func (p *EPUBParser) ParseFromBytes(data []byte) (*Metadata, error) {
+	return nil, fmt.Errorf("ParseFromBytes not supported for EPUB (requires ZIP structure)")
 }
 
-// charsetReader returns a reader for the specified charset
-func charsetReader(charset string, input io.Reader) (io.Reader, error) {
-	charset = strings.ToLower(charset)
+// ParseFromReader extracts metadata from an EPUB reader
+func (p *EPUBParser) ParseFromReader(reader io.Reader) (*Metadata, error) {
+	return nil, fmt.Errorf("ParseFromReader not supported for EPUB (requires ReaderAt)")
+}
 
-	switch charset {
-	case "windows-1251":
-		return charmap.Windows1251.NewDecoder().Reader(input), nil
-	case "windows-1252":
-		return charmap.Windows1252.NewDecoder().Reader(input), nil
-	case "iso-8859-1", "latin1":
-		return charmap.ISO8859_1.NewDecoder().Reader(input), nil
-	case "utf-8", "":
-		return input, nil
-	case "utf-16", "utf-16le":
-		return unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder().Reader(input), nil
-	case "utf-16be":
-		return unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder().Reader(input), nil
-	default:
-		// For unknown charsets, try to parse as UTF-8
-		return input, nil
+// Format returns the format this parser handles
+func (p *EPUBParser) Format() string {
+	return "epub"
+}
+
+// epubMetadataToMetadata converts EPUBMetadata to the generic Metadata type
+func epubMetadataToMetadata(epub *EPUBMetadata) *Metadata {
+	authors := make([]string, len(epub.Authors))
+	for i, author := range epub.Authors {
+		authors[i] = author.FullName()
+	}
+
+	return &Metadata{
+		Title:       epub.Title,
+		Authors:     authors,
+		Language:    epub.Language,
+		Description: epub.Description,
+		Genres:      epub.Genres,
+		Series:      epub.Series,
+		SeriesIndex: epub.SeriesIndex,
+		CoverData:   epub.CoverData,
+		CoverType:   epub.CoverType,
 	}
 }
 
-func parseFB2Metadata(r io.Reader) (*EPUBMetadata, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read FB2: %w", err)
+// FullName returns the full name of an author
+func (a Author) FullName() string {
+	parts := []string{}
+	if a.FirstName != "" {
+		parts = append(parts, a.FirstName)
 	}
-
-	var fb2 fb2MetadataDocument
-	decoder := xml.NewDecoder(bytes.NewReader(data))
-	decoder.CharsetReader = charsetReader
-
-	if err := decoder.Decode(&fb2); err != nil {
-		return nil, fmt.Errorf("failed to parse FB2: %w", err)
+	if a.MiddleName != "" {
+		parts = append(parts, a.MiddleName)
 	}
-
-	// Get annotation from paragraphs
-	annotation := strings.Join(fb2.Description.TitleInfo.Annotation.Paragraphs, "\n\n")
-
-	metadata := &EPUBMetadata{
-		Title:       strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
-		Language:    strings.TrimSpace(fb2.Description.TitleInfo.Lang),
-		Description: strings.TrimSpace(annotation),
-		Series:      strings.TrimSpace(fb2.Description.TitleInfo.Sequence.Name),
-		SeriesIndex: fb2.Description.TitleInfo.Sequence.Number,
-		Genres:      fb2.Description.TitleInfo.Genres,
+	if a.LastName != "" {
+		parts = append(parts, a.LastName)
 	}
-
-	// Parse author
-	author := Author{
-		FirstName:  strings.TrimSpace(fb2.Description.TitleInfo.Author.FirstName),
-		LastName:   strings.TrimSpace(fb2.Description.TitleInfo.Author.LastName),
-		MiddleName: strings.TrimSpace(fb2.Description.TitleInfo.Author.MiddleName),
-	}
-	if author.FirstName != "" || author.LastName != "" {
-		metadata.Authors = []Author{author}
-	}
-
-	// Extract cover image
-	var coverID string
-	for _, img := range fb2.Description.TitleInfo.Coverpage.Images {
-		href := img.Href
-		if href == "" {
-			href = img.XlinkHref
-		}
-		if href == "" {
-			href = img.LHref
-		}
-		if href != "" {
-			coverID = strings.TrimPrefix(href, "#")
-			break
-		}
-	}
-
-	if coverID != "" {
-		for _, binary := range fb2.Binaries {
-			if binary.ID == coverID {
-				decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(binary.Data))
-				if err == nil {
-					metadata.CoverData = decoded
-					metadata.CoverType = binary.ContentType
-					if metadata.CoverType == "" {
-						if bytes.HasPrefix(decoded, []byte{0xFF, 0xD8, 0xFF}) {
-							metadata.CoverType = "image/jpeg"
-						} else if bytes.HasPrefix(decoded, []byte{0x89, 0x50, 0x4E, 0x47}) {
-							metadata.CoverType = "image/png"
-						} else {
-							metadata.CoverType = "image/jpeg"
-						}
-					}
-				}
-				break
-			}
-		}
-	}
-
-	return metadata, nil
-}
-
-// ParseFB2MetadataFromBytes parses FB2 metadata from a byte array
-func ParseFB2MetadataFromBytes(data []byte) (*EPUBMetadata, error) {
-	var fb2 fb2MetadataDocument
-	decoder := xml.NewDecoder(bytes.NewReader(data))
-	decoder.CharsetReader = charsetReader
-
-	if err := decoder.Decode(&fb2); err != nil {
-		return nil, fmt.Errorf("failed to parse FB2: %w", err)
-	}
-
-	// Get annotation from paragraphs
-	annotation := strings.Join(fb2.Description.TitleInfo.Annotation.Paragraphs, "\n\n")
-
-	metadata := &EPUBMetadata{
-		Title:       strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
-		Language:    strings.TrimSpace(fb2.Description.TitleInfo.Lang),
-		Description: strings.TrimSpace(annotation),
-		Series:      strings.TrimSpace(fb2.Description.TitleInfo.Sequence.Name),
-		SeriesIndex: fb2.Description.TitleInfo.Sequence.Number,
-		Genres:      fb2.Description.TitleInfo.Genres,
-	}
-
-	// Parse author
-	author := Author{
-		FirstName:  strings.TrimSpace(fb2.Description.TitleInfo.Author.FirstName),
-		LastName:   strings.TrimSpace(fb2.Description.TitleInfo.Author.LastName),
-		MiddleName: strings.TrimSpace(fb2.Description.TitleInfo.Author.MiddleName),
-	}
-	if author.FirstName != "" || author.LastName != "" {
-		metadata.Authors = []Author{author}
-	}
-
-	return metadata, nil
+	return strings.Join(parts, " ")
 }

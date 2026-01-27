@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"biblio-opds-server/internal/bookfile"
 	"biblio-opds-server/internal/db"
+	"biblio-opds-server/internal/parser"
 )
 
 // ScannedBook represents a book found during directory scanning
@@ -20,7 +20,7 @@ type ScannedBook struct {
 	FileName   string
 	Format     string
 	Size       int64
-	Metadata   *bookfile.EPUBMetadata
+	Metadata   *parser.Metadata
 	Archive    string // If file is in a ZIP archive
 	FileInZip  string // File name inside ZIP (for fb2.zip)
 	ParseError error
@@ -201,7 +201,7 @@ func (s *Scanner) parseFile(path string) []*ScannedBook {
 
 	// For ZIP archives, extract all FB2 files inside
 	if format == "fb2.zip" {
-		return s.parseZipArchive(path, relPath, info.Size())
+		return s.parseZipArchive(path, relPath)
 	}
 
 	// For single files (EPUB, FB2)
@@ -213,19 +213,8 @@ func (s *Scanner) parseFile(path string) []*ScannedBook {
 		Size:     info.Size(),
 	}
 
-	// Parse metadata based on format
-	var metadata *bookfile.EPUBMetadata
-	var parseErr error
-
-	switch format {
-	case "epub":
-		metadata, parseErr = bookfile.ParseEPUBMetadata(path)
-	case "fb2":
-		metadata, parseErr = bookfile.ParseFB2Metadata(path)
-	default:
-		parseErr = fmt.Errorf("unsupported format: %s", format)
-	}
-
+	// Parse metadata using the parser registry
+	metadata, parseErr := parser.Parse(format, path)
 	if parseErr != nil {
 		log.Printf("Warning: failed to parse %s: %v", path, parseErr)
 		book.ParseError = parseErr
@@ -330,12 +319,12 @@ func (imp *Importer) importBookBatch(books []*ScannedBook) (int, error) {
 
 		// Insert authors
 		var dbAuthors []db.Author
-		for _, author := range scannedBook.Metadata.Authors {
+		for _, authorName := range scannedBook.Metadata.Authors {
+			// Parse author name - for now, treat the whole string as LastName
+			// More sophisticated parsing could split "FirstName LastName" format
 			dbAuthors = append(dbAuthors, db.Author{
-				LibraryID:  imp.libraryID,
-				LastName:   author.LastName,
-				FirstName:  author.FirstName,
-				MiddleName: author.MiddleName,
+				LibraryID: imp.libraryID,
+				LastName:  authorName,
 			})
 		}
 		if err := imp.insertAuthors(tx, bookID, dbAuthors); err != nil {

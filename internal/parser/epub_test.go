@@ -1,4 +1,4 @@
-package bookfile
+package parser
 
 import (
 	"os"

@@ -124,11 +124,12 @@ func TestParseFile(t *testing.T) {
 		t.Skip("No EPUB files found in test directory")
 	}
 
-	book := scanner.parseFile(testFile)
-	if book == nil {
-		t.Fatal("Expected non-nil book")
+	books := scanner.parseFile(testFile)
+	if len(books) == 0 {
+		t.Fatal("Expected at least one book")
 	}
 
+	book := books[0]
 	t.Logf("Parsed: %s", book.FilePath)
 	if book.Metadata != nil {
 		t.Logf("  Title: %s", book.Metadata.Title)

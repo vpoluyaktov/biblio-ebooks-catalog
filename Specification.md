@@ -375,6 +375,55 @@ Note: This is a non-destructive operation. Database remains unchanged.
   - [x] Update README with new import options
   - [x] CLI usage examples for all three modes
   - [x] API endpoint documentation
+- [x] **Phase 7: FB2 Parser Robustness** (2026-01-27)
+  - [x] Extract FB2 parser from `epub.go` to separate `fb2.go` file
+  - [x] Fix series number parsing to handle non-numeric values
+    - Parse year-month formats (`"1996 02"` → 1996)
+    - Parse underscore/dash formats (`"09_2"` → 9)
+    - Handle corrupted data (`"« name=»Рассказы"` → 1)
+    - Default to 1 for unparseable values
+  - [x] Add XML sanitization for malformed FB2 files
+    - Fix invalid UTF-8 sequences (Windows-1251 auto-detection)
+    - Remove illegal XML control characters (U+0001-U+001F except tab/newline/CR)
+    - Escape unescaped ampersands
+    - Fix malformed tags (tags starting with numbers, ellipsis, etc.)
+  - [x] Comprehensive unit tests covering all error categories
+    - Series number parsing (20 test cases)
+    - UTF-8 fixing (3 test cases)
+    - Illegal character removal (7 test cases)
+    - Ampersand escaping (9 test cases)
+    - Malformed tag fixing (6 test cases)
+    - Full FB2 parsing with malformed XML (4 test cases)
+  - [x] Set `decoder.Strict = false` for lenient XML parsing
+  - [x] Fallback to original data if sanitization fails
+- [x] **Phase 8: Parser Interface Refactoring** (2026-01-27)
+  - [x] Create unified `Parser` interface in `internal/parser/parser.go`
+    - `Parse(filePath string) (*Metadata, error)` - parse from file
+    - `ParseFromBytes(data []byte) (*Metadata, error)` - parse from bytes
+    - `ParseFromReader(reader io.Reader) (*Metadata, error)` - parse from reader
+    - `Format() string` - return format identifier
+  - [x] Implement `EPUBParser` and `FB2Parser` types conforming to interface
+  - [x] Create `Registry` for managing parsers by format
+  - [x] Add convenience functions: `Parse(format, path)` and `ParseFromBytes(format, data)`
+  - [x] Unified `Metadata` struct replacing format-specific metadata types
+    - Title, Authors ([]string), Language, Description
+    - Genres, Series, SeriesIndex
+    - CoverData, CoverType
+  - [x] Update all consumers to use parser interface:
+    - `internal/importer/scanner.go` - uses `parser.Parse()` for scanning
+    - `internal/importer/scanner_zip.go` - uses `parser.ParseFromBytes()` for ZIP archives
+    - `internal/server/handlers_opds.go` - uses `parser.Parse()` for cover/annotation extraction
+  - [x] Remove backward compatibility code - single clean interface throughout
+  - [x] All 49 parser tests passing
+
+#### Error Analysis from Production Import
+
+During FB2 library import (3,006 errors analyzed):
+- **Series number parsing errors (~400)**: Fixed by lenient string parsing
+- **Invalid UTF-8 (~29)**: Fixed by charset auto-detection
+- **Illegal XML characters (~100)**: Fixed by character filtering
+- **Unescaped ampersands (~76)**: Fixed by entity escaping
+- **Malformed XML tags (~2,400)**: Partially fixed, some files may remain unparseable due to severe corruption
 
 #### Technical Notes
 
@@ -430,4 +479,4 @@ book.epub (ZIP archive)
 
 ---
 
-*Last updated: 2026-01-26*
+*Last updated: 2026-01-27*
