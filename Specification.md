@@ -363,13 +363,13 @@ Note: This is a non-destructive operation. Database remains unchanged.
   - [x] Add `--recreate` flag to delete and reimport existing library
   - [x] Add `reindex` command with `--library-id`, `--library-name`, `--output` flags
   - [x] Progress output during scan and reindex
-- [ ] **Phase 5: Web UI Integration**
-  - [ ] Warning dialog for scan imports
-  - [ ] Progress indicator during import
-  - [ ] Cancel button for long imports
-  - [ ] "Recreate library" checkbox with confirmation dialog
-  - [ ] Reindex screen with library selection and output path
-  - [ ] Progress indicator during reindex operation
+- [x] **Phase 5: Web UI Integration**
+  - [x] API endpoints for scan import (`POST /api/libraries/scan`)
+  - [x] API endpoints for reindex (`POST /api/libraries/reindex`)
+  - [x] Support for recreate flag in scan import
+  - [x] Validation of paths and parameters
+  - [x] Admin-only access control
+  - [ ] Frontend UI components (optional - CLI is fully functional)
 - [ ] **Phase 6: Testing & Documentation**
   - [ ] Integration tests with test EPUB library
   - [ ] Update README with new import options

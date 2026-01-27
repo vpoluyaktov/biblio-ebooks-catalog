@@ -506,3 +506,170 @@ func (s *Server) apiToggleLibrary(w http.ResponseWriter, r *http.Request) {
 	lib, _ := s.db.GetLibrary(id)
 	s.jsonResponse(w, lib)
 }
+
+// ScanImportRequest represents a request to scan and import a directory
+type ScanImportRequest struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Workers  int    `json:"workers"`
+	Recreate bool   `json:"recreate"`
+}
+
+// ScanImportResponse represents the response from a scan import operation
+type ScanImportResponse struct {
+	Success   bool   `json:"success"`
+	LibraryID int64  `json:"library_id,omitempty"`
+	Message   string `json:"message,omitempty"`
+	BookCount int    `json:"book_count,omitempty"`
+}
+
+func (s *Server) apiScanImport(w http.ResponseWriter, r *http.Request) {
+	var req ScanImportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" || req.Path == "" {
+		s.jsonError(w, "Name and path are required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate path exists
+	if _, err := os.Stat(req.Path); os.IsNotExist(err) {
+		s.jsonError(w, "Path not found: "+req.Path, http.StatusBadRequest)
+		return
+	}
+
+	if req.Workers <= 0 {
+		req.Workers = 4
+	}
+
+	// Check if library already exists and handle recreate
+	if req.Recreate {
+		libraries, err := s.db.GetLibraries()
+		if err == nil {
+			for _, lib := range libraries {
+				if lib.Path == req.Path {
+					if err := s.db.DeleteLibrary(lib.ID); err != nil {
+						s.jsonError(w, "Failed to delete existing library: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Scan directory
+	scanner := importer.NewScanner(req.Path, req.Workers)
+	books, err := scanner.ScanDirectory()
+	if err != nil {
+		s.jsonError(w, "Scan failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Import scanned books
+	imp := importer.New(s.db)
+	newLibID, err := imp.ImportScannedBooks(books, req.Name, false)
+	if err != nil {
+		s.jsonError(w, "Import failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get book count
+	bookCount, _, _, _ := s.db.GetLibraryStats(newLibID)
+
+	s.jsonResponse(w, ScanImportResponse{
+		Success:   true,
+		LibraryID: newLibID,
+		Message:   fmt.Sprintf("Successfully imported %d books", bookCount),
+		BookCount: int(bookCount),
+	})
+}
+
+// ReindexRequest represents a request to export a library to INPX
+type ReindexRequest struct {
+	LibraryID   int64  `json:"library_id,omitempty"`
+	LibraryName string `json:"library_name,omitempty"`
+	OutputPath  string `json:"output_path"`
+}
+
+// ReindexResponse represents the response from a reindex operation
+type ReindexResponse struct {
+	Success    bool   `json:"success"`
+	Message    string `json:"message,omitempty"`
+	OutputPath string `json:"output_path,omitempty"`
+	BookCount  int    `json:"book_count,omitempty"`
+}
+
+func (s *Server) apiReindex(w http.ResponseWriter, r *http.Request) {
+	var req ReindexRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.LibraryID == 0 && req.LibraryName == "" {
+		s.jsonError(w, "Either library_id or library_name is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.OutputPath == "" {
+		s.jsonError(w, "Output path is required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate output directory exists
+	outputDir := filepath.Dir(req.OutputPath)
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		s.jsonError(w, "Output directory not found: "+outputDir, http.StatusBadRequest)
+		return
+	}
+
+	writer := importer.NewINPXWriter(s.db)
+
+	var err error
+	var libraryID int64
+
+	if req.LibraryID > 0 {
+		libraryID = req.LibraryID
+		err = writer.ExportLibraryToINPX(req.LibraryID, req.OutputPath)
+	} else {
+		// Find library by name
+		libraries, libErr := s.db.GetLibraries()
+		if libErr != nil {
+			s.jsonError(w, "Failed to get libraries: "+libErr.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		for _, lib := range libraries {
+			if lib.Name == req.LibraryName {
+				libraryID = lib.ID
+				break
+			}
+		}
+
+		if libraryID == 0 {
+			s.jsonError(w, "Library not found: "+req.LibraryName, http.StatusNotFound)
+			return
+		}
+
+		err = writer.ExportLibraryToINPX(libraryID, req.OutputPath)
+	}
+
+	if err != nil {
+		s.jsonError(w, "Reindex failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Get book count
+	bookCount, _, _, _ := s.db.GetLibraryStats(libraryID)
+
+	s.jsonResponse(w, ReindexResponse{
+		Success:    true,
+		Message:    fmt.Sprintf("Successfully exported %d books to INPX", bookCount),
+		OutputPath: req.OutputPath,
+		BookCount:  int(bookCount),
+	})
+}
