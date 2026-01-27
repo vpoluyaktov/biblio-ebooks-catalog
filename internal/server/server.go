@@ -131,6 +131,7 @@ func (s *Server) setupRoutes() {
 			// Library management
 			r.Post("/libraries", s.apiCreateLibrary)
 			r.Get("/libraries/import", s.apiImportLibrarySSE)
+			r.Post("/libraries/reindex", s.apiReindex)
 			r.Put("/libraries/{libID}", s.apiUpdateLibrary)
 			r.Delete("/libraries/{libID}", s.apiDeleteLibrary)
 			r.Get("/libraries/{libID}/stats", s.apiGetLibraryStats)

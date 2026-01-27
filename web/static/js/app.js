@@ -1925,10 +1925,7 @@ const App = {
                             </label>
                           </td>
                           <td>
-                            <div class="flex gap-1">
-                              <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
-                              <button class="btn btn-sm btn-danger" data-action="deleteLibrary" data-id="${lib.id}" data-name="${lib.name}">Delete</button>
-                            </div>
+                            <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
                           </td>
                         </tr>
                       `).join('')}
@@ -1949,11 +1946,12 @@ const App = {
                     <input type="text" name="name" class="form-input" placeholder="My Library" required>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">INPX File Path (on server) *</label>
+                    <label class="form-label">INPX File Path (on server)</label>
                     <div class="input-with-btn">
-                      <input type="text" name="inpx_path" id="inpx-path-input" class="form-input" placeholder="/data/library/books.inpx" required>
+                      <input type="text" name="inpx_path" id="inpx-path-input" class="form-input" placeholder="/data/library/books.inpx (optional)">
                       <button type="button" class="btn btn-outline" data-action="browseInpx">Browse...</button>
                     </div>
+                    <small class="form-help">Leave empty to scan directory (slower but works for EPUB/FB2 files)</small>
                   </div>
                   <div class="form-group">
                     <label class="form-label">Library Path (folder with ZIP files) *</label>
@@ -1968,12 +1966,28 @@ const App = {
                       <span>First author only</span>
                     </label>
                   </div>
-                  <div class="mt-2">
+                  <div class="mt-2" style="display: flex; gap: 0.5rem;">
                     <button type="submit" class="btn btn-primary" id="import-btn">Import Library</button>
+                    <button type="button" class="btn btn-outline" id="import-cancel-btn" style="display:none;" onclick="App.cancelImport()">Cancel</button>
                   </div>
                   <div id="import-progress" style="display:none;margin-top:1rem">
-                    <div class="progress-bar">
-                      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                    <div style="margin-bottom:0.5rem">
+                      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem">
+                        <span>Overall Progress</span>
+                        <span id="overall-progress-text"></span>
+                      </div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                    <div id="zip-progress-container" style="display:none;margin-bottom:0.5rem">
+                      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem">
+                        <span id="zip-progress-label">Current ZIP</span>
+                        <span id="zip-progress-text"></span>
+                      </div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="zip-progress-fill" style="width:0%"></div>
+                      </div>
                     </div>
                     <div id="import-status" class="text-muted mt-1" style="font-size:0.875rem"></div>
                   </div>
@@ -2002,26 +2016,186 @@ const App = {
     }
   },
 
-  async editLibrary(btn) {
+  editLibrary(btn) {
     const id = btn.dataset.id;
     const currentName = btn.dataset.name;
-    const currentPath = btn.dataset.path;
     
-    const name = prompt('Library name:', currentName);
-    if (name === null) return;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 class="modal-title">Manage Library: ${currentName}</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Rename Section -->
+          <form data-form="submitEditLibrary" data-library-id="${id}">
+            <h4 class="mb-2">Rename Library</h4>
+            <div class="form-group">
+              <label class="form-label">Library Name</label>
+              <input type="text" name="name" id="edit-library-name" class="form-control" value="${currentName}" required>
+            </div>
+            <div id="edit-library-error" class="form-error"></div>
+            <div class="mb-4">
+              <button type="submit" class="btn btn-primary">Save Name</button>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <!-- Reindex Section -->
+          <h4 class="mb-2">Export to INPX</h4>
+          <form data-form="submitReindexFromEdit" data-library-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Output INPX File Path</label>
+              <div class="input-with-btn">
+                <input type="text" name="output_path" id="reindex-output-path-edit" class="form-control" placeholder="/path/to/output.inpx" required style="flex: 1;">
+                <button type="button" class="btn btn-outline" data-action="browseReindexOutputEdit">Browse...</button>
+              </div>
+              <small class="form-help">Full path where the INPX file will be created</small>
+            </div>
+            <div id="reindex-status-edit" class="form-info" style="display:none;">
+              <div class="progress-bar">
+                <div id="reindex-progress-edit" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div id="reindex-message-edit" class="mt-2"></div>
+            </div>
+            <div id="reindex-error-edit" class="form-error"></div>
+            <div class="mb-4">
+              <button type="submit" class="btn btn-primary" id="reindex-submit-btn-edit">Start Reindex</button>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <!-- Delete Section -->
+          <h4 class="mb-2">Delete Library</h4>
+          <p class="text-muted mb-2">This will remove all books, authors, and series from the database. The actual book files will not be deleted.</p>
+          <button type="button" class="btn btn-danger" data-action="deleteLibraryFromEdit" data-library-id="${id}" data-library-name="${currentName}">Delete Library</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitEditLibrary(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const name = data.get('name').trim();
+    const errorEl = document.getElementById('edit-library-error');
     
-    const path = prompt('Library path:', currentPath);
-    if (path === null) return;
+    if (!name) {
+      errorEl.textContent = 'Library name is required';
+      return;
+    }
     
     try {
-      await fetch(`/api/libraries/${id}`, {
+      const res = await fetch(`/api/libraries/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, path })
+        body: JSON.stringify({ name })
       });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update library');
+      }
+      
+      this.closeModal();
       this.renderLibraries();
     } catch (e) {
-      alert('Failed to update library');
+      errorEl.textContent = e.message;
+    }
+  },
+
+  reindexLibrary(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Reindex Library: ${name}</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitReindex" data-library-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Output INPX File Path</label>
+              <div class="input-group">
+                <input type="text" name="output_path" id="reindex-output-path" class="form-control" placeholder="/path/to/output.inpx" required>
+                <button type="button" class="btn btn-outline" data-action="browseReindexOutput">Browse...</button>
+              </div>
+              <small class="form-help">Full path where the INPX file will be created</small>
+            </div>
+            <div id="reindex-status" class="form-info" style="display:none;">
+              <div class="progress-bar">
+                <div id="reindex-progress" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div id="reindex-message" class="mt-2"></div>
+            </div>
+            <div id="reindex-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="reindex-submit-btn">Start Reindex</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitReindex(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const outputPath = data.get('output_path').trim();
+    const errorEl = document.getElementById('reindex-error');
+    const statusEl = document.getElementById('reindex-status');
+    const messageEl = document.getElementById('reindex-message');
+    const progressEl = document.getElementById('reindex-progress');
+    const submitBtn = document.getElementById('reindex-submit-btn');
+    
+    if (!outputPath) {
+      errorEl.textContent = 'Output path is required';
+      return;
+    }
+    
+    errorEl.textContent = '';
+    statusEl.style.display = 'block';
+    submitBtn.disabled = true;
+    messageEl.textContent = 'Starting reindex...';
+    progressEl.style.width = '0%';
+    
+    try {
+      const res = await fetch('/api/libraries/reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          library_id: parseInt(id),
+          output_path: outputPath 
+        })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reindex library');
+      }
+      
+      const result = await res.json();
+      progressEl.style.width = '100%';
+      messageEl.textContent = result.message || 'Reindex completed successfully!';
+      
+      setTimeout(() => {
+        this.closeModal();
+      }, 2000);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      submitBtn.disabled = false;
+      statusEl.style.display = 'none';
     }
   },
 
@@ -2049,23 +2223,147 @@ const App = {
     this.showFilePicker('library-path-input', 'dir');
   },
 
+  browseReindexOutput() {
+    // Use dir picker, then user can append filename
+    this.filePickerCallback = (path) => {
+      const input = document.getElementById('reindex-output-path');
+      // Append default filename if path is a directory
+      const outputPath = path.endsWith('/') ? path + 'library.inpx' : path + '/library.inpx';
+      input.value = outputPath;
+      this.closeFilePicker();
+    };
+    this.filePickerType = 'dir';
+    this.renderFilePicker('/');
+  },
+
+  browseReindexOutputEdit() {
+    // Use dir picker for edit modal
+    this.filePickerCallback = (path) => {
+      const input = document.getElementById('reindex-output-path-edit');
+      const outputPath = path.endsWith('/') ? path + 'library.inpx' : path + '/library.inpx';
+      input.value = outputPath;
+      this.closeFilePicker();
+    };
+    this.filePickerType = 'dir';
+    this.renderFilePicker('/');
+  },
+
+  async submitReindexFromEdit(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const outputPath = data.get('output_path').trim();
+    const errorEl = document.getElementById('reindex-error-edit');
+    const statusEl = document.getElementById('reindex-status-edit');
+    const messageEl = document.getElementById('reindex-message-edit');
+    const progressEl = document.getElementById('reindex-progress-edit');
+    const submitBtn = document.getElementById('reindex-submit-btn-edit');
+    
+    if (!outputPath) {
+      errorEl.textContent = 'Output path is required';
+      return;
+    }
+    
+    errorEl.textContent = '';
+    statusEl.style.display = 'block';
+    submitBtn.disabled = true;
+    messageEl.textContent = 'Starting reindex...';
+    progressEl.style.width = '0%';
+    
+    try {
+      const res = await fetch('/api/libraries/reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          library_id: parseInt(id),
+          output_path: outputPath 
+        })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reindex library');
+      }
+      
+      const result = await res.json();
+      progressEl.style.width = '100%';
+      messageEl.textContent = result.message || 'Reindex completed successfully!';
+      
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        statusEl.style.display = 'none';
+        progressEl.style.width = '0%';
+      }, 2000);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      submitBtn.disabled = false;
+      statusEl.style.display = 'none';
+    }
+  },
+
+  async deleteLibraryFromEdit(btn) {
+    const id = btn.dataset.libraryId;
+    const name = btn.dataset.libraryName;
+    
+    const confirmed = await this.showDangerDialog(
+      `Delete Library "${name}"?`,
+      `This will remove all books, authors, and series from the database.`,
+      `The actual book files will not be deleted.`,
+      'Delete Library',
+      'Cancel'
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    try {
+      await fetch(`/api/libraries/${id}`, { method: 'DELETE' });
+      this.closeModal();
+      this.renderLibraries();
+    } catch (e) {
+      alert('Failed to delete library');
+    }
+  },
+
   async submitImportLibrary(form) {
     const data = new FormData(form);
+    const inpxPath = data.get('inpx_path').trim();
+    
+    // Warn if importing without INPX file
+    if (!inpxPath) {
+      const confirmed = await this.showWarningDialog(
+        'Import Without INPX File?',
+        'Importing without an INPX file will be slower as it requires scanning all book files.',
+        'This method works for EPUB and FB2 files but may take significant time for large libraries.',
+        'Continue Import',
+        'Cancel'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    
     const statusEl = document.getElementById('import-status');
     const progressEl = document.getElementById('import-progress');
-    const progressFill = document.getElementById('progress-fill');
     const btnEl = document.getElementById('import-btn');
+    const cancelBtn = document.getElementById('import-cancel-btn');
+    
+    const progressFill = document.getElementById('progress-fill');
     
     btnEl.disabled = true;
     btnEl.textContent = 'Importing...';
+    cancelBtn.style.display = 'inline-block';
     progressEl.style.display = 'block';
     progressFill.style.width = '0%';
     statusEl.textContent = 'Starting import...';
     statusEl.style.color = 'var(--text-muted)';
     
+    this.importAborted = false;
+    this.importReader = null;
+    
     const params = new URLSearchParams({
       name: data.get('name'),
-      inpx_path: data.get('inpx_path'),
+      inpx_path: inpxPath,
       library_path: data.get('library_path'),
       first_author_only: data.get('first_author_only') === 'on' ? 'true' : 'false'
     });
@@ -2093,10 +2391,21 @@ const App = {
       }
 
       const reader = response.body.getReader();
+      this.importReader = reader;
       const decoder = new TextDecoder();
       let buffer = '';
 
       while (true) {
+        if (this.importAborted) {
+          reader.cancel();
+          statusEl.textContent = '✗ Import cancelled by user';
+          statusEl.style.color = 'var(--danger)';
+          btnEl.disabled = false;
+          btnEl.textContent = 'Import Library';
+          cancelBtn.style.display = 'none';
+          return;
+        }
+        
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -2108,9 +2417,43 @@ const App = {
           if (line.startsWith('data: ')) {
             const progress = JSON.parse(line.slice(6));
             
+            // Get ZIP progress elements
+            const zipContainer = document.getElementById('zip-progress-container');
+            const zipProgressFill = document.getElementById('zip-progress-fill');
+            const zipProgressLabel = document.getElementById('zip-progress-label');
+            const zipProgressText = document.getElementById('zip-progress-text');
+            const overallProgressText = document.getElementById('overall-progress-text');
+            
+            // Update overall progress bar
             if (progress.total > 0) {
               const percent = Math.round((progress.current / progress.total) * 100);
               progressFill.style.width = percent + '%';
+              progressFill.classList.remove('indeterminate');
+              if (overallProgressText) {
+                overallProgressText.textContent = `${progress.current}/${progress.total} files`;
+              }
+            } else {
+              progressFill.classList.add('indeterminate');
+              if (overallProgressText) {
+                overallProgressText.textContent = '';
+              }
+            }
+            
+            // Update ZIP progress bar if ZIP data is present
+            if (progress.zip_total > 0 && zipContainer) {
+              zipContainer.style.display = 'block';
+              const zipPercent = Math.round((progress.zip_current / progress.zip_total) * 100);
+              zipProgressFill.style.width = zipPercent + '%';
+              zipProgressFill.classList.remove('indeterminate');
+              if (zipProgressLabel) {
+                zipProgressLabel.textContent = progress.zip_filename || 'Current ZIP';
+              }
+              if (zipProgressText) {
+                zipProgressText.textContent = `${progress.zip_current}/${progress.zip_total} books (${zipPercent}%)`;
+              }
+            } else if (zipContainer && progress.zip_total === 0) {
+              // Hide ZIP progress when not processing a ZIP
+              zipContainer.style.display = 'none';
             }
             
             statusEl.textContent = progress.message;
@@ -2122,11 +2465,13 @@ const App = {
                 progressFill.style.background = 'var(--danger)';
                 btnEl.disabled = false;
                 btnEl.textContent = 'Import Library';
+                cancelBtn.style.display = 'none';
               } else {
                 statusEl.textContent = `✓ ${progress.message}`;
                 statusEl.style.color = 'var(--success)';
                 progressFill.style.width = '100%';
                 progressFill.style.background = 'var(--success)';
+                cancelBtn.style.display = 'none';
                 form.reset();
                 setTimeout(() => this.renderLibraries(), 1500);
               }
@@ -2140,6 +2485,20 @@ const App = {
       statusEl.style.color = 'var(--danger)';
       btnEl.disabled = false;
       btnEl.textContent = 'Import Library';
+      cancelBtn.style.display = 'none';
+    }
+  },
+
+  async cancelImport() {
+    const confirmed = await this.showWarningDialog(
+      'Cancel Import',
+      'Are you sure you want to cancel the current import?',
+      'All progress will be saved up to the last batch.',
+      'Yes, Cancel Import',
+      'Continue Importing'
+    );
+    if (confirmed) {
+      this.importAborted = true;
     }
   },
 
@@ -2576,42 +2935,58 @@ const App = {
 
   async renderFilePicker(path) {
     const type = this.filePickerType;
-    const res = await this.fetchAPI(`/api/browse?path=${encodeURIComponent(path)}&type=${type}`);
     
-    const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
-    
-    modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
-    modal.querySelector('.modal-body').innerHTML = `
-      <div class="file-picker">
-        <div class="file-picker-path">
-          <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1">
-          <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
+    try {
+      const res = await this.fetchAPI(`/api/browse?path=${encodeURIComponent(path)}&type=${type}`);
+      
+      if (!res || !res.path) {
+        throw new Error('Invalid response from server');
+      }
+      
+      const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
+      
+      // Store current path for selection
+      this.currentPickerPath = res.path;
+      
+      // Ensure entries is an array
+      const entries = res.entries || [];
+      
+      modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
+      modal.querySelector('.modal-body').innerHTML = `
+        <div class="file-picker">
+          <div class="file-picker-path">
+            <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1" readonly>
+            <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
+          </div>
+          <div class="file-picker-list">
+            ${res.parent ? `
+              <div class="file-picker-item" onclick="App.renderFilePicker('${res.parent.replace(/'/g, "\\'")}')">
+                <span class="file-icon">📁</span>
+                <span>..</span>
+              </div>
+            ` : ''}
+            ${entries.map(entry => `
+              <div class="file-picker-item ${entry.is_dir ? 'is-dir' : 'is-file'}" 
+                   onclick="App.${entry.is_dir ? 'renderFilePicker' : 'selectFile'}('${entry.path.replace(/'/g, "\\'")}')">
+                <span class="file-icon">${entry.is_dir ? '📁' : '📄'}</span>
+                <span>${entry.name}</span>
+                ${!entry.is_dir && entry.size ? `<span class="file-size">${this.formatSize(entry.size)}</span>` : ''}
+              </div>
+            `).join('')}
+            ${entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
+          </div>
+          <div class="file-picker-actions">
+            ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select: ${res.path}</button>` : ''}
+            <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
+          </div>
         </div>
-        <div class="file-picker-list">
-          ${res.parent ? `
-            <div class="file-picker-item" onclick="App.renderFilePicker('${res.parent.replace(/'/g, "\\'")}')">
-              <span class="file-icon">📁</span>
-              <span>..</span>
-            </div>
-          ` : ''}
-          ${res.entries.map(entry => `
-            <div class="file-picker-item ${entry.is_dir ? 'is-dir' : 'is-file'}" 
-                 onclick="App.${entry.is_dir ? 'renderFilePicker' : 'selectFile'}('${entry.path.replace(/'/g, "\\'")}')">
-              <span class="file-icon">${entry.is_dir ? '📁' : '📄'}</span>
-              <span>${entry.name}</span>
-              ${!entry.is_dir && entry.size ? `<span class="file-size">${this.formatSize(entry.size)}</span>` : ''}
-            </div>
-          `).join('')}
-          ${res.entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
-        </div>
-        <div class="file-picker-actions">
-          ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select This Directory</button>` : ''}
-          <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
-        </div>
-      </div>
-    `;
-    
-    modal.style.display = 'flex';
+      `;
+      
+      modal.style.display = 'flex';
+    } catch (e) {
+      console.error('File picker error:', e);
+      alert('Failed to browse directory: ' + e.message);
+    }
   },
 
   createFilePickerModal() {
@@ -2643,7 +3018,7 @@ const App = {
   },
 
   selectCurrentDir() {
-    const path = document.getElementById('picker-path-input').value;
+    const path = this.currentPickerPath || document.getElementById('picker-path-input').value;
     if (this.filePickerCallback) {
       this.filePickerCallback(path);
     }
@@ -2691,6 +3066,80 @@ const App = {
       toast.style.transition = 'opacity 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 1500);
+  },
+
+  showWarningDialog(title, message, details, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-dialog" style="max-width: 500px;">
+          <div class="modal-header" style="background: var(--primary); color: white;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem;">⚠️</span>
+              ${title}
+            </h3>
+            <button type="button" class="modal-close" style="color: white;" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(false);">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 1rem; font-weight: 500; margin-bottom: 1rem; color: var(--text);">
+              ${message}
+            </p>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+              ${details}
+            </p>
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(false);">
+                ${cancelText}
+              </button>
+              <button type="button" class="btn btn-primary" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(true);">
+                ${confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      window.warningDialogResolve = resolve;
+      document.body.appendChild(modal);
+    });
+  },
+
+  showDangerDialog(title, message, details, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-dialog" style="max-width: 500px;">
+          <div class="modal-header" style="background: var(--danger); color: white;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem;">⚠️</span>
+              ${title}
+            </h3>
+            <button type="button" class="modal-close" style="color: white;" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(false);">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 1rem; font-weight: 500; margin-bottom: 1rem; color: var(--text);">
+              ${message}
+            </p>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+              ${details}
+            </p>
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(false);">
+                ${cancelText}
+              </button>
+              <button type="button" class="btn btn-danger" onclick="this.closest('.modal-overlay').remove(); window.dangerDialogResolve(true);">
+                ${confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      window.dangerDialogResolve = resolve;
+      document.body.appendChild(modal);
+    });
   }
 };
 

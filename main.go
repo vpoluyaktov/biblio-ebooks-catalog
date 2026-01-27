@@ -31,6 +31,12 @@ func main() {
 		case "import":
 			runImport()
 			return
+		case "scan":
+			runScanImport()
+			return
+		case "reindex":
+			runReindex()
+			return
 		case "delete-library":
 			runDeleteLibrary()
 			return
@@ -134,6 +140,118 @@ func runImport() {
 	}
 
 	log.Println("Import completed successfully")
+}
+
+func runScanImport() {
+	fs := flag.NewFlagSet("scan", flag.ExitOnError)
+	libName := fs.String("name", "", "Library name")
+	libPath := fs.String("path", "", "Path to books directory")
+	dbPath := fs.String("db", "./data/library.db", "Database path")
+	workers := fs.Int("workers", 4, "Number of parallel workers for parsing")
+	recreate := fs.Bool("recreate", false, "Delete existing library and reimport")
+	fs.Parse(os.Args[2:])
+
+	if *libPath == "" {
+		log.Fatal("--path is required")
+	}
+	if *libName == "" {
+		log.Fatal("--name is required")
+	}
+
+	database, err := db.Open(*dbPath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer database.Close()
+
+	if err := database.Migrate(); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	if err := database.LoadGenres(); err != nil {
+		log.Printf("Warning: Failed to load genres: %v", err)
+	}
+
+	// Check if library already exists
+	if *recreate {
+		libraries, err := database.GetLibraries()
+		if err == nil {
+			for _, lib := range libraries {
+				if lib.Path == *libPath {
+					log.Printf("Deleting existing library '%s' (ID: %d)", lib.Name, lib.ID)
+					if err := database.DeleteLibrary(lib.ID); err != nil {
+						log.Fatalf("Failed to delete existing library: %v", err)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Scan directory
+	log.Printf("Scanning directory: %s", *libPath)
+	scanner := importer.NewScanner(*libPath, *workers)
+	scanner.SetProgressCallback(func(current, total int, message string) {
+		log.Printf("[%d/%d] %s", current, total, message)
+	})
+
+	books, err := scanner.ScanDirectory()
+	if err != nil {
+		log.Fatalf("Scan failed: %v", err)
+	}
+
+	log.Printf("Found %d books, starting import...", len(books))
+
+	// Import scanned books
+	imp := importer.New(database)
+	imp.SetProgressCallback(func(current, total int, message string) {
+		log.Printf("[%d/%d] %s", current, total, message)
+	})
+
+	if _, err := imp.ImportScannedBooks(books, *libName, *libPath, false); err != nil {
+		log.Fatalf("Import failed: %v", err)
+	}
+
+	log.Println("Scan import completed successfully")
+}
+
+func runReindex() {
+	fs := flag.NewFlagSet("reindex", flag.ExitOnError)
+	libraryID := fs.Int64("library-id", 0, "Library ID to export")
+	libraryName := fs.String("library-name", "", "Library name to export")
+	output := fs.String("output", "", "Output INPX file path")
+	dbPath := fs.String("db", "./data/library.db", "Database path")
+	fs.Parse(os.Args[2:])
+
+	if *libraryID == 0 && *libraryName == "" {
+		log.Fatal("Either --library-id or --library-name is required")
+	}
+	if *output == "" {
+		log.Fatal("--output is required")
+	}
+
+	database, err := db.Open(*dbPath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer database.Close()
+
+	writer := importer.NewINPXWriter(database)
+	writer.SetProgressCallback(func(current, total int, message string) {
+		log.Printf("[%d/%d] %s", current, total, message)
+	})
+
+	if *libraryID > 0 {
+		if err := writer.ExportLibraryToINPX(*libraryID, *output); err != nil {
+			log.Fatalf("Reindex failed: %v", err)
+		}
+	} else {
+		if err := writer.ExportLibraryByNameToINPX(*libraryName, *output); err != nil {
+			log.Fatalf("Reindex failed: %v", err)
+		}
+	}
+
+	log.Printf("Reindex completed successfully. INPX file created: %s", *output)
 }
 
 func runDeleteLibrary() {

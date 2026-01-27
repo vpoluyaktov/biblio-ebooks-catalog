@@ -6,40 +6,17 @@ import (
 	"encoding/xml"
 	"io"
 	"strings"
+
+	"biblio-opds-server/internal/parser"
 )
 
 type fb2Document struct {
-	Description fb2Description `xml:"description"`
-	Binaries    []fb2Binary    `xml:"binary"`
+	Description fb2Description     `xml:"description"`
+	Binaries    []parser.Fb2Binary `xml:"binary"`
 }
 
 type fb2Description struct {
-	TitleInfo fb2TitleInfo `xml:"title-info"`
-}
-
-type fb2TitleInfo struct {
-	Coverpage  fb2Coverpage  `xml:"coverpage"`
-	Annotation fb2Annotation `xml:"annotation"`
-}
-
-type fb2Annotation struct {
-	Paragraphs []string `xml:"p"`
-}
-
-type fb2Coverpage struct {
-	Images []fb2Image `xml:"image"`
-}
-
-type fb2Image struct {
-	Href      string `xml:"href,attr"`
-	XlinkHref string `xml:"http://www.w3.org/1999/xlink href,attr"`
-	LHref     string `xml:"http://www.gribuser.ru/xml/fictionbook/2.0 href,attr"`
-}
-
-type fb2Binary struct {
-	ID          string `xml:"id,attr"`
-	ContentType string `xml:"content-type,attr"`
-	Data        string `xml:",chardata"`
+	TitleInfo parser.Fb2TitleInfo `xml:"title-info"`
 }
 
 // ExtractFB2Annotation extracts the annotation/description from an FB2 file
