@@ -2307,7 +2307,14 @@ const App = {
     
     // Warn if importing without INPX file
     if (!inpxPath) {
-      if (!confirm('Warning: Importing without an INPX file will be slower as it requires scanning all book files.\n\nThis method works for EPUB and FB2 files but may take significant time for large libraries.\n\nDo you want to continue?')) {
+      const confirmed = await this.showWarningDialog(
+        'Import Without INPX File?',
+        'Importing without an INPX file will be slower as it requires scanning all book files.',
+        'This method works for EPUB and FB2 files but may take significant time for large libraries.',
+        'Continue Import',
+        'Cancel'
+      );
+      if (!confirmed) {
         return;
       }
     }
@@ -2968,6 +2975,43 @@ const App = {
       toast.style.transition = 'opacity 0.3s ease';
       setTimeout(() => toast.remove(), 300);
     }, 1500);
+  },
+
+  showWarningDialog(title, message, details, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.innerHTML = `
+        <div class="modal-dialog" style="max-width: 500px;">
+          <div class="modal-header" style="background: #f59e0b; color: white;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem;">⚠️</span>
+              ${title}
+            </h3>
+            <button type="button" class="modal-close" style="color: white;" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(false);">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 1rem; font-weight: 500; margin-bottom: 1rem; color: var(--text);">
+              ${message}
+            </p>
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+              ${details}
+            </p>
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(false);">
+                ${cancelText}
+              </button>
+              <button type="button" class="btn btn-primary" style="background: #f59e0b; border-color: #f59e0b;" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(true);">
+                ${confirmText}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      window.warningDialogResolve = resolve;
+      document.body.appendChild(modal);
+    });
   }
 };
 
