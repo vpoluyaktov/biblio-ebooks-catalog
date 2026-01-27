@@ -181,7 +181,7 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 		// INPX import
 		libID, err = imp.ImportINPX(inpxPath, name, libraryPath, firstAuthorOnly)
 	} else {
-		// Scan import (for EPUB/FB2 files)
+		// Scan import (for EPUB/FB2 files) - Streaming Import Flow
 		// Create library BEFORE scanning so it exists even if scan is interrupted
 		libID, err = imp.CreateLibraryForImport(name, libraryPath, firstAuthorOnly)
 		if err != nil {
@@ -192,9 +192,9 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Now scan the directory with cancellation support
-		scanner := importer.NewScanner(libraryPath, 4) // Use 4 workers
-		scanner.SetProgressCallback(func(current, total int, message string) {
+		// Phase 1: File Discovery (fast - just list files)
+		discovery := importer.NewFileDiscovery(libraryPath)
+		discovery.SetProgressCallback(func(current, total int, message string) {
 			sendProgress(ImportProgress{
 				Current: current,
 				Total:   total,
@@ -202,25 +202,63 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 				Done:    false,
 			})
 		})
-		books, scanErr := scanner.ScanDirectoryWithContext(ctx)
-		if scanErr != nil {
-			if scanErr == context.Canceled {
-				sendProgress(ImportProgress{
-					Done:  true,
-					Error: "Import canceled by user",
-				})
-				log.Printf("Import canceled by user for library: %s", name)
-				return
-			}
+
+		files, discErr := discovery.DiscoverFiles()
+		if discErr != nil {
 			sendProgress(ImportProgress{
 				Done:  true,
-				Error: "Scan failed: " + scanErr.Error(),
+				Error: "File discovery failed: " + discErr.Error(),
 			})
 			return
 		}
 
-		// Import books to the already-created library with cancellation support
-		err = imp.ImportBooksToLibraryWithContext(ctx, libID, books)
+		if len(files) == 0 {
+			sendProgress(ImportProgress{
+				Done:  true,
+				Error: "No book files found in directory",
+			})
+			return
+		}
+
+		// Phase 2: Streaming Import (slow - parse and import one-by-one)
+		streamingImp := importer.NewStreamingImporter(s.db, libID, libraryPath, firstAuthorOnly)
+		streamingImp.SetProgressCallback(func(current, total int, message string) {
+			sendProgress(ImportProgress{
+				Current: current,
+				Total:   total,
+				Message: message,
+				Done:    false,
+			})
+		})
+
+		// Load genre codes
+		if err := streamingImp.LoadGenreCodes(); err != nil {
+			sendProgress(ImportProgress{
+				Done:  true,
+				Error: "Failed to load genre codes: " + err.Error(),
+			})
+			return
+		}
+
+		// Import files with streaming
+		err = streamingImp.ImportFiles(ctx, files)
+		if err != nil {
+			if err == context.Canceled {
+				sendProgress(ImportProgress{
+					Done:  true,
+					Error: "Import canceled. Check library for partial results.",
+				})
+				log.Printf("Import canceled for library: %s", name)
+				return
+			}
+			sendProgress(ImportProgress{
+				Done:  true,
+				Error: "Import failed: " + err.Error(),
+			})
+			return
+		}
+
+		err = nil
 	}
 
 	if err != nil {
