@@ -1946,11 +1946,12 @@ const App = {
                     <input type="text" name="name" class="form-input" placeholder="My Library" required>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">INPX File Path (on server) *</label>
+                    <label class="form-label">INPX File Path (on server)</label>
                     <div class="input-with-btn">
-                      <input type="text" name="inpx_path" id="inpx-path-input" class="form-input" placeholder="/data/library/books.inpx" required>
+                      <input type="text" name="inpx_path" id="inpx-path-input" class="form-input" placeholder="/data/library/books.inpx (optional)">
                       <button type="button" class="btn btn-outline" data-action="browseInpx">Browse...</button>
                     </div>
+                    <small class="form-help">Leave empty to scan directory (slower but works for EPUB/FB2 files)</small>
                   </div>
                   <div class="form-group">
                     <label class="form-label">Library Path (folder with ZIP files) *</label>
@@ -2302,6 +2303,15 @@ const App = {
 
   async submitImportLibrary(form) {
     const data = new FormData(form);
+    const inpxPath = data.get('inpx_path').trim();
+    
+    // Warn if importing without INPX file
+    if (!inpxPath) {
+      if (!confirm('Warning: Importing without an INPX file will be slower as it requires scanning all book files.\n\nThis method works for EPUB and FB2 files but may take significant time for large libraries.\n\nDo you want to continue?')) {
+        return;
+      }
+    }
+    
     const statusEl = document.getElementById('import-status');
     const progressEl = document.getElementById('import-progress');
     const progressFill = document.getElementById('progress-fill');
@@ -2316,7 +2326,7 @@ const App = {
     
     const params = new URLSearchParams({
       name: data.get('name'),
-      inpx_path: data.get('inpx_path'),
+      inpx_path: inpxPath,
       library_path: data.get('library_path'),
       first_author_only: data.get('first_author_only') === 'on' ? 'true' : 'false'
     });
