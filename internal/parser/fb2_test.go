@@ -142,6 +142,19 @@ func TestFixMalformedTags(t *testing.T) {
 		{"valid tag", "<p>text</p>", "<p>text</p>"},
 		{"tag with hyphen and space", "<- text>", "&lt;- text>"},
 		{"tag with hyphen and number", "<-123>", "&lt;-123>"},
+		// Cyrillic text after < (invalid XML element name)
+		{"cyrillic after <", "<Привет>", "&lt;Привет>"},
+		{"cyrillic word in text", "text <образуется more", "text &lt;образуется more"},
+		// Space/whitespace after <
+		{"space after <", "< space", "&lt; space"},
+		{"newline after <", "<\ntext", "&lt;\ntext"},
+		// Bare < at end
+		{"bare < at end", "text <", "text &lt;"},
+		// Valid tags should not be modified
+		{"valid closing tag", "</p>", "</p>"},
+		{"valid comment", "<!-- comment -->", "<!-- comment -->"},
+		{"valid processing instruction", "<?xml?>", "<?xml?>"},
+		{"valid tag with underscore", "<_tag>", "<_tag>"},
 	}
 
 	for _, tt := range tests {

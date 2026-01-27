@@ -208,11 +208,45 @@ func fixUnescapedAmpersands(data []byte) []byte {
 }
 
 func fixMalformedTags(data []byte) []byte {
+	// Fix tags starting with numbers, dots, or dashes
 	reInvalidTagStart := regexp.MustCompile(`<([0-9]|\.\.\.|--?[^a-zA-Z>])`)
 	data = reInvalidTagStart.ReplaceAllFunc(data, func(match []byte) []byte {
 		return append([]byte("&lt;"), match[1:]...)
 	})
-	return data
+
+	// Fix unescaped < followed by non-ASCII characters (e.g., Cyrillic text)
+	// Valid XML element names must start with a letter (A-Z, a-z), underscore, or colon
+	// This pattern matches < followed by any non-ASCII byte (0x80+) which indicates
+	// text content that was not properly escaped
+	result := make([]byte, 0, len(data))
+	i := 0
+	for i < len(data) {
+		if data[i] == '<' {
+			// Check if this is a valid XML tag start
+			if i+1 >= len(data) {
+				// Bare < at end of file
+				result = append(result, []byte("&lt;")...)
+				i++
+				continue
+			}
+			nextByte := data[i+1]
+			// Valid tag starts: a-z, A-Z, /, !, ?, _
+			isValidTagStart := (nextByte >= 'a' && nextByte <= 'z') ||
+				(nextByte >= 'A' && nextByte <= 'Z') ||
+				nextByte == '/' || nextByte == '!' || nextByte == '?' || nextByte == '_'
+
+			if !isValidTagStart {
+				// Invalid tag start - escape the <
+				result = append(result, []byte("&lt;")...)
+				i++
+				continue
+			}
+		}
+		result = append(result, data[i])
+		i++
+	}
+
+	return result
 }
 
 func parseSeriesNumber(s string) int {
