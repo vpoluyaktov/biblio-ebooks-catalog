@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path/filepath"
 	"strings"
 
 	"biblio-opds-server/internal/parser"
@@ -116,10 +117,13 @@ func (si *StreamingImporter) parseBookFromZip(zipPath string, file *zip.File) (*
 	fileName := file.Name
 	lowerName := strings.ToLower(fileName)
 	var format string
+	var ext string
 	if strings.HasSuffix(lowerName, ".fb2") {
 		format = "fb2"
+		ext = ".fb2"
 	} else if strings.HasSuffix(lowerName, ".epub") {
 		format = "epub"
+		ext = ".epub"
 	} else {
 		return nil, fmt.Errorf("unknown format: %s", fileName)
 	}
@@ -130,15 +134,23 @@ func (si *StreamingImporter) parseBookFromZip(zipPath string, file *zip.File) (*
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
+	// Extract just the archive filename (not full path) for storage
+	// This matches how INPX import stores archive names
+	archiveName := filepath.Base(zipPath)
+
+	// Extract file ID without extension (e.g., "24" from "24.fb2")
+	// This matches how INPX import and bookfile.GetReader expect the file field
+	fileID := strings.TrimSuffix(filepath.Base(fileName), ext)
+
 	// Create ScannedBook
 	scannedBook := &ScannedBook{
 		FilePath:  zipPath,
 		RelPath:   zipPath,
-		FileName:  fileName,
+		FileName:  fileID, // Just the file ID without extension
 		Format:    format,
 		Size:      int64(file.UncompressedSize64),
 		Metadata:  metadata,
-		Archive:   zipPath,
+		Archive:   archiveName, // Just the ZIP filename, not full path
 		FileInZip: fileName,
 	}
 
