@@ -10,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/unicode"
 )
 
 // EPUBMetadata represents metadata extracted from an EPUB file
@@ -361,6 +364,29 @@ func ParseFB2MetadataFromZip(zipPath string) (*EPUBMetadata, error) {
 	return parseFB2Metadata(rc)
 }
 
+// charsetReader returns a reader for the specified charset
+func charsetReader(charset string, input io.Reader) (io.Reader, error) {
+	charset = strings.ToLower(charset)
+
+	switch charset {
+	case "windows-1251":
+		return charmap.Windows1251.NewDecoder().Reader(input), nil
+	case "windows-1252":
+		return charmap.Windows1252.NewDecoder().Reader(input), nil
+	case "iso-8859-1", "latin1":
+		return charmap.ISO8859_1.NewDecoder().Reader(input), nil
+	case "utf-8", "":
+		return input, nil
+	case "utf-16", "utf-16le":
+		return unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewDecoder().Reader(input), nil
+	case "utf-16be":
+		return unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder().Reader(input), nil
+	default:
+		// For unknown charsets, try to parse as UTF-8
+		return input, nil
+	}
+}
+
 func parseFB2Metadata(r io.Reader) (*EPUBMetadata, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -368,7 +394,10 @@ func parseFB2Metadata(r io.Reader) (*EPUBMetadata, error) {
 	}
 
 	var fb2 fb2MetadataDocument
-	if err := xml.Unmarshal(data, &fb2); err != nil {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.CharsetReader = charsetReader
+
+	if err := decoder.Decode(&fb2); err != nil {
 		return nil, fmt.Errorf("failed to parse FB2: %w", err)
 	}
 
@@ -437,32 +466,35 @@ func parseFB2Metadata(r io.Reader) (*EPUBMetadata, error) {
 
 // ParseFB2MetadataFromBytes parses FB2 metadata from a byte array
 func ParseFB2MetadataFromBytes(data []byte) (*EPUBMetadata, error) {
-var fb2 fb2MetadataDocument
-if err := xml.Unmarshal(data, &fb2); err != nil {
-return nil, fmt.Errorf("failed to parse FB2: %w", err)
-}
+	var fb2 fb2MetadataDocument
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.CharsetReader = charsetReader
 
-// Get annotation from paragraphs
-annotation := strings.Join(fb2.Description.TitleInfo.Annotation.Paragraphs, "\n\n")
+	if err := decoder.Decode(&fb2); err != nil {
+		return nil, fmt.Errorf("failed to parse FB2: %w", err)
+	}
 
-metadata := &EPUBMetadata{
-Title:       strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
-Language:    strings.TrimSpace(fb2.Description.TitleInfo.Lang),
-Description: strings.TrimSpace(annotation),
-Series:      strings.TrimSpace(fb2.Description.TitleInfo.Sequence.Name),
-SeriesIndex: fb2.Description.TitleInfo.Sequence.Number,
-Genres:      fb2.Description.TitleInfo.Genres,
-}
+	// Get annotation from paragraphs
+	annotation := strings.Join(fb2.Description.TitleInfo.Annotation.Paragraphs, "\n\n")
 
-// Parse author
-author := Author{
-FirstName:  strings.TrimSpace(fb2.Description.TitleInfo.Author.FirstName),
-LastName:   strings.TrimSpace(fb2.Description.TitleInfo.Author.LastName),
-MiddleName: strings.TrimSpace(fb2.Description.TitleInfo.Author.MiddleName),
-}
-if author.FirstName != "" || author.LastName != "" {
-metadata.Authors = []Author{author}
-}
+	metadata := &EPUBMetadata{
+		Title:       strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
+		Language:    strings.TrimSpace(fb2.Description.TitleInfo.Lang),
+		Description: strings.TrimSpace(annotation),
+		Series:      strings.TrimSpace(fb2.Description.TitleInfo.Sequence.Name),
+		SeriesIndex: fb2.Description.TitleInfo.Sequence.Number,
+		Genres:      fb2.Description.TitleInfo.Genres,
+	}
 
-return metadata, nil
+	// Parse author
+	author := Author{
+		FirstName:  strings.TrimSpace(fb2.Description.TitleInfo.Author.FirstName),
+		LastName:   strings.TrimSpace(fb2.Description.TitleInfo.Author.LastName),
+		MiddleName: strings.TrimSpace(fb2.Description.TitleInfo.Author.MiddleName),
+	}
+	if author.FirstName != "" || author.LastName != "" {
+		metadata.Authors = []Author{author}
+	}
+
+	return metadata, nil
 }

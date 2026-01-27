@@ -1971,10 +1971,7 @@ const App = {
                     <button type="button" class="btn btn-outline" id="import-cancel-btn" style="display:none;" onclick="App.cancelImport()">Cancel</button>
                   </div>
                   <div id="import-progress" style="display:none;margin-top:1rem">
-                    <div class="progress-bar">
-                      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-                    </div>
-                    <div id="import-status" class="text-muted mt-1" style="font-size:0.875rem"></div>
+                    <div id="import-status" class="text-muted" style="font-size:0.875rem"></div>
                   </div>
                 </form>
               </div>
@@ -2330,7 +2327,6 @@ const App = {
     
     const statusEl = document.getElementById('import-status');
     const progressEl = document.getElementById('import-progress');
-    const progressFill = document.getElementById('progress-fill');
     const btnEl = document.getElementById('import-btn');
     const cancelBtn = document.getElementById('import-cancel-btn');
     
@@ -2338,7 +2334,6 @@ const App = {
     btnEl.textContent = 'Importing...';
     cancelBtn.style.display = 'inline-block';
     progressEl.style.display = 'block';
-    progressFill.style.width = '0%';
     statusEl.textContent = 'Starting import...';
     statusEl.style.color = 'var(--text-muted)';
     
@@ -2401,26 +2396,18 @@ const App = {
           if (line.startsWith('data: ')) {
             const progress = JSON.parse(line.slice(6));
             
-            if (progress.total > 0) {
-              const percent = Math.round((progress.current / progress.total) * 100);
-              progressFill.style.width = percent + '%';
-            }
-            
             statusEl.textContent = progress.message;
             
             if (progress.done) {
               if (progress.error) {
                 statusEl.textContent = `✗ ${progress.error}`;
                 statusEl.style.color = 'var(--danger)';
-                progressFill.style.background = 'var(--danger)';
                 btnEl.disabled = false;
                 btnEl.textContent = 'Import Library';
                 cancelBtn.style.display = 'none';
               } else {
                 statusEl.textContent = `✓ ${progress.message}`;
                 statusEl.style.color = 'var(--success)';
-                progressFill.style.width = '100%';
-                progressFill.style.background = 'var(--success)';
                 cancelBtn.style.display = 'none';
                 form.reset();
                 setTimeout(() => this.renderLibraries(), 1500);
