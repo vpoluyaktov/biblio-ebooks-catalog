@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -404,13 +405,34 @@ func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
 	var coverData []byte
 	var contentType string
 
-	// Try to extract cover from FB2 files
+	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+
+	// Try to extract cover based on format
 	if book.Format == "fb2" {
-		bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
 		reader, _, err := bf.GetReader()
 		if err == nil {
 			coverData, contentType, _ = bookfile.ExtractFB2Cover(reader)
 			reader.Close()
+		}
+	} else if book.Format == "epub" {
+		// Extract cover from EPUB
+		// For EPUB files, we need the actual file path (not from archive)
+		var fullPath string
+		if book.Archive == "" {
+			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+		} else {
+			// EPUB in archive - need to extract first or read from archive
+			// For now, try direct file path (most EPUBs are not in archives)
+			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+		}
+
+		metadata, err := bookfile.ParseEPUBMetadata(fullPath)
+		if err == nil && metadata.CoverData != nil {
+			coverData = metadata.CoverData
+			contentType = metadata.CoverType
+			if contentType == "" {
+				contentType = "image/jpeg"
+			}
 		}
 	}
 
@@ -452,23 +474,39 @@ func (s *Server) handleOPDSAnnotation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only FB2 files have embedded annotations
-	if book.Format != "fb2" {
-		http.Error(w, "Annotation not available", http.StatusNotFound)
-		return
-	}
+	var annotation string
 
-	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
-	reader, _, err := bf.GetReader()
-	if err != nil {
-		http.Error(w, "Failed to read book", http.StatusInternalServerError)
-		return
-	}
-	defer reader.Close()
+	if book.Format == "fb2" {
+		bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+		reader, _, err := bf.GetReader()
+		if err != nil {
+			http.Error(w, "Failed to read book", http.StatusInternalServerError)
+			return
+		}
+		defer reader.Close()
 
-	annotation, err := bookfile.ExtractFB2Annotation(reader)
-	if err != nil || annotation == "" {
-		http.Error(w, "Annotation not found", http.StatusNotFound)
+		annotation, err = bookfile.ExtractFB2Annotation(reader)
+		if err != nil || annotation == "" {
+			http.Error(w, "Annotation not found", http.StatusNotFound)
+			return
+		}
+	} else if book.Format == "epub" {
+		// Extract description from EPUB
+		var fullPath string
+		if book.Archive == "" {
+			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+		} else {
+			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+		}
+
+		metadata, err := bookfile.ParseEPUBMetadata(fullPath)
+		if err != nil || metadata.Description == "" {
+			http.Error(w, "Annotation not found", http.StatusNotFound)
+			return
+		}
+		annotation = metadata.Description
+	} else {
+		http.Error(w, "Annotation not available for this format", http.StatusNotFound)
 		return
 	}
 
