@@ -2442,7 +2442,9 @@ const App = {
   },
 
   cancelImport() {
-    this.importAborted = true;
+    if (confirm('Are you sure you want to cancel the current import? All progress will be saved up to the last batch.')) {
+      this.importAborted = true;
+    }
   },
 
   renderBookGrid(entries) {
