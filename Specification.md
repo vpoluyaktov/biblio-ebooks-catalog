@@ -258,16 +258,63 @@ Implement a **three-mode system**:
 - Parse INPX for metadata (existing implementation)
 - Fast: metadata already indexed
 
-**2. Directory Scan Import (Slow)**
-- User provides path to book directory (no INPX)
-- Recursively scan for `.fb2`, `.fb2.zip`, `.epub` files
-- Parse each file for metadata (matching INPX fields):
-  - Title, Author(s), Series, Series Number
-  - Genre codes, Language
-  - File size, Format
-- Import metadata directly to database
-- Note: Cover images are extracted on-demand when requested, not during import
-- Show progress indicator (file count, percentage)
+**2. Directory Scan Import (Slow) - Streaming Import Flow**
+
+The streaming import flow ensures:
+- **Immediate progress feedback** - UI shows accurate progress from the start
+- **Partial import preservation** - Canceled imports save already-processed books
+- **Responsive cancellation** - Cancel button stops import within seconds
+- **Memory efficiency** - Books imported as parsed, not accumulated in memory
+
+**Flow Steps:**
+
+1. **File Discovery Phase** (Fast - seconds)
+   - Recursively scan directory for book files
+   - Collect file paths and determine file types:
+     - `.fb2` → FB2 type
+     - `.epub` → EPUB type  
+     - `.zip` → ZIP type (requires further inspection)
+   - For ZIP files: Quick list of contents to identify books inside
+     - Store each book as "InZip" type with:
+       - Parent ZIP file path
+       - File name inside ZIP
+       - Position/offset in ZIP (for efficient extraction)
+   - **Result**: Complete file list with accurate total book count for progress bar
+
+2. **Streaming Parse & Import Phase** (Slow - minutes)
+   - Process files one-by-one in a loop
+   - **Before each book**:
+     - Check cancellation flag → exit if canceled
+     - Update progress bar (current/total)
+     - Update import statistics (imported/skipped counts)
+   
+   - **For single FB2/EPUB files**:
+     - Parse metadata using appropriate parser (FB2Parser or EPUBParser)
+     - Import to database immediately
+     - Commit transaction every 100 books
+   
+   - **For InZip files**:
+     - Extract file from ZIP on-the-fly (no temp files)
+     - Parse metadata from bytes using `ParseFromReader()`
+     - Import to database immediately
+     - Commit transaction every 100 books
+   
+   - **After each book**:
+     - Increment progress counter
+     - Send progress update to UI via SSE
+     - Check if batch size (100) reached → commit transaction
+
+3. **Completion/Cancellation**
+   - On completion: Final commit, show success message with stats
+   - On cancellation: Final commit of partial batch, show canceled message with stats
+   - Library exists with all successfully imported books (even if canceled)
+
+**Key Design Principles:**
+- **No bulk collection**: Don't collect all parsed books in memory before importing
+- **Frequent commits**: Commit every 100 books to preserve progress
+- **Frequent cancellation checks**: Check before each book parse (not just between batches)
+- **Accurate progress**: Total count known from file discovery phase
+- **On-the-fly ZIP extraction**: Extract and parse ZIP contents without temp files
 
 **3. Reindex Mode**
 - User selects existing library from database
