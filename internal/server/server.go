@@ -73,15 +73,39 @@ func (s *Server) basicAuth(next http.Handler) http.Handler {
 }
 
 func (s *Server) setupRoutes() {
+	basePath := s.config.Server.BasePath
+	if basePath == "" {
+		basePath = "/"
+	}
+	// Ensure base path ends with /
+	if basePath != "/" && basePath[len(basePath)-1] != '/' {
+		basePath += "/"
+	}
+
+	// If we have a base path, mount everything under it
+	if basePath != "/" {
+		s.router.Route(basePath[:len(basePath)-1], func(r chi.Router) {
+			s.setupRoutesWithBase(r)
+		})
+		// Redirect from base path without trailing slash
+		s.router.Get(basePath[:len(basePath)-1], func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, basePath, http.StatusMovedPermanently)
+		})
+	} else {
+		s.setupRoutesWithBase(s.router)
+	}
+}
+
+func (s *Server) setupRoutesWithBase(r chi.Router) {
 	// Static files
-	s.router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	// Web UI routes
-	s.router.Get("/", s.handleIndex)
-	s.router.Get("/library/{libID}", s.handleLibrary)
+	r.Get("/", s.handleIndex)
+	r.Get("/library/{libID}", s.handleLibrary)
 
 	// OPDS routes (support both session auth for web UI and Basic Auth for e-readers)
-	s.router.Route("/opds", func(r chi.Router) {
+	r.Route("/opds", func(r chi.Router) {
 		r.Use(s.auth.SessionMiddleware)
 		r.Use(s.auth.BasicAuthMiddleware)
 		r.Get("/{libID}", s.handleOPDSRoot)
@@ -100,7 +124,7 @@ func (s *Server) setupRoutes() {
 	})
 
 	// REST API routes
-	s.router.Route("/api", func(r chi.Router) {
+	r.Route("/api", func(r chi.Router) {
 		// Apply session middleware to all API routes
 		r.Use(s.auth.SessionMiddleware)
 

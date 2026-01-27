@@ -17,8 +17,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	BasePath string `yaml:"base_path"`
 }
 
 type DatabaseConfig struct {
@@ -93,6 +94,9 @@ func (c *Config) loadFromEnv() {
 		if port, err := strconv.Atoi(v); err == nil {
 			c.Server.Port = port
 		}
+	}
+	if v := os.Getenv("OPDS_BASE_PATH"); v != "" {
+		c.Server.BasePath = v
 	}
 	if v := os.Getenv("OPDS_DATABASE_PATH"); v != "" {
 		c.Database.Path = v
