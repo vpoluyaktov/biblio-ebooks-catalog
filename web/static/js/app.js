@@ -2407,11 +2407,10 @@ const App = {
               // Determinate progress - show percentage
               const percent = Math.round((progress.current / progress.total) * 100);
               progressFill.style.width = percent + '%';
-              progressFill.style.animation = 'none';
+              progressFill.classList.remove('indeterminate');
             } else {
-              // Indeterminate progress - show animated bar for ZIP imports
-              progressFill.style.width = '100%';
-              progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
+              // Indeterminate progress - show animated striped bar for ZIP imports
+              progressFill.classList.add('indeterminate');
             }
             
             statusEl.textContent = progress.message;
