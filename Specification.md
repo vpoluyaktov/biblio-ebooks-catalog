@@ -352,12 +352,12 @@ Note: This is a non-destructive operation. Database remains unchanged.
   - [x] Parallel file processing with worker pool
   - [x] Progress reporting callback
   - [x] Handle various directory structures (flat, Author/Book, Author/Series/Book, Genre/Book)
-- [ ] **Phase 3: INPX Generator (Reindex Mode)**
-  - [ ] Create `internal/importer/inpx_writer.go`
-  - [ ] Query database for library books, authors, series
-  - [ ] Format records as INPX (semicolon-delimited)
-  - [ ] Write ZIP archive with `.inp` file(s)
-  - [ ] Support both library ID and library name lookup
+- [x] **Phase 3: INPX Generator (Reindex Mode)**
+  - [x] Create `internal/importer/inpx_writer.go`
+  - [x] Query database for library books, authors, series
+  - [x] Format records as INPX (semicolon-delimited)
+  - [x] Write ZIP archive with `.inp` file(s)
+  - [x] Support both library ID and library name lookup
 - [ ] **Phase 4: CLI Integration**
   - [ ] Add `--scan` flag to import command
   - [ ] Add `--recreate` flag to delete and reimport existing library
