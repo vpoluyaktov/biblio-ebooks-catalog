@@ -2005,23 +2005,19 @@ const App = {
   async editLibrary(btn) {
     const id = btn.dataset.id;
     const currentName = btn.dataset.name;
-    const currentPath = btn.dataset.path;
     
-    const name = prompt('Library name:', currentName);
-    if (name === null) return;
-    
-    const path = prompt('Library path:', currentPath);
-    if (path === null) return;
+    const name = prompt('Enter new library name:', currentName);
+    if (name === null || name.trim() === '') return;
     
     try {
       await fetch(`/api/libraries/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, path })
+        body: JSON.stringify({ name: name.trim() })
       });
       this.renderLibraries();
     } catch (e) {
-      alert('Failed to update library');
+      alert('Failed to update library: ' + e.message);
     }
   },
 
