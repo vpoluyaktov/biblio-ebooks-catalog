@@ -434,3 +434,35 @@ func parseFB2Metadata(r io.Reader) (*EPUBMetadata, error) {
 
 	return metadata, nil
 }
+
+// ParseFB2MetadataFromBytes parses FB2 metadata from a byte array
+func ParseFB2MetadataFromBytes(data []byte) (*EPUBMetadata, error) {
+var fb2 fb2MetadataDocument
+if err := xml.Unmarshal(data, &fb2); err != nil {
+return nil, fmt.Errorf("failed to parse FB2: %w", err)
+}
+
+// Get annotation from paragraphs
+annotation := strings.Join(fb2.Description.TitleInfo.Annotation.Paragraphs, "\n\n")
+
+metadata := &EPUBMetadata{
+Title:       strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
+Language:    strings.TrimSpace(fb2.Description.TitleInfo.Lang),
+Description: strings.TrimSpace(annotation),
+Series:      strings.TrimSpace(fb2.Description.TitleInfo.Sequence.Name),
+SeriesIndex: fb2.Description.TitleInfo.Sequence.Number,
+Genres:      fb2.Description.TitleInfo.Genres,
+}
+
+// Parse author
+author := Author{
+FirstName:  strings.TrimSpace(fb2.Description.TitleInfo.Author.FirstName),
+LastName:   strings.TrimSpace(fb2.Description.TitleInfo.Author.LastName),
+MiddleName: strings.TrimSpace(fb2.Description.TitleInfo.Author.MiddleName),
+}
+if author.FirstName != "" || author.LastName != "" {
+metadata.Authors = []Author{author}
+}
+
+return metadata, nil
+}

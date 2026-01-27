@@ -125,7 +125,7 @@ func (s *Scanner) findBookFiles() ([]string, error) {
 // parseFilesParallel parses files using a worker pool for parallel processing
 func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 	jobs := make(chan string, len(filePaths))
-	results := make(chan *ScannedBook, len(filePaths))
+	results := make(chan []*ScannedBook, len(filePaths))
 
 	var wg sync.WaitGroup
 
@@ -135,9 +135,9 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 		go func() {
 			defer wg.Done()
 			for path := range jobs {
-				book := s.parseFile(path)
-				if book != nil {
-					results <- book
+				booksFromFile := s.parseFile(path)
+				if len(booksFromFile) > 0 {
+					results <- booksFromFile
 				}
 			}
 		}()
@@ -160,12 +160,12 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 	parsed := 0
 	total := len(filePaths)
 
-	for book := range results {
-		books = append(books, book)
+	for booksFromFile := range results {
+		books = append(books, booksFromFile...)
 		parsed++
 
 		if parsed%10 == 0 || parsed == total {
-			s.reportProgress(parsed, total, fmt.Sprintf("Parsed %d/%d files...", parsed, total))
+			s.reportProgress(parsed, total, fmt.Sprintf("Parsed %d/%d archives, %d books found...", parsed, total, len(books)))
 		}
 	}
 
@@ -173,7 +173,8 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 }
 
 // parseFile parses a single book file and extracts metadata
-func (s *Scanner) parseFile(path string) *ScannedBook {
+// For ZIP archives containing multiple FB2 files, returns multiple ScannedBook entries
+func (s *Scanner) parseFile(path string) []*ScannedBook {
 	info, err := os.Stat(path)
 	if err != nil {
 		log.Printf("Warning: failed to stat %s: %v", path, err)
@@ -198,6 +199,12 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 		format = "fb2.zip"
 	}
 
+	// For ZIP archives, extract all FB2 files inside
+	if format == "fb2.zip" {
+		return s.parseZipArchive(path, relPath, info.Size())
+	}
+
+	// For single files (EPUB, FB2)
 	book := &ScannedBook{
 		FilePath: path,
 		RelPath:  relPath,
@@ -215,8 +222,6 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 		metadata, parseErr = bookfile.ParseEPUBMetadata(path)
 	case "fb2":
 		metadata, parseErr = bookfile.ParseFB2Metadata(path)
-	case "fb2.zip":
-		metadata, parseErr = bookfile.ParseFB2MetadataFromZip(path)
 	default:
 		parseErr = fmt.Errorf("unsupported format: %s", format)
 	}
@@ -225,11 +230,11 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 		log.Printf("Warning: failed to parse %s: %v", path, parseErr)
 		book.ParseError = parseErr
 		// Still return the book with basic file info
-		return book
+		return []*ScannedBook{book}
 	}
 
 	book.Metadata = metadata
-	return book
+	return []*ScannedBook{book}
 }
 
 // ImportScannedBooks imports scanned books into the database
