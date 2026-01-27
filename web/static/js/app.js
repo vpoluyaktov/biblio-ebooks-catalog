@@ -2831,11 +2831,14 @@ const App = {
     
     const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
     
+    // Store current path for selection
+    this.currentPickerPath = res.path;
+    
     modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
     modal.querySelector('.modal-body').innerHTML = `
       <div class="file-picker">
         <div class="file-picker-path">
-          <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1">
+          <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1" readonly>
           <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
         </div>
         <div class="file-picker-list">
@@ -2856,7 +2859,7 @@ const App = {
           ${res.entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
         </div>
         <div class="file-picker-actions">
-          ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select This Directory</button>` : ''}
+          ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select: ${res.path}</button>` : ''}
           <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
         </div>
       </div>
@@ -2894,7 +2897,7 @@ const App = {
   },
 
   selectCurrentDir() {
-    const path = document.getElementById('picker-path-input').value;
+    const path = this.currentPickerPath || document.getElementById('picker-path-input').value;
     if (this.filePickerCallback) {
       this.filePickerCallback(path);
     }
