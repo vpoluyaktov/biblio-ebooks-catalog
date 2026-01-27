@@ -139,8 +139,9 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 
 // parseFilesParallelWithContext parses files with cancellation support
 func (s *Scanner) parseFilesParallelWithContext(ctx context.Context, filePaths []string) ([]*ScannedBook, error) {
-	jobs := make(chan string, len(filePaths))
-	results := make(chan []*ScannedBook, len(filePaths))
+	// Use small buffer to allow frequent cancellation checks
+	jobs := make(chan string, s.workers*2)
+	results := make(chan []*ScannedBook, s.workers*2)
 
 	var wg sync.WaitGroup
 
