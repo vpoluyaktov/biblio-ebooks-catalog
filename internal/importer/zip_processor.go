@@ -21,11 +21,20 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 
 	log.Printf("Processing ZIP file: %s (%d files inside)", fileInfo.FileName, len(reader.File))
 
+	booksProcessed := 0
+
 	// Process each file in the ZIP
 	for _, file := range reader.File {
 		// Check for cancellation before each book
 		select {
 		case <-ctx.Done():
+			// Commit any remaining books in current batch before exiting
+			if len(si.currentBatch) > 0 {
+				if err := si.commitBatch(); err != nil {
+					log.Printf("Warning: failed to commit final batch on cancellation: %v", err)
+				}
+			}
+			log.Printf("ZIP processing canceled after %d books in %s", booksProcessed, fileInfo.FileName)
 			return ctx.Err()
 		default:
 		}
@@ -42,11 +51,19 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 			continue
 		}
 
+		booksProcessed++
+
 		// Parse the book from ZIP
 		scannedBook, err := si.parseBookFromZip(fileInfo.Path, file)
 		if err != nil {
 			log.Printf("Warning: failed to parse %s in %s: %v", fileName, fileInfo.FileName, err)
 			si.skippedBooks++
+
+			// Report progress every 100 books (including skipped)
+			if booksProcessed%100 == 0 {
+				si.reportProgress(si.importedBooks+si.skippedBooks, si.totalBooks,
+					fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
+			}
 			continue
 		}
 
@@ -58,8 +75,21 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 			if err := si.commitBatch(); err != nil {
 				log.Printf("Warning: batch commit error: %v", err)
 			}
+			// Report progress after each batch commit
+			si.reportProgress(si.importedBooks+si.skippedBooks, si.totalBooks,
+				fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
 		}
 	}
+
+	// Commit any remaining books in final partial batch
+	if len(si.currentBatch) > 0 {
+		if err := si.commitBatch(); err != nil {
+			log.Printf("Warning: failed to commit final batch: %v", err)
+		}
+	}
+
+	log.Printf("Completed processing ZIP: %s (%d books processed, %d imported, %d skipped)",
+		fileInfo.FileName, booksProcessed, si.importedBooks, si.skippedBooks)
 
 	return nil
 }
