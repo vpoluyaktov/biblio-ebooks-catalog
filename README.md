@@ -2,7 +2,7 @@
 
 > Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
-A lightweight OPDS (Open Publication Distribution System) catalog server for e-book libraries, written in Go. Import your FB2 book collections from INPX files and serve them via OPDS protocol to e-readers and reading apps.
+A lightweight OPDS (Open Publication Distribution System) catalog server for e-book libraries, written in Go. Import your EPUB and FB2 book collections with or without INPX index files and serve them via OPDS protocol to e-readers and reading apps.
 
 ## Features
 
@@ -23,9 +23,15 @@ A lightweight OPDS (Open Publication Distribution System) catalog server for e-b
 - **Per-library OPDS URLs** with click-to-copy functionality
 
 ### Library Import
-- Import from **INPX** index files (lib.rus.ec format)
-- Supports custom field mappings via `structure.info`
+- **Three import modes:**
+  - **INPX Import** - Fast import from INPX index files (lib.rus.ec format)
+  - **Scan Import** - Direct directory scanning for EPUB and FB2 files (no INPX needed)
+  - **Reindex** - Export library metadata to INPX format from database
+- **Supported formats:** EPUB, FB2, FB2.ZIP
+- **Metadata extraction** from EPUB (Dublin Core + Calibre) and FB2 files
+- **Parallel processing** with configurable worker pools for fast scanning
 - **Progress tracking** during import with live book count
+- **Recreate mode** - Delete and reimport existing libraries
 - **ID reuse** - deleted library IDs are recycled for stable OPDS URLs
 
 ## Installation
@@ -76,6 +82,69 @@ The server starts on `http://0.0.0.0:9988` by default.
 ```bash
 ./biblio-opds-server --help
 ./biblio-opds-server --restart  # Kill existing process on port and restart
+```
+
+### CLI Commands
+
+#### Import from INPX (Fast)
+Import a library using an existing INPX index file:
+```bash
+./biblio-opds-server import \
+  --inpx /path/to/library.inpx \
+  --name "My Library" \
+  --path /path/to/books \
+  --db ./data/library.db
+```
+
+#### Scan Import (No INPX needed)
+Scan a directory and import EPUB/FB2 files directly:
+```bash
+./biblio-opds-server scan \
+  --name "My EPUB Library" \
+  --path /path/to/epub/books \
+  --workers 4 \
+  --db ./data/library.db
+```
+
+**Options:**
+- `--workers` - Number of parallel workers for parsing (default: 4)
+- `--recreate` - Delete existing library with same path and reimport
+
+**Example with recreate:**
+```bash
+./biblio-opds-server scan \
+  --name "My Library" \
+  --path /path/to/books \
+  --recreate
+```
+
+#### Reindex (Export to INPX)
+Export library metadata from database to INPX format:
+```bash
+# By library ID
+./biblio-opds-server reindex \
+  --library-id 1 \
+  --output /path/to/output.inpx
+
+# By library name
+./biblio-opds-server reindex \
+  --library-name "My Library" \
+  --output /path/to/output.inpx
+```
+
+#### Other Commands
+```bash
+# Delete a library
+./biblio-opds-server delete-library --id 1
+
+# Create a user
+./biblio-opds-server create-user \
+  --username admin \
+  --password secret \
+  --role admin
+
+# Show version
+./biblio-opds-server version
 ```
 
 ### First-time setup
@@ -131,7 +200,10 @@ biblio-opds-server/
 - `GET /api/libraries` - List all libraries
 - `GET /api/libraries/{id}` - Get library details
 - `GET /api/libraries/{id}/stats` - Get library statistics
+- `POST /api/libraries` - Import library from INPX
 - `GET /api/libraries/import` - Import library (SSE progress)
+- `POST /api/libraries/scan` - Scan and import directory (EPUB/FB2)
+- `POST /api/libraries/reindex` - Export library to INPX format
 - `PUT /api/libraries/{id}` - Update library
 - `DELETE /api/libraries/{id}` - Delete library
 
