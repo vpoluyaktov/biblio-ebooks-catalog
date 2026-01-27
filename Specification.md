@@ -358,11 +358,11 @@ Note: This is a non-destructive operation. Database remains unchanged.
   - [x] Format records as INPX (semicolon-delimited)
   - [x] Write ZIP archive with `.inp` file(s)
   - [x] Support both library ID and library name lookup
-- [ ] **Phase 4: CLI Integration**
-  - [ ] Add `--scan` flag to import command
-  - [ ] Add `--recreate` flag to delete and reimport existing library
-  - [ ] Add `reindex` command with `--library-id`, `--library-name`, `--output` flags
-  - [ ] Progress output during scan and reindex
+- [x] **Phase 4: CLI Integration**
+  - [x] Add `scan` command for directory scanning import
+  - [x] Add `--recreate` flag to delete and reimport existing library
+  - [x] Add `reindex` command with `--library-id`, `--library-name`, `--output` flags
+  - [x] Progress output during scan and reindex
 - [ ] **Phase 5: Web UI Integration**
   - [ ] Warning dialog for scan imports
   - [ ] Progress indicator during import
