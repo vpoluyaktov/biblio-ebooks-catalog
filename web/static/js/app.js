@@ -2032,8 +2032,8 @@ const App = {
           <form data-form="submitReindexFromEdit" data-library-id="${id}">
             <div class="form-group">
               <label class="form-label">Output INPX File Path</label>
-              <div class="input-group">
-                <input type="text" name="output_path" id="reindex-output-path-edit" class="form-control" placeholder="/path/to/output.inpx" required>
+              <div class="input-with-btn">
+                <input type="text" name="output_path" id="reindex-output-path-edit" class="form-control" placeholder="/path/to/output.inpx" required style="flex: 1;">
                 <button type="button" class="btn btn-outline" data-action="browseReindexOutputEdit">Browse...</button>
               </div>
               <small class="form-help">Full path where the INPX file will be created</small>
