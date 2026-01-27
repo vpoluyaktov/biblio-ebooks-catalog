@@ -2002,22 +2002,63 @@ const App = {
     }
   },
 
-  async editLibrary(btn) {
+  editLibrary(btn) {
     const id = btn.dataset.id;
     const currentName = btn.dataset.name;
     
-    const name = prompt('Enter new library name:', currentName);
-    if (name === null || name.trim() === '') return;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Edit Library</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitEditLibrary" data-library-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Library Name</label>
+              <input type="text" name="name" class="form-control" value="${currentName}" required>
+            </div>
+            <div id="edit-library-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitEditLibrary(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const name = data.get('name').trim();
+    const errorEl = document.getElementById('edit-library-error');
+    
+    if (!name) {
+      errorEl.textContent = 'Library name is required';
+      return;
+    }
     
     try {
-      await fetch(`/api/libraries/${id}`, {
+      const res = await fetch(`/api/libraries/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify({ name })
       });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update library');
+      }
+      
+      this.closeModal();
       this.renderLibraries();
     } catch (e) {
-      alert('Failed to update library: ' + e.message);
+      errorEl.textContent = e.message;
     }
   },
 
