@@ -2983,7 +2983,7 @@ const App = {
       modal.className = 'modal-overlay';
       modal.innerHTML = `
         <div class="modal-dialog" style="max-width: 500px;">
-          <div class="modal-header" style="background: #f59e0b; color: white;">
+          <div class="modal-header" style="background: var(--primary); color: white;">
             <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
               <span style="font-size: 1.5rem;">⚠️</span>
               ${title}
@@ -3001,7 +3001,7 @@ const App = {
               <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(false);">
                 ${cancelText}
               </button>
-              <button type="button" class="btn btn-primary" style="background: #f59e0b; border-color: #f59e0b;" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(true);">
+              <button type="button" class="btn btn-primary" onclick="this.closest('.modal-overlay').remove(); window.warningDialogResolve(true);">
                 ${confirmText}
               </button>
             </div>
