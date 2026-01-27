@@ -2079,7 +2079,10 @@ const App = {
           <form data-form="submitReindex" data-library-id="${id}">
             <div class="form-group">
               <label class="form-label">Output INPX File Path</label>
-              <input type="text" name="output_path" class="form-control" placeholder="/path/to/output.inpx" required>
+              <div class="input-group">
+                <input type="text" name="output_path" id="reindex-output-path" class="form-control" placeholder="/path/to/output.inpx" required>
+                <button type="button" class="btn btn-outline" data-action="browseReindexOutput">Browse...</button>
+              </div>
               <small class="form-help">Full path where the INPX file will be created</small>
             </div>
             <div id="reindex-status" class="form-info" style="display:none;">
@@ -2172,6 +2175,19 @@ const App = {
 
   browseLibraryPath() {
     this.showFilePicker('library-path-input', 'dir');
+  },
+
+  browseReindexOutput() {
+    // Use dir picker, then user can append filename
+    this.filePickerCallback = (path) => {
+      const input = document.getElementById('reindex-output-path');
+      // Append default filename if path is a directory
+      const outputPath = path.endsWith('/') ? path + 'library.inpx' : path + '/library.inpx';
+      input.value = outputPath;
+      this.closeFilePicker();
+    };
+    this.filePickerType = 'dir';
+    this.renderFilePicker('/');
   },
 
   async submitImportLibrary(form) {
