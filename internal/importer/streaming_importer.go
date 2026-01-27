@@ -68,7 +68,7 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 	si.reportProgress(0, si.totalBooks, "Starting import...")
 
 	for i, fileInfo := range files {
-		// Check for cancellation before each book
+		// Check for cancellation before each file
 		select {
 		case <-ctx.Done():
 			// Commit any remaining books in current batch
@@ -82,7 +82,16 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 		default:
 		}
 
-		// Parse the file
+		// Handle ZIP files specially - process all books inside
+		if fileInfo.Type == FileTypeZIP {
+			if err := si.processZipFile(ctx, fileInfo); err != nil {
+				log.Printf("Warning: failed to process ZIP %s: %v", fileInfo.FileName, err)
+			}
+			si.reportProgress(i+1, si.totalBooks, fmt.Sprintf("Processed %d files, imported %d books, skipped %d...", i+1, si.importedBooks, si.skippedBooks))
+			continue
+		}
+
+		// Parse single file
 		scannedBook, err := si.parseFile(fileInfo)
 		if err != nil {
 			log.Printf("Warning: failed to parse %s: %v", fileInfo.FileName, err)
@@ -119,11 +128,15 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 }
 
 // parseFile parses a single file and returns a ScannedBook
+// For ZIP files, this returns nil as they are handled separately
 func (si *StreamingImporter) parseFile(fileInfo *FileInfo) (*ScannedBook, error) {
 	var metadata *parser.Metadata
 	var err error
 
-	if fileInfo.IsInZip() {
+	if fileInfo.Type == FileTypeZIP {
+		// ZIP files are handled by parseZipFile, not here
+		return nil, fmt.Errorf("ZIP files should be processed separately")
+	} else if fileInfo.IsInZip() {
 		// Extract and parse from ZIP
 		metadata, err = si.parseFromZip(fileInfo)
 	} else {

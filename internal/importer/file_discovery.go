@@ -76,13 +76,15 @@ func (fd *FileDiscovery) DiscoverFiles() ([]*FileInfo, error) {
 				Size:     fileSize,
 			})
 		} else if strings.HasSuffix(lowerName, ".zip") {
-			// ZIP archive - need to list contents
-			zipFiles, err := fd.listZipContents(path, relPath, fileSize)
-			if err != nil {
-				log.Printf("Warning: failed to list ZIP contents for %s: %v", path, err)
-				return nil // Continue walking
-			}
-			files = append(files, zipFiles...)
+			// ZIP archive - treat as single unit, will be processed during import
+			// Don't list contents here as it's too slow for large archives
+			files = append(files, &FileInfo{
+				Path:     path,
+				RelPath:  relPath,
+				FileName: fileName,
+				Type:     FileTypeZIP,
+				Size:     fileSize,
+			})
 		}
 
 		return nil
