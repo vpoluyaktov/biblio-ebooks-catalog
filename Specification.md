@@ -225,16 +225,187 @@ opds-server:
 
 ### In Progress 🚧
 
-- **EPUB Library Import** (2026-01-26)
+- **Universal Book Import (EPUB + FB2)** (2026-01-26)
   - Feature branch: `feature/EPUB_Import`
-  - Goal: Import EPUB files similar to FB2 import functionality
-  - Test data: Python script to fetch 100 EPUB books from Project Gutenberg
-  - Tasks:
-    - [x] Create test data fetcher script (`scripts/fetch_gutenberg_epubs.py`)
-    - [ ] EPUB metadata extraction (title, author, series, description)
-    - [ ] EPUB cover extraction
-    - [ ] EPUB library import command
-    - [ ] Integration with existing book serving infrastructure
+  - Goal: Import EPUB and FB2 files with or without INPX index file
+
+#### Problem Statement
+
+Currently, library import relies on INPX files (index files commonly used for FB2 libraries). However:
+1. EPUB libraries typically don't have INPX files
+2. Users may have mixed FB2/EPUB collections without an index
+3. Manual metadata extraction from files is slow but necessary as fallback
+
+#### Solution Overview
+
+Implement a **three-mode system**:
+- **INPX Import (Fast)**: Use existing INPX file if provided (current behavior)
+- **Scan Import (Slow)**: Direct filesystem scan with metadata extraction from each book file, import to database
+- **Reindex Mode**: Generate INPX file from database for an existing library
+
+#### Supported Formats
+
+| Format | Metadata | Cover | Annotation |
+|--------|----------|-------|------------|
+| FB2 | ✅ | ✅ | ✅ |
+| FB2.ZIP | ✅ | ✅ | ✅ |
+| EPUB | ✅ | ✅ | ✅ |
+
+#### Import Modes
+
+**1. INPX Import (Fast)**
+- User provides path to INPX file
+- Parse INPX for metadata (existing implementation)
+- Fast: metadata already indexed
+
+**2. Directory Scan Import (Slow)**
+- User provides path to book directory (no INPX)
+- Recursively scan for `.fb2`, `.fb2.zip`, `.epub` files
+- Parse each file for metadata (matching INPX fields):
+  - Title, Author(s), Series, Series Number
+  - Genre codes, Language
+  - File size, Format
+- Import metadata directly to database
+- Note: Cover images are extracted on-demand when requested, not during import
+- Show progress indicator (file count, percentage)
+
+**3. Reindex Mode**
+- User selects existing library from database
+- User specifies output INPX file path and name
+- Export all library metadata from database to INPX format
+- Overwrites existing INPX file if it exists
+- Fast operation (reads from database, not files)
+- Useful for:
+  - Creating INPX for libraries imported via scan mode
+  - Regenerating INPX after manual database edits
+  - Sharing library index without book files
+
+#### Web UI Changes
+
+**Import Screen:**
+- Add warning when importing without INPX:
+  > "No index file provided. Import will scan all book files for metadata. This may take significantly longer than importing with an .inpx file."
+- Show estimated time based on file count
+- Progress bar during scan import
+- Option to cancel long-running imports
+- **"Recreate library" checkbox** - When checked and library with same path exists:
+  - Show confirmation warning: "This will delete all existing books, authors, and series for this library. This action cannot be undone."
+  - If confirmed, delete existing library before import
+
+**Reindex Screen:**
+- Library dropdown to select existing library
+- File path input for output INPX file location
+- File name input (defaults to `library_name.inpx`)
+- "Overwrite if exists" checkbox
+- Progress indicator during INPX generation
+- Success message with file location
+
+#### CLI Changes
+
+```bash
+# Import with INPX (existing)
+./biblio-opds-server import --inpx /path/to/file.inpx --name "My Library" --path /path/to/books
+
+# Import by scanning directory (new)
+./biblio-opds-server import --scan --name "My Library" --path /path/to/books
+
+# Recreate library (delete existing and reimport)
+./biblio-opds-server import --scan --recreate --name "My Library" --path /path/to/books
+
+# Generate INPX from existing library (new)
+./biblio-opds-server reindex --library-id 1 --output /path/to/output.inpx
+./biblio-opds-server reindex --library-name "My Library" --output /path/to/output.inpx
+```
+
+#### Recreate Mode Behavior
+
+When `--recreate` is used with an existing library (matched by path):
+1. **Delete existing library data** - All books, authors, series for that library are removed (CASCADE delete)
+2. **Rescan directory** - Fresh scan of all book files
+3. **Reimport to database** - Insert all scanned books as new records
+
+Note: This is a destructive operation. The library ID may change. Any user customizations (ratings, etc.) will be lost.
+
+#### Reindex Mode Behavior
+
+When `reindex` command is used:
+1. **Query database** - Fetch all books, authors, series for specified library
+2. **Format as INPX** - Convert database records to INPX format (semicolon-delimited)
+3. **Write INPX file** - Create ZIP archive with `.inp` file(s)
+4. **Overwrite if exists** - Replace existing file at output path
+
+Note: This is a non-destructive operation. Database remains unchanged.
+
+#### Implementation Steps
+
+- [x] Create test data fetcher script (`scripts/fetch_gutenberg_epubs.py`)
+- [x] Create test EPUB library with varied directory structures
+- [x] **Phase 1: EPUB Metadata Parser**
+  - [x] Create `internal/bookfile/epub.go` for EPUB parsing
+  - [x] Extract metadata from `META-INF/container.xml` → OPF file
+  - [x] Parse OPF for: title, creator, language, series (calibre metadata), genre
+  - [x] Unit tests for EPUB parser
+  - [x] Add EPUB cover extraction function (for on-demand use, not import)
+- [x] **Phase 2: Directory Scanner**
+  - [x] Create `internal/importer/scanner.go` for filesystem scanning
+  - [x] Recursive directory walk for supported extensions
+  - [x] Parallel file processing with worker pool
+  - [x] Progress reporting callback
+  - [x] Handle various directory structures (flat, Author/Book, Author/Series/Book, Genre/Book)
+- [ ] **Phase 3: INPX Generator (Reindex Mode)**
+  - [ ] Create `internal/importer/inpx_writer.go`
+  - [ ] Query database for library books, authors, series
+  - [ ] Format records as INPX (semicolon-delimited)
+  - [ ] Write ZIP archive with `.inp` file(s)
+  - [ ] Support both library ID and library name lookup
+- [ ] **Phase 4: CLI Integration**
+  - [ ] Add `--scan` flag to import command
+  - [ ] Add `--recreate` flag to delete and reimport existing library
+  - [ ] Add `reindex` command with `--library-id`, `--library-name`, `--output` flags
+  - [ ] Progress output during scan and reindex
+- [ ] **Phase 5: Web UI Integration**
+  - [ ] Warning dialog for scan imports
+  - [ ] Progress indicator during import
+  - [ ] Cancel button for long imports
+  - [ ] "Recreate library" checkbox with confirmation dialog
+  - [ ] Reindex screen with library selection and output path
+  - [ ] Progress indicator during reindex operation
+- [ ] **Phase 6: Testing & Documentation**
+  - [ ] Integration tests with test EPUB library
+  - [ ] Update README with new import options
+  - [ ] Performance benchmarks
+
+#### Technical Notes
+
+**EPUB Structure:**
+```
+book.epub (ZIP archive)
+├── META-INF/
+│   └── container.xml      # Points to OPF file location
+├── OEBPS/ (or similar)
+│   ├── content.opf        # Metadata (Dublin Core + calibre extensions)
+│   ├── toc.ncx            # Table of contents
+│   ├── cover.jpg          # Cover image (referenced in OPF)
+│   └── *.xhtml            # Content files
+```
+
+**INPX Structure:**
+- ZIP archive containing `.inp` files
+- Each `.inp` is semicolon-delimited text with book metadata
+- Fields: Author;Genre;Title;Series;SeriesNum;File;Size;LibId;Deleted;Ext;Date;Language;Keywords;Annotation
+
+**Performance Considerations:**
+- Use worker pool (e.g., 4-8 workers) for parallel file parsing
+- Stream large files instead of loading entirely into memory
+- Cache extracted covers to avoid re-extraction
+- Batch database inserts (100-500 records per transaction)
+
+**Code Reuse:**
+- Reuse ebook parsers from `biblio-audiobook-builder-tts/internal/parser/`:
+  - `epub.go` - EPUB metadata and content extraction
+  - `fb2.go` - FB2 metadata and content extraction
+  - `parser.go` - Common parser interface
+- These parsers are well-tested with comprehensive test suites (`epub_test.go`, `fb2_test.go`)
 
 ### Future Enhancements
 
