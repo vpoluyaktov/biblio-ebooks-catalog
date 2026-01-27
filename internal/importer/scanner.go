@@ -58,6 +58,7 @@ func NewScanner(libraryPath string, workers int) *Scanner {
 			".epub":    true,
 			".fb2":     true,
 			".fb2.zip": true,
+			".zip":     true, // For FB2 archives
 		},
 	}
 }
@@ -189,6 +190,11 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 
 	// Handle .fb2.zip
 	if strings.HasSuffix(strings.ToLower(path), ".fb2.zip") {
+		format = "fb2.zip"
+	}
+
+	// Handle regular .zip files as potential FB2 archives
+	if format == "zip" {
 		format = "fb2.zip"
 	}
 
