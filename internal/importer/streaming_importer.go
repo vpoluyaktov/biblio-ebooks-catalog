@@ -18,6 +18,7 @@ type StreamingImporter struct {
 	libraryPath     string
 	firstAuthorOnly bool
 	progress        ProgressCallback
+	zipProgress     ZipProgressCallback
 
 	// Import statistics
 	totalBooks    int
@@ -30,6 +31,9 @@ type StreamingImporter struct {
 
 	// Genre codes
 	genreCodes map[string]int
+
+	// Current file index for progress reporting
+	currentFileIndex int
 }
 
 // NewStreamingImporter creates a new streaming importer
@@ -48,6 +52,11 @@ func NewStreamingImporter(database *db.DB, libraryID int64, libraryPath string, 
 // SetProgressCallback sets the progress callback function
 func (si *StreamingImporter) SetProgressCallback(cb ProgressCallback) {
 	si.progress = cb
+}
+
+// SetZipProgressCallback sets the ZIP progress callback for dual progress bars
+func (si *StreamingImporter) SetZipProgressCallback(cb ZipProgressCallback) {
+	si.zipProgress = cb
 }
 
 // LoadGenreCodes loads genre codes from file
@@ -69,6 +78,8 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 	si.reportProgress(0, 0, "Starting import...")
 
 	for i, fileInfo := range files {
+		si.currentFileIndex = i
+
 		// Check for cancellation before each file
 		select {
 		case <-ctx.Done():
@@ -88,8 +99,8 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 			if err := si.processZipFile(ctx, fileInfo); err != nil {
 				log.Printf("Warning: failed to process ZIP %s: %v", fileInfo.FileName, err)
 			}
-			// Use 0 as total for indeterminate progress
-			si.reportProgress(si.importedBooks+si.skippedBooks, 0, fmt.Sprintf("Processed %d/%d files, imported %d books, skipped %d...", i+1, si.totalBooks, si.importedBooks, si.skippedBooks))
+			// Clear ZIP progress after completing a ZIP file
+			si.reportZipProgress(i+1, si.totalBooks, 0, 0, "", fmt.Sprintf("Processed %d/%d files, imported %d books, skipped %d...", i+1, si.totalBooks, si.importedBooks, si.skippedBooks))
 			continue
 		}
 
@@ -235,5 +246,12 @@ func (si *StreamingImporter) commitBatch() error {
 func (si *StreamingImporter) reportProgress(current, total int, message string) {
 	if si.progress != nil {
 		si.progress(current, total, message)
+	}
+}
+
+// reportZipProgress reports progress with ZIP file details for dual progress bars
+func (si *StreamingImporter) reportZipProgress(fileIndex, fileTotal, zipCurrent, zipTotal int, zipFileName, message string) {
+	if si.zipProgress != nil {
+		si.zipProgress(fileIndex, fileTotal, zipCurrent, zipTotal, zipFileName, message)
 	}
 }

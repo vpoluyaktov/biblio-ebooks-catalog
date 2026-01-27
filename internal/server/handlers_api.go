@@ -105,6 +105,10 @@ type ImportProgress struct {
 	Done    bool   `json:"done"`
 	Error   string `json:"error,omitempty"`
 	LibID   int64  `json:"library_id,omitempty"`
+	// ZIP file progress (for dual progress bar)
+	ZipCurrent  int    `json:"zip_current,omitempty"`
+	ZipTotal    int    `json:"zip_total,omitempty"`
+	ZipFileName string `json:"zip_filename,omitempty"`
 }
 
 func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
@@ -228,6 +232,18 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 				Total:   total,
 				Message: message,
 				Done:    false,
+			})
+		})
+		// Set ZIP progress callback for dual progress bars
+		streamingImp.SetZipProgressCallback(func(fileIndex, fileTotal, zipCurrent, zipTotal int, zipFileName, message string) {
+			sendProgress(ImportProgress{
+				Current:     fileIndex,
+				Total:       fileTotal,
+				Message:     message,
+				Done:        false,
+				ZipCurrent:  zipCurrent,
+				ZipTotal:    zipTotal,
+				ZipFileName: zipFileName,
 			})
 		})
 

@@ -19,12 +19,27 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 	}
 	defer reader.Close()
 
-	log.Printf("Processing ZIP file: %s (%d files inside)", fileInfo.FileName, len(reader.File))
-
-	booksProcessed := 0
-
-	// Process each file in the ZIP
+	// First pass: count book files in ZIP for accurate progress
+	var bookFiles []*zip.File
 	for _, file := range reader.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		lowerName := strings.ToLower(file.Name)
+		if strings.HasSuffix(lowerName, ".fb2") || strings.HasSuffix(lowerName, ".epub") {
+			bookFiles = append(bookFiles, file)
+		}
+	}
+
+	totalBooksInZip := len(bookFiles)
+	log.Printf("Processing ZIP file: %s (%d books inside)", fileInfo.FileName, totalBooksInZip)
+
+	// Report initial ZIP progress
+	si.reportZipProgress(si.currentFileIndex+1, si.totalBooks, 0, totalBooksInZip, fileInfo.FileName,
+		fmt.Sprintf("Starting %s (0/%d books)...", fileInfo.FileName, totalBooksInZip))
+
+	// Second pass: process each book file
+	for i, file := range bookFiles {
 		// Check for cancellation before each book
 		select {
 		case <-ctx.Done():
@@ -34,24 +49,12 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 					log.Printf("Warning: failed to commit final batch on cancellation: %v", err)
 				}
 			}
-			log.Printf("ZIP processing canceled after %d books in %s", booksProcessed, fileInfo.FileName)
+			log.Printf("ZIP processing canceled after %d/%d books in %s", i, totalBooksInZip, fileInfo.FileName)
 			return ctx.Err()
 		default:
 		}
 
-		if file.FileInfo().IsDir() {
-			continue
-		}
-
 		fileName := file.Name
-		lowerName := strings.ToLower(fileName)
-
-		// Check if it's a book file
-		if !strings.HasSuffix(lowerName, ".fb2") && !strings.HasSuffix(lowerName, ".epub") {
-			continue
-		}
-
-		booksProcessed++
 
 		// Parse the book from ZIP
 		scannedBook, err := si.parseBookFromZip(fileInfo.Path, file)
@@ -59,10 +62,10 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 			log.Printf("Warning: failed to parse %s in %s: %v", fileName, fileInfo.FileName, err)
 			si.skippedBooks++
 
-			// Report progress every 100 books (including skipped)
-			if booksProcessed%100 == 0 {
-				si.reportProgress(si.importedBooks+si.skippedBooks, 0,
-					fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
+			// Report progress every 100 books
+			if (i+1)%100 == 0 {
+				si.reportZipProgress(si.currentFileIndex+1, si.totalBooks, i+1, totalBooksInZip, fileInfo.FileName,
+					fmt.Sprintf("Processing %s: %d/%d books (imported %d, skipped %d)...", fileInfo.FileName, i+1, totalBooksInZip, si.importedBooks, si.skippedBooks))
 			}
 			continue
 		}
@@ -76,8 +79,8 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 				log.Printf("Warning: batch commit error: %v", err)
 			}
 			// Report progress after each batch commit
-			si.reportProgress(si.importedBooks+si.skippedBooks, 0,
-				fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
+			si.reportZipProgress(si.currentFileIndex+1, si.totalBooks, i+1, totalBooksInZip, fileInfo.FileName,
+				fmt.Sprintf("Processing %s: %d/%d books (imported %d, skipped %d)...", fileInfo.FileName, i+1, totalBooksInZip, si.importedBooks, si.skippedBooks))
 		}
 	}
 
@@ -89,7 +92,7 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 	}
 
 	log.Printf("Completed processing ZIP: %s (%d books processed, %d imported, %d skipped)",
-		fileInfo.FileName, booksProcessed, si.importedBooks, si.skippedBooks)
+		fileInfo.FileName, totalBooksInZip, si.importedBooks, si.skippedBooks)
 
 	return nil
 }

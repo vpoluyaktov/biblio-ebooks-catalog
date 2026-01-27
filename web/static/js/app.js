@@ -1971,8 +1971,23 @@ const App = {
                     <button type="button" class="btn btn-outline" id="import-cancel-btn" style="display:none;" onclick="App.cancelImport()">Cancel</button>
                   </div>
                   <div id="import-progress" style="display:none;margin-top:1rem">
-                    <div class="progress-bar">
-                      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                    <div style="margin-bottom:0.5rem">
+                      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem">
+                        <span>Overall Progress</span>
+                        <span id="overall-progress-text"></span>
+                      </div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+                      </div>
+                    </div>
+                    <div id="zip-progress-container" style="display:none;margin-bottom:0.5rem">
+                      <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem">
+                        <span id="zip-progress-label">Current ZIP</span>
+                        <span id="zip-progress-text"></span>
+                      </div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="zip-progress-fill" style="width:0%"></div>
+                      </div>
                     </div>
                     <div id="import-status" class="text-muted mt-1" style="font-size:0.875rem"></div>
                   </div>
@@ -2402,15 +2417,43 @@ const App = {
           if (line.startsWith('data: ')) {
             const progress = JSON.parse(line.slice(6));
             
-            // Update progress bar
+            // Get ZIP progress elements
+            const zipContainer = document.getElementById('zip-progress-container');
+            const zipProgressFill = document.getElementById('zip-progress-fill');
+            const zipProgressLabel = document.getElementById('zip-progress-label');
+            const zipProgressText = document.getElementById('zip-progress-text');
+            const overallProgressText = document.getElementById('overall-progress-text');
+            
+            // Update overall progress bar
             if (progress.total > 0) {
-              // Determinate progress - show percentage
               const percent = Math.round((progress.current / progress.total) * 100);
               progressFill.style.width = percent + '%';
               progressFill.classList.remove('indeterminate');
+              if (overallProgressText) {
+                overallProgressText.textContent = `${progress.current}/${progress.total} files`;
+              }
             } else {
-              // Indeterminate progress - show animated striped bar for ZIP imports
               progressFill.classList.add('indeterminate');
+              if (overallProgressText) {
+                overallProgressText.textContent = '';
+              }
+            }
+            
+            // Update ZIP progress bar if ZIP data is present
+            if (progress.zip_total > 0 && zipContainer) {
+              zipContainer.style.display = 'block';
+              const zipPercent = Math.round((progress.zip_current / progress.zip_total) * 100);
+              zipProgressFill.style.width = zipPercent + '%';
+              zipProgressFill.classList.remove('indeterminate');
+              if (zipProgressLabel) {
+                zipProgressLabel.textContent = progress.zip_filename || 'Current ZIP';
+              }
+              if (zipProgressText) {
+                zipProgressText.textContent = `${progress.zip_current}/${progress.zip_total} books (${zipPercent}%)`;
+              }
+            } else if (zipContainer && progress.zip_total === 0) {
+              // Hide ZIP progress when not processing a ZIP
+              zipContainer.style.display = 'none';
             }
             
             statusEl.textContent = progress.message;

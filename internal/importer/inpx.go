@@ -56,6 +56,9 @@ func defaultFieldIndex() fieldIndex {
 
 type ProgressCallback func(current, total int, message string)
 
+// ZipProgressCallback provides detailed progress for ZIP file processing
+type ZipProgressCallback func(fileIndex, fileTotal int, zipCurrent, zipTotal int, zipFileName, message string)
+
 type Importer struct {
 	db              *db.DB
 	libraryID       int64
