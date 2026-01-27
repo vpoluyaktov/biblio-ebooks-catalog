@@ -112,25 +112,30 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 	libraryPath := r.URL.Query().Get("library_path")
 	firstAuthorOnly := r.URL.Query().Get("first_author_only") == "true"
 
-	if name == "" || inpxPath == "" || libraryPath == "" {
+	// Only name and library_path are required
+	if name == "" || libraryPath == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"name, inpx_path, and library_path are required"}`))
+		w.Write([]byte(`{"error":"name and library_path are required"}`))
 		return
 	}
 
-	// Validate paths
-	if _, err := os.Stat(inpxPath); os.IsNotExist(err) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"INPX file not found"}`))
-		return
-	}
+	// Validate library path exists
 	if _, err := os.Stat(libraryPath); os.IsNotExist(err) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(`{"error":"Library path not found"}`))
 		return
+	}
+
+	// If INPX path is provided, validate it exists
+	if inpxPath != "" {
+		if _, err := os.Stat(inpxPath); os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":"INPX file not found"}`))
+			return
+		}
 	}
 
 	// Set SSE headers
@@ -162,7 +167,27 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 		})
 	})
 
-	libID, err := imp.ImportINPX(inpxPath, name, libraryPath, firstAuthorOnly)
+	var libID int64
+	var err error
+
+	// Choose import method based on whether INPX path is provided
+	if inpxPath != "" {
+		// INPX import
+		libID, err = imp.ImportINPX(inpxPath, name, libraryPath, firstAuthorOnly)
+	} else {
+		// Scan import (for EPUB/FB2 files)
+		scanner := importer.NewScanner(libraryPath, 4) // Use 4 workers
+		books, scanErr := scanner.ScanDirectory()
+		if scanErr != nil {
+			sendProgress(ImportProgress{
+				Done:  true,
+				Error: "Scan failed: " + scanErr.Error(),
+			})
+			return
+		}
+		libID, err = imp.ImportScannedBooks(books, name, libraryPath, firstAuthorOnly)
+	}
+
 	if err != nil {
 		sendProgress(ImportProgress{
 			Done:  true,
