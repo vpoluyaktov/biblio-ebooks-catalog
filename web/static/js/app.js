@@ -1966,8 +1966,9 @@ const App = {
                       <span>First author only</span>
                     </label>
                   </div>
-                  <div class="mt-2">
+                  <div class="mt-2" style="display: flex; gap: 0.5rem;">
                     <button type="submit" class="btn btn-primary" id="import-btn">Import Library</button>
+                    <button type="button" class="btn btn-outline" id="import-cancel-btn" style="display:none;" onclick="App.cancelImport()">Cancel</button>
                   </div>
                   <div id="import-progress" style="display:none;margin-top:1rem">
                     <div class="progress-bar">
@@ -2331,13 +2332,18 @@ const App = {
     const progressEl = document.getElementById('import-progress');
     const progressFill = document.getElementById('progress-fill');
     const btnEl = document.getElementById('import-btn');
+    const cancelBtn = document.getElementById('import-cancel-btn');
     
     btnEl.disabled = true;
     btnEl.textContent = 'Importing...';
+    cancelBtn.style.display = 'inline-block';
     progressEl.style.display = 'block';
     progressFill.style.width = '0%';
     statusEl.textContent = 'Starting import...';
     statusEl.style.color = 'var(--text-muted)';
+    
+    this.importAborted = false;
+    this.importReader = null;
     
     const params = new URLSearchParams({
       name: data.get('name'),
@@ -2369,10 +2375,21 @@ const App = {
       }
 
       const reader = response.body.getReader();
+      this.importReader = reader;
       const decoder = new TextDecoder();
       let buffer = '';
 
       while (true) {
+        if (this.importAborted) {
+          reader.cancel();
+          statusEl.textContent = '✗ Import cancelled by user';
+          statusEl.style.color = 'var(--danger)';
+          btnEl.disabled = false;
+          btnEl.textContent = 'Import Library';
+          cancelBtn.style.display = 'none';
+          return;
+        }
+        
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -2398,11 +2415,13 @@ const App = {
                 progressFill.style.background = 'var(--danger)';
                 btnEl.disabled = false;
                 btnEl.textContent = 'Import Library';
+                cancelBtn.style.display = 'none';
               } else {
                 statusEl.textContent = `✓ ${progress.message}`;
                 statusEl.style.color = 'var(--success)';
                 progressFill.style.width = '100%';
                 progressFill.style.background = 'var(--success)';
+                cancelBtn.style.display = 'none';
                 form.reset();
                 setTimeout(() => this.renderLibraries(), 1500);
               }
@@ -2416,7 +2435,12 @@ const App = {
       statusEl.style.color = 'var(--danger)';
       btnEl.disabled = false;
       btnEl.textContent = 'Import Library';
+      cancelBtn.style.display = 'none';
     }
+  },
+
+  cancelImport() {
+    this.importAborted = true;
   },
 
   renderBookGrid(entries) {

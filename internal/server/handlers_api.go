@@ -177,6 +177,14 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Scan import (for EPUB/FB2 files)
 		scanner := importer.NewScanner(libraryPath, 4) // Use 4 workers
+		scanner.SetProgressCallback(func(current, total int, message string) {
+			sendProgress(ImportProgress{
+				Current: current,
+				Total:   total,
+				Message: message,
+				Done:    false,
+			})
+		})
 		books, scanErr := scanner.ScanDirectory()
 		if scanErr != nil {
 			sendProgress(ImportProgress{
