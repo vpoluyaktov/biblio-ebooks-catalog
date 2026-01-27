@@ -1925,11 +1925,7 @@ const App = {
                             </label>
                           </td>
                           <td>
-                            <div class="flex gap-1">
-                              <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
-                              <button class="btn btn-sm btn-outline" data-action="reindexLibrary" data-id="${lib.id}" data-name="${lib.name}">Reindex</button>
-                              <button class="btn btn-sm btn-danger" data-action="deleteLibrary" data-id="${lib.id}" data-name="${lib.name}">Delete</button>
-                            </div>
+                            <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
                           </td>
                         </tr>
                       `).join('')}
@@ -2010,23 +2006,56 @@ const App = {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal-dialog">
+      <div class="modal-dialog" style="max-width: 600px;">
         <div class="modal-header">
-          <h3 class="modal-title">Edit Library</h3>
+          <h3 class="modal-title">Manage Library: ${currentName}</h3>
           <button type="button" class="modal-close" data-action="closeModal">&times;</button>
         </div>
         <div class="modal-body">
+          <!-- Rename Section -->
           <form data-form="submitEditLibrary" data-library-id="${id}">
+            <h4 class="mb-2">Rename Library</h4>
             <div class="form-group">
               <label class="form-label">Library Name</label>
-              <input type="text" name="name" class="form-control" value="${currentName}" required>
+              <input type="text" name="name" id="edit-library-name" class="form-control" value="${currentName}" required>
             </div>
             <div id="edit-library-error" class="form-error"></div>
-            <div class="modal-actions">
-              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
-              <button type="submit" class="btn btn-primary">Save</button>
+            <div class="mb-4">
+              <button type="submit" class="btn btn-primary">Save Name</button>
             </div>
           </form>
+
+          <hr class="my-4">
+
+          <!-- Reindex Section -->
+          <h4 class="mb-2">Export to INPX</h4>
+          <form data-form="submitReindexFromEdit" data-library-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Output INPX File Path</label>
+              <div class="input-group">
+                <input type="text" name="output_path" id="reindex-output-path-edit" class="form-control" placeholder="/path/to/output.inpx" required>
+                <button type="button" class="btn btn-outline" data-action="browseReindexOutputEdit">Browse...</button>
+              </div>
+              <small class="form-help">Full path where the INPX file will be created</small>
+            </div>
+            <div id="reindex-status-edit" class="form-info" style="display:none;">
+              <div class="progress-bar">
+                <div id="reindex-progress-edit" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div id="reindex-message-edit" class="mt-2"></div>
+            </div>
+            <div id="reindex-error-edit" class="form-error"></div>
+            <div class="mb-4">
+              <button type="submit" class="btn btn-primary" id="reindex-submit-btn-edit">Start Reindex</button>
+            </div>
+          </form>
+
+          <hr class="my-4">
+
+          <!-- Delete Section -->
+          <h4 class="mb-2">Delete Library</h4>
+          <p class="text-muted mb-2">This will remove all books, authors, and series from the database. The actual book files will not be deleted.</p>
+          <button type="button" class="btn btn-danger" data-action="deleteLibraryFromEdit" data-library-id="${id}" data-library-name="${currentName}">Delete Library</button>
         </div>
       </div>
     `;
@@ -2188,6 +2217,87 @@ const App = {
     };
     this.filePickerType = 'dir';
     this.renderFilePicker('/');
+  },
+
+  browseReindexOutputEdit() {
+    // Use dir picker for edit modal
+    this.filePickerCallback = (path) => {
+      const input = document.getElementById('reindex-output-path-edit');
+      const outputPath = path.endsWith('/') ? path + 'library.inpx' : path + '/library.inpx';
+      input.value = outputPath;
+      this.closeFilePicker();
+    };
+    this.filePickerType = 'dir';
+    this.renderFilePicker('/');
+  },
+
+  async submitReindexFromEdit(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const outputPath = data.get('output_path').trim();
+    const errorEl = document.getElementById('reindex-error-edit');
+    const statusEl = document.getElementById('reindex-status-edit');
+    const messageEl = document.getElementById('reindex-message-edit');
+    const progressEl = document.getElementById('reindex-progress-edit');
+    const submitBtn = document.getElementById('reindex-submit-btn-edit');
+    
+    if (!outputPath) {
+      errorEl.textContent = 'Output path is required';
+      return;
+    }
+    
+    errorEl.textContent = '';
+    statusEl.style.display = 'block';
+    submitBtn.disabled = true;
+    messageEl.textContent = 'Starting reindex...';
+    progressEl.style.width = '0%';
+    
+    try {
+      const res = await fetch('/api/libraries/reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          library_id: parseInt(id),
+          output_path: outputPath 
+        })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reindex library');
+      }
+      
+      const result = await res.json();
+      progressEl.style.width = '100%';
+      messageEl.textContent = result.message || 'Reindex completed successfully!';
+      
+      setTimeout(() => {
+        submitBtn.disabled = false;
+        statusEl.style.display = 'none';
+        progressEl.style.width = '0%';
+      }, 2000);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      submitBtn.disabled = false;
+      statusEl.style.display = 'none';
+    }
+  },
+
+  async deleteLibraryFromEdit(btn) {
+    const id = btn.dataset.libraryId;
+    const name = btn.dataset.libraryName;
+    
+    if (!confirm(`Are you sure you want to delete the library "${name}"?\n\nThis will remove all books, authors, and series from the database. The actual book files will not be deleted.`)) {
+      return;
+    }
+    
+    try {
+      await fetch(`/api/libraries/${id}`, { method: 'DELETE' });
+      this.closeModal();
+      this.renderLibraries();
+    } catch (e) {
+      alert('Failed to delete library');
+    }
   },
 
   async submitImportLibrary(form) {
