@@ -1927,6 +1927,7 @@ const App = {
                           <td>
                             <div class="flex gap-1">
                               <button class="btn btn-sm btn-outline" data-action="editLibrary" data-id="${lib.id}" data-name="${lib.name}" data-path="${lib.path}">Edit</button>
+                              <button class="btn btn-sm btn-outline" data-action="reindexLibrary" data-id="${lib.id}" data-name="${lib.name}">Reindex</button>
                               <button class="btn btn-sm btn-danger" data-action="deleteLibrary" data-id="${lib.id}" data-name="${lib.name}">Delete</button>
                             </div>
                           </td>
@@ -2059,6 +2060,93 @@ const App = {
       this.renderLibraries();
     } catch (e) {
       errorEl.textContent = e.message;
+    }
+  },
+
+  reindexLibrary(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">Reindex Library: ${name}</h3>
+          <button type="button" class="modal-close" data-action="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form data-form="submitReindex" data-library-id="${id}">
+            <div class="form-group">
+              <label class="form-label">Output INPX File Path</label>
+              <input type="text" name="output_path" class="form-control" placeholder="/path/to/output.inpx" required>
+              <small class="form-help">Full path where the INPX file will be created</small>
+            </div>
+            <div id="reindex-status" class="form-info" style="display:none;">
+              <div class="progress-bar">
+                <div id="reindex-progress" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <div id="reindex-message" class="mt-2"></div>
+            </div>
+            <div id="reindex-error" class="form-error"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-outline" data-action="closeModal">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="reindex-submit-btn">Start Reindex</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  async submitReindex(form) {
+    const id = form.dataset.libraryId;
+    const data = new FormData(form);
+    const outputPath = data.get('output_path').trim();
+    const errorEl = document.getElementById('reindex-error');
+    const statusEl = document.getElementById('reindex-status');
+    const messageEl = document.getElementById('reindex-message');
+    const progressEl = document.getElementById('reindex-progress');
+    const submitBtn = document.getElementById('reindex-submit-btn');
+    
+    if (!outputPath) {
+      errorEl.textContent = 'Output path is required';
+      return;
+    }
+    
+    errorEl.textContent = '';
+    statusEl.style.display = 'block';
+    submitBtn.disabled = true;
+    messageEl.textContent = 'Starting reindex...';
+    progressEl.style.width = '0%';
+    
+    try {
+      const res = await fetch('/api/libraries/reindex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          library_id: parseInt(id),
+          output_path: outputPath 
+        })
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reindex library');
+      }
+      
+      const result = await res.json();
+      progressEl.style.width = '100%';
+      messageEl.textContent = result.message || 'Reindex completed successfully!';
+      
+      setTimeout(() => {
+        this.closeModal();
+      }, 2000);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      submitBtn.disabled = false;
+      statusEl.style.display = 'none';
     }
   },
 
