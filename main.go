@@ -208,7 +208,7 @@ func runScanImport() {
 		log.Printf("[%d/%d] %s", current, total, message)
 	})
 
-	if _, err := imp.ImportScannedBooks(books, *libName, false); err != nil {
+	if _, err := imp.ImportScannedBooks(books, *libName, *libPath, false); err != nil {
 		log.Fatalf("Import failed: %v", err)
 	}
 

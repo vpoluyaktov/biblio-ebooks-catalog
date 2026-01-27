@@ -15,15 +15,15 @@ import (
 
 // ScannedBook represents a book found during directory scanning
 type ScannedBook struct {
-	FilePath    string
-	RelPath     string // Relative path from library root
-	FileName    string
-	Format      string
-	Size        int64
-	Metadata    *bookfile.EPUBMetadata
-	Archive     string // If file is in a ZIP archive
-	FileInZip   string // File name inside ZIP (for fb2.zip)
-	ParseError  error
+	FilePath   string
+	RelPath    string // Relative path from library root
+	FileName   string
+	Format     string
+	Size       int64
+	Metadata   *bookfile.EPUBMetadata
+	Archive    string // If file is in a ZIP archive
+	FileInZip  string // File name inside ZIP (for fb2.zip)
+	ParseError error
 }
 
 // ScanProgress represents the current scanning progress
@@ -40,7 +40,7 @@ type Scanner struct {
 	libraryPath string
 	progress    ProgressCallback
 	workers     int
-	
+
 	// Supported extensions
 	supportedExts map[string]bool
 }
@@ -50,7 +50,7 @@ func NewScanner(libraryPath string, workers int) *Scanner {
 	if workers <= 0 {
 		workers = 4 // Default to 4 workers
 	}
-	
+
 	return &Scanner{
 		libraryPath: libraryPath,
 		workers:     workers,
@@ -92,7 +92,7 @@ func (s *Scanner) ScanDirectory() ([]*ScannedBook, error) {
 // findBookFiles recursively finds all book files in the library directory
 func (s *Scanner) findBookFiles() ([]string, error) {
 	var files []string
-	
+
 	err := filepath.Walk(s.libraryPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("Warning: error accessing %s: %v", path, err)
@@ -105,7 +105,7 @@ func (s *Scanner) findBookFiles() ([]string, error) {
 
 		// Check if file has supported extension
 		ext := strings.ToLower(filepath.Ext(path))
-		
+
 		// Handle .fb2.zip specially
 		if strings.HasSuffix(strings.ToLower(path), ".fb2.zip") {
 			ext = ".fb2.zip"
@@ -125,9 +125,9 @@ func (s *Scanner) findBookFiles() ([]string, error) {
 func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 	jobs := make(chan string, len(filePaths))
 	results := make(chan *ScannedBook, len(filePaths))
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Start workers
 	for i := 0; i < s.workers; i++ {
 		wg.Add(1)
@@ -158,11 +158,11 @@ func (s *Scanner) parseFilesParallel(filePaths []string) []*ScannedBook {
 	var books []*ScannedBook
 	parsed := 0
 	total := len(filePaths)
-	
+
 	for book := range results {
 		books = append(books, book)
 		parsed++
-		
+
 		if parsed%10 == 0 || parsed == total {
 			s.reportProgress(parsed, total, fmt.Sprintf("Parsed %d/%d files...", parsed, total))
 		}
@@ -186,7 +186,7 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 
 	ext := strings.ToLower(filepath.Ext(path))
 	format := strings.TrimPrefix(ext, ".")
-	
+
 	// Handle .fb2.zip
 	if strings.HasSuffix(strings.ToLower(path), ".fb2.zip") {
 		format = "fb2.zip"
@@ -227,7 +227,8 @@ func (s *Scanner) parseFile(path string) *ScannedBook {
 }
 
 // ImportScannedBooks imports scanned books into the database
-func (imp *Importer) ImportScannedBooks(books []*ScannedBook, libraryName string, firstAuthorOnly bool) (int64, error) {
+func (imp *Importer) ImportScannedBooks(books []*ScannedBook, libraryName, libraryPath string, firstAuthorOnly bool) (int64, error) {
+	imp.libraryPath = libraryPath
 	imp.firstAuthorOnly = firstAuthorOnly
 
 	// Load genre codes
@@ -236,7 +237,7 @@ func (imp *Importer) ImportScannedBooks(books []*ScannedBook, libraryName string
 	}
 
 	// Create library
-	libID, err := imp.createLibrary(libraryName, imp.libraryPath, "")
+	libID, err := imp.createLibrary(libraryName, libraryPath, "")
 	if err != nil {
 		return 0, fmt.Errorf("failed to create library: %w", err)
 	}
@@ -261,16 +262,16 @@ func (imp *Importer) ImportScannedBooks(books []*ScannedBook, libraryName string
 		if err != nil {
 			log.Printf("Warning: batch import error: %v", err)
 		}
-		
+
 		imported += count
 		skipped += (len(batch) - count)
-		
+
 		imp.reportProgress(end, len(books), fmt.Sprintf("Imported %d books, skipped %d...", imported, skipped))
 	}
 
 	log.Printf("Import complete: %d books imported, %d skipped", imported, skipped)
 	imp.reportProgress(len(books), len(books), fmt.Sprintf("Complete! %d books imported, %d skipped", imported, skipped))
-	
+
 	return libID, nil
 }
 

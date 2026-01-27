@@ -571,7 +571,7 @@ func (s *Server) apiScanImport(w http.ResponseWriter, r *http.Request) {
 
 	// Import scanned books
 	imp := importer.New(s.db)
-	newLibID, err := imp.ImportScannedBooks(books, req.Name, false)
+	newLibID, err := imp.ImportScannedBooks(books, req.Name, req.Path, false)
 	if err != nil {
 		s.jsonError(w, "Import failed: "+err.Error(), http.StatusInternalServerError)
 		return
