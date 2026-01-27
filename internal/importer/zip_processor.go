@@ -61,7 +61,7 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 
 			// Report progress every 100 books (including skipped)
 			if booksProcessed%100 == 0 {
-				si.reportProgress(si.importedBooks+si.skippedBooks, si.totalBooks,
+				si.reportProgress(si.importedBooks+si.skippedBooks, 0,
 					fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
 			}
 			continue
@@ -76,7 +76,7 @@ func (si *StreamingImporter) processZipFile(ctx context.Context, fileInfo *FileI
 				log.Printf("Warning: batch commit error: %v", err)
 			}
 			// Report progress after each batch commit
-			si.reportProgress(si.importedBooks+si.skippedBooks, si.totalBooks,
+			si.reportProgress(si.importedBooks+si.skippedBooks, 0,
 				fmt.Sprintf("Processing %s: imported %d books, skipped %d...", fileInfo.FileName, si.importedBooks, si.skippedBooks))
 		}
 	}

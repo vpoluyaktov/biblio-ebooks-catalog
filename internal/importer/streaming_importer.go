@@ -65,7 +65,8 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 	si.totalBooks = len(files)
 
 	log.Printf("Starting streaming import of %d files to library %d", si.totalBooks, si.libraryID)
-	si.reportProgress(0, si.totalBooks, "Starting import...")
+	// Use 0 as total to indicate indeterminate progress (we don't know total book count for ZIPs)
+	si.reportProgress(0, 0, "Starting import...")
 
 	for i, fileInfo := range files {
 		// Check for cancellation before each file
@@ -87,7 +88,8 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 			if err := si.processZipFile(ctx, fileInfo); err != nil {
 				log.Printf("Warning: failed to process ZIP %s: %v", fileInfo.FileName, err)
 			}
-			si.reportProgress(i+1, si.totalBooks, fmt.Sprintf("Processed %d files, imported %d books, skipped %d...", i+1, si.importedBooks, si.skippedBooks))
+			// Use 0 as total for indeterminate progress
+			si.reportProgress(si.importedBooks+si.skippedBooks, 0, fmt.Sprintf("Processed %d/%d files, imported %d books, skipped %d...", i+1, si.totalBooks, si.importedBooks, si.skippedBooks))
 			continue
 		}
 
@@ -96,7 +98,7 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 		if err != nil {
 			log.Printf("Warning: failed to parse %s: %v", fileInfo.FileName, err)
 			si.skippedBooks++
-			si.reportProgress(i+1, si.totalBooks, fmt.Sprintf("Imported %d books, skipped %d...", si.importedBooks, si.skippedBooks))
+			si.reportProgress(si.importedBooks+si.skippedBooks, 0, fmt.Sprintf("Imported %d books, skipped %d...", si.importedBooks, si.skippedBooks))
 			continue
 		}
 
@@ -111,7 +113,7 @@ func (si *StreamingImporter) ImportFiles(ctx context.Context, files []*FileInfo)
 		}
 
 		// Report progress
-		si.reportProgress(i+1, si.totalBooks, fmt.Sprintf("Imported %d books, skipped %d...", si.importedBooks, si.skippedBooks))
+		si.reportProgress(si.importedBooks+si.skippedBooks, 0, fmt.Sprintf("Imported %d books, skipped %d...", si.importedBooks, si.skippedBooks))
 	}
 
 	// Commit any remaining books

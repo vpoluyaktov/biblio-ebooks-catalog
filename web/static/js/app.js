@@ -2402,10 +2402,16 @@ const App = {
           if (line.startsWith('data: ')) {
             const progress = JSON.parse(line.slice(6));
             
-            // Update progress bar if total is available
+            // Update progress bar
             if (progress.total > 0) {
+              // Determinate progress - show percentage
               const percent = Math.round((progress.current / progress.total) * 100);
               progressFill.style.width = percent + '%';
+              progressFill.style.animation = 'none';
+            } else {
+              // Indeterminate progress - show animated bar for ZIP imports
+              progressFill.style.width = '100%';
+              progressFill.style.animation = 'progress-indeterminate 1.5s ease-in-out infinite';
             }
             
             statusEl.textContent = progress.message;
@@ -2441,8 +2447,15 @@ const App = {
     }
   },
 
-  cancelImport() {
-    if (confirm('Are you sure you want to cancel the current import? All progress will be saved up to the last batch.')) {
+  async cancelImport() {
+    const confirmed = await this.showWarningDialog(
+      'Cancel Import',
+      'Are you sure you want to cancel the current import?',
+      'All progress will be saved up to the last batch.',
+      'Yes, Cancel Import',
+      'Continue Importing'
+    );
+    if (confirmed) {
       this.importAborted = true;
     }
   },
