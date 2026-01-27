@@ -28,7 +28,7 @@ type Book struct {
 	Deleted       bool      `db:"deleted" json:"deleted"`
 	AddedAt       time.Time `db:"added_at" json:"added_at"`
 	IDInLib       int64     `db:"id_in_lib" json:"id_in_lib"`
-	FirstAuthorID int64     `db:"first_author_id" json:"first_author_id"`
+	FirstAuthorID *int64    `db:"first_author_id" json:"first_author_id"`
 	Keywords      string    `db:"keywords" json:"keywords"`
 }
 
