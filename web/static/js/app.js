@@ -2827,45 +2827,58 @@ const App = {
 
   async renderFilePicker(path) {
     const type = this.filePickerType;
-    const res = await this.fetchAPI(`/api/browse?path=${encodeURIComponent(path)}&type=${type}`);
     
-    const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
-    
-    // Store current path for selection
-    this.currentPickerPath = res.path;
-    
-    modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
-    modal.querySelector('.modal-body').innerHTML = `
-      <div class="file-picker">
-        <div class="file-picker-path">
-          <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1" readonly>
-          <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
+    try {
+      const res = await this.fetchAPI(`/api/browse?path=${encodeURIComponent(path)}&type=${type}`);
+      
+      if (!res || !res.path) {
+        throw new Error('Invalid response from server');
+      }
+      
+      const modal = document.getElementById('file-picker-modal') || this.createFilePickerModal();
+      
+      // Store current path for selection
+      this.currentPickerPath = res.path;
+      
+      // Ensure entries is an array
+      const entries = res.entries || [];
+      
+      modal.querySelector('.modal-title').textContent = type === 'inpx' ? 'Select INPX File' : 'Select Directory';
+      modal.querySelector('.modal-body').innerHTML = `
+        <div class="file-picker">
+          <div class="file-picker-path">
+            <input type="text" class="form-input" value="${res.path}" id="picker-path-input" style="flex:1" readonly>
+            <button class="btn btn-outline btn-sm" onclick="App.navigateToPath()">Go</button>
+          </div>
+          <div class="file-picker-list">
+            ${res.parent ? `
+              <div class="file-picker-item" onclick="App.renderFilePicker('${res.parent.replace(/'/g, "\\'")}')">
+                <span class="file-icon">📁</span>
+                <span>..</span>
+              </div>
+            ` : ''}
+            ${entries.map(entry => `
+              <div class="file-picker-item ${entry.is_dir ? 'is-dir' : 'is-file'}" 
+                   onclick="App.${entry.is_dir ? 'renderFilePicker' : 'selectFile'}('${entry.path.replace(/'/g, "\\'")}')">
+                <span class="file-icon">${entry.is_dir ? '📁' : '📄'}</span>
+                <span>${entry.name}</span>
+                ${!entry.is_dir && entry.size ? `<span class="file-size">${this.formatSize(entry.size)}</span>` : ''}
+              </div>
+            `).join('')}
+            ${entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
+          </div>
+          <div class="file-picker-actions">
+            ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select: ${res.path}</button>` : ''}
+            <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
+          </div>
         </div>
-        <div class="file-picker-list">
-          ${res.parent ? `
-            <div class="file-picker-item" onclick="App.renderFilePicker('${res.parent.replace(/'/g, "\\'")}')">
-              <span class="file-icon">📁</span>
-              <span>..</span>
-            </div>
-          ` : ''}
-          ${res.entries.map(entry => `
-            <div class="file-picker-item ${entry.is_dir ? 'is-dir' : 'is-file'}" 
-                 onclick="App.${entry.is_dir ? 'renderFilePicker' : 'selectFile'}('${entry.path.replace(/'/g, "\\'")}')">
-              <span class="file-icon">${entry.is_dir ? '📁' : '📄'}</span>
-              <span>${entry.name}</span>
-              ${!entry.is_dir && entry.size ? `<span class="file-size">${this.formatSize(entry.size)}</span>` : ''}
-            </div>
-          `).join('')}
-          ${res.entries.length === 0 ? '<div class="text-muted text-center" style="padding:2rem">No items</div>' : ''}
-        </div>
-        <div class="file-picker-actions">
-          ${type === 'dir' ? `<button class="btn btn-primary" onclick="App.selectCurrentDir()">Select: ${res.path}</button>` : ''}
-          <button class="btn btn-outline" onclick="App.closeFilePicker()">Cancel</button>
-        </div>
-      </div>
-    `;
-    
-    modal.style.display = 'flex';
+      `;
+      
+      modal.style.display = 'flex';
+    } catch (e) {
+      console.error('File picker error:', e);
+      alert('Failed to browse directory: ' + e.message);
+    }
   },
 
   createFilePickerModal() {
