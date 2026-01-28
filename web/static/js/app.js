@@ -1915,8 +1915,8 @@ const App = {
                           <td>${lib.book_count?.toLocaleString() || 0}</td>
                           <td>
                             <code style="background:var(--bg-tertiary);padding:0.25rem 0.5rem;border-radius:var(--radius);font-size:0.8rem;cursor:pointer" 
-                                  onclick="navigator.clipboard.writeText('${window.location.origin}/opds/${lib.id}');this.title='Copied!'" 
-                                  title="Click to copy">${window.location.origin}/opds/${lib.id}</code>
+                                  onclick="navigator.clipboard.writeText('${window.location.origin}${window.APP_BASE_PATH || ''}/opds/${lib.id}');this.title='Copied!'" 
+                                  title="Click to copy">${window.location.origin}${window.APP_BASE_PATH || ''}/opds/${lib.id}</code>
                           </td>
                           <td>
                             <label class="toggle-switch">
