@@ -98,27 +98,13 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) setupRoutesWithBase(r chi.Router) {
-	// Static files
-	basePath := s.config.Server.BasePath
-	if basePath == "" {
-		basePath = "/"
-	}
-	if basePath != "/" && basePath[len(basePath)-1] != '/' {
-		basePath += "/"
-	}
-
-	// Create file server
+	// Static files - chi.Route() already strips the base path,
+	// so we only need to strip /static/ prefix
 	fileServer := http.FileServer(http.Dir("web/static"))
-	r.Handle("/static/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// When mounted under base path with chi.Route(), the full path includes base path
-		// Strip both base path and /static prefix
-		path := r.URL.Path
-		if basePath != "/" {
-			path = strings.TrimPrefix(path, basePath[:len(basePath)-1])
-		}
-		path = strings.TrimPrefix(path, "/static")
-		r.URL.Path = path
-		fileServer.ServeHTTP(w, r)
+	r.Handle("/static/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Strip /static prefix from the URL path
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/static")
+		fileServer.ServeHTTP(w, req)
 	}))
 
 	// Web UI routes
