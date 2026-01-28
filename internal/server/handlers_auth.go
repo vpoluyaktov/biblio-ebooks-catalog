@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	"biblio-opds-server/internal/auth"
 	"biblio-opds-server/internal/db"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type LoginRequest struct {

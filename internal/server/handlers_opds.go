@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-
 	"biblio-opds-server/internal/bookfile"
 	"biblio-opds-server/internal/db"
 	"biblio-opds-server/internal/opds"
@@ -26,11 +24,30 @@ func (s *Server) writeOPDS(w http.ResponseWriter, feed *opds.Feed) {
 	w.Write(data)
 }
 
+// getLibraryID extracts library ID from URL path
+// Path format: /opds/{libID}/...
 func (s *Server) getLibraryID(r *http.Request) int64 {
-	libIDStr := chi.URLParam(r, "libID")
-	libID, _ := strconv.ParseInt(libIDStr, 10, 64)
-	if libID == 0 {
-		libID = 1
+	path := r.URL.Path
+	basePath := s.config.Server.BasePath
+
+	// Strip base path and /opds prefix
+	opdsPrefix := basePath + "/opds/"
+	if len(path) <= len(opdsPrefix) {
+		return 1 // Default library
+	}
+
+	remaining := path[len(opdsPrefix):]
+	// Extract first segment (library ID)
+	var idStr string
+	if idx := indexOf(remaining, "/"); idx != -1 {
+		idStr = remaining[:idx]
+	} else {
+		idStr = remaining
+	}
+
+	libID, err := parseInt64(idStr)
+	if err != nil || libID == 0 {
+		return 1 // Default library
 	}
 	return libID
 }
@@ -83,9 +100,7 @@ func (s *Server) handleOPDSAuthors(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSAuthorsByLetter(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	letter := chi.URLParam(r, "letter")
+func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.Request, libID int64, letter string) {
 	// URL decode the letter for Cyrillic support
 	if decoded, err := url.QueryUnescape(letter); err == nil {
 		letter = decoded
@@ -120,10 +135,7 @@ func (s *Server) handleOPDSAuthorsByLetter(w http.ResponseWriter, r *http.Reques
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSAuthor(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	authorIDStr := chi.URLParam(r, "authorID")
-	authorID, _ := strconv.ParseInt(authorIDStr, 10, 64)
+func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, libID int64, authorID int64) {
 	baseURL := fmt.Sprintf("/opds/%d", libID)
 
 	author, err := s.db.GetAuthor(authorID)
@@ -202,10 +214,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSSeriesBooks(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	seriesIDStr := chi.URLParam(r, "seriesID")
-	seriesID, _ := strconv.ParseInt(seriesIDStr, 10, 64)
+func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, seriesID int64) {
 	baseURL := fmt.Sprintf("/opds/%d", libID)
 
 	series, err := s.db.GetSeriesByID(seriesID)
@@ -270,9 +279,7 @@ func (s *Server) handleOPDSGenres(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSGenreBooks(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	genreIDStr := chi.URLParam(r, "genreID")
+func (s *Server) handleOPDSGenreBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, genreIDStr string) {
 	genreID, _ := strconv.Atoi(genreIDStr)
 	baseURL := fmt.Sprintf("/opds/%d", libID)
 
@@ -334,11 +341,7 @@ func (s *Server) handleOPDSGenreBooks(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSBook(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	bookIDStr := chi.URLParam(r, "bookID")
-	bookID, _ := strconv.ParseInt(bookIDStr, 10, 64)
-	format := chi.URLParam(r, "format")
+func (s *Server) handleOPDSBookDirect(w http.ResponseWriter, r *http.Request, libID int64, bookID int64, format string) {
 
 	book, err := s.db.GetBook(bookID)
 	if err != nil {
@@ -386,10 +389,7 @@ func (s *Server) handleOPDSBook(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, reader)
 }
 
-func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	bookIDStr := chi.URLParam(r, "bookID")
-	bookID, _ := strconv.ParseInt(bookIDStr, 10, 64)
+func (s *Server) handleOPDSCoverDirect(w http.ResponseWriter, r *http.Request, libID int64, bookID int64) {
 
 	book, err := s.db.GetBook(bookID)
 	if err != nil {
@@ -458,10 +458,7 @@ func (s *Server) handleOPDSCover(w http.ResponseWriter, r *http.Request) {
 	w.Write(coverData)
 }
 
-func (s *Server) handleOPDSAnnotation(w http.ResponseWriter, r *http.Request) {
-	libID := s.getLibraryID(r)
-	bookIDStr := chi.URLParam(r, "bookID")
-	bookID, _ := strconv.ParseInt(bookIDStr, 10, 64)
+func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Request, libID int64, bookID int64) {
 
 	book, err := s.db.GetBook(bookID)
 	if err != nil {

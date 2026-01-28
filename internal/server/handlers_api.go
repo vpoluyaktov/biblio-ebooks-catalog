@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	"biblio-opds-server/internal/db"
 	"biblio-opds-server/internal/importer"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // API handlers for opds-server
