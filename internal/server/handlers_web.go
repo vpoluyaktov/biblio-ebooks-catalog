@@ -50,10 +50,20 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	basePath := s.config.Server.BasePath
+	if basePath == "" {
+		basePath = "/"
+	}
+	if basePath != "/" && basePath[len(basePath)-1] != '/' {
+		basePath += "/"
+	}
+
 	data := struct {
-		Version string
+		Version  string
+		BasePath string
 	}{
-		Version: computeStaticVersion(),
+		Version:  computeStaticVersion(),
+		BasePath: basePath[:len(basePath)-1], // Remove trailing slash for use in paths
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

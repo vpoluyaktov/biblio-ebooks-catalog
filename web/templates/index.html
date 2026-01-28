@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Biblio OPDS Server</title>
-  <link rel="stylesheet" href="/static/css/style.css?v={{.Version}}">
-  <link rel="stylesheet" href="/static/css/mobile.css?v={{.Version}}">
+  <link rel="stylesheet" href="{{.BasePath}}/static/css/style.css?v={{.Version}}">
+  <link rel="stylesheet" href="{{.BasePath}}/static/css/mobile.css?v={{.Version}}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2'><path d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20'/><path d='M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'/></svg>">
 </head>
 <body>
@@ -16,7 +16,7 @@
   </div>
   <div id="mobile-container"></div>
   <div id="toast-container" class="toast-container"></div>
-  <script src="/static/js/app.js?v={{.Version}}"></script>
-  <script src="/static/js/mobile.js?v={{.Version}}"></script>
+  <script src="{{.BasePath}}/static/js/app.js?v={{.Version}}"></script>
+  <script src="{{.BasePath}}/static/js/mobile.js?v={{.Version}}"></script>
 </body>
 </html>
