@@ -961,11 +961,11 @@ const MobileUI = {
       let opdsUrl = '';
       
       if (this.selectedAuthor) {
-        opdsUrl = `/opds/${App.currentLibrary}/author/${this.selectedAuthor.id}`;
+        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/author/${this.selectedAuthor.id}`);
       } else if (this.selectedSeries) {
-        opdsUrl = `/opds/${App.currentLibrary}/series/${this.selectedSeries.id}`;
+        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/series/${this.selectedSeries.id}`);
       } else if (this.selectedGenre) {
-        opdsUrl = `/opds/${App.currentLibrary}/genres/${encodeURIComponent(this.selectedGenre)}`;
+        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/genres/${encodeURIComponent(this.selectedGenre)}`);
       }
 
       if (!opdsUrl) {
@@ -1124,7 +1124,7 @@ const MobileUI = {
       }
 
       // Use OPDS search endpoint like desktop UI
-      const opdsUrl = `/opds/${App.currentLibrary}/search?q=${encodeURIComponent(query)}`;
+      const opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/search?q=${encodeURIComponent(query)}`);
       const response = await fetch(opdsUrl);
       const text = await response.text();
       const parser = new DOMParser();
