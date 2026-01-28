@@ -543,4 +543,50 @@ book.epub (ZIP archive)
 
 ---
 
-*Last updated: 2026-01-27*
+## Recent Changes
+
+### Path-Based Routing Implementation (2026-01-28)
+
+**Overview**: Implemented support for running the OPDS server on a sub-path (e.g., `/opds`) as part of the BiblioHub unified deployment architecture.
+
+**Architecture Approach**:
+- Backend routes registered **WITH** base path prefix (e.g., `/opds/api/libraries`)
+- Nginx gateway preserves full path when forwarding (no trailing slash in `proxy_pass`)
+- Frontend JavaScript uses `apiUrl()` helper to prepend base path to all API calls
+- Each service isolated in its own namespace, preventing route conflicts
+
+**Backend Changes**:
+- Added `BASE_PATH` environment variable support in `config.go` (default: `/`)
+- Routes registered with base path prefix in `server.go`
+- Path parsing in handlers uses `strings.Index()` to find prefix position
+- Fixed `handleOPDSSource()` to correctly extract source ID with base path
+
+**Frontend Changes**:
+- Added `window.APP_BASE_PATH` injection in HTML template
+- Created `apiUrl()` helper function in `app.js` to prefix all API calls
+- Fixed mobile UI (`mobile.js`): 4 OPDS feed URLs now use `App.apiUrl()`
+  - Author books URL
+  - Series books URL  
+  - Genre books URL
+  - Search URL
+- Fixed user management (`app.js`): 2 endpoints now use `this.apiUrl()`
+  - Change password endpoint
+  - Change role endpoint
+
+**Configuration**:
+```yaml
+# stack.yaml
+opds-server:
+  environment:
+    - BASE_PATH=/opds
+```
+
+**Impact**: 
+- Resolves "no books found" issue in mobile UI when selecting authors/series
+- Fixes user management operations (password/role changes)
+- Enables deployment behind reverse proxy with path-based routing
+- All API calls now work correctly with base path prefix
+
+---
+
+*Last updated: 2026-01-28*
