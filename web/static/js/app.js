@@ -2828,7 +2828,7 @@ const App = {
     }
     
     try {
-      const res = await fetch(`/api/users/${userId}/password`, {
+      const res = await fetch(this.apiUrl(`/api/users/${userId}/password`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -2887,7 +2887,7 @@ const App = {
     const userId = form.dataset.userId;
     
     try {
-      const res = await fetch(`/api/users/${userId}/role`, {
+      const res = await fetch(this.apiUrl(`/api/users/${userId}/role`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
