@@ -1386,7 +1386,8 @@ const App = {
   async showBookDetails(book) {
     this.currentBook = book;
     const panel = document.getElementById('panel-right');
-    const coverUrl = book.id ? `/opds/${this.currentLibrary}/covers/${book.id}/cover.jpg` : '';
+    const basePath = window.APP_BASE_PATH || '';
+    const coverUrl = book.id ? `${basePath}/opds/${this.currentLibrary}/covers/${book.id}/cover.jpg` : '';
 
     // Fetch annotation from the book file if not already present
     let description = book.content || '';
@@ -2528,7 +2529,8 @@ const App = {
           // Extract book ID from link for cover
           const bookId = link.match(/book\/(\d+)/)?.[1];
           const libId = link.match(/opds\/(\d+)/)?.[1] || '1';
-          const coverUrl = bookId ? `/opds/${libId}/covers/${bookId}/cover.jpg` : '';
+          const basePath = window.APP_BASE_PATH || '';
+          const coverUrl = bookId ? `${basePath}/opds/${libId}/covers/${bookId}/cover.jpg` : '';
           
           return `
             <div class="book-card">

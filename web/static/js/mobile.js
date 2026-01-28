@@ -1018,7 +1018,8 @@ const MobileUI = {
         const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
         
         // Construct cover URL like desktop UI does
-        const coverUrl = bookId ? `/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
+        const basePath = window.APP_BASE_PATH || '';
+        const coverUrl = bookId ? `${basePath}/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
         
         return {
           id: bookId,
@@ -1164,7 +1165,8 @@ const MobileUI = {
         const size = sizeBytes > 0 ? this.formatFileSize(sizeBytes) : '';
         
         // Construct cover URL like desktop UI does
-        const coverUrl = bookId ? `/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
+        const basePath = window.APP_BASE_PATH || '';
+        const coverUrl = bookId ? `${basePath}/opds/${App.currentLibrary}/covers/${bookId}/cover.jpg` : '';
         
         return {
           id: bookId,
