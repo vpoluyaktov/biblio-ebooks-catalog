@@ -14,8 +14,6 @@ import (
 
 	"biblio-opds-server/internal/db"
 	"biblio-opds-server/internal/importer"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // API handlers for opds-server
@@ -296,14 +294,7 @@ func (s *Server) apiImportLibrarySSE(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) apiGetLibrary(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) apiGetLibrary(w http.ResponseWriter, r *http.Request, id int64) {
 	lib, err := s.db.GetLibrary(id)
 	if err != nil {
 		s.jsonError(w, "Library not found", http.StatusNotFound)
@@ -312,14 +303,7 @@ func (s *Server) apiGetLibrary(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, lib)
 }
 
-func (s *Server) apiDeleteLibrary(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) apiDeleteLibrary(w http.ResponseWriter, r *http.Request, id int64) {
 	lib, err := s.db.GetLibrary(id)
 	if err != nil {
 		s.jsonError(w, "Library not found", http.StatusNotFound)
@@ -342,13 +326,7 @@ func (s *Server) apiGetBooks(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
-func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	libID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
+func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request, libID int64) {
 
 	// Get pagination and filter params
 	limit := 50 // Default limit for virtual scrolling
@@ -375,13 +353,7 @@ func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, result)
 }
 
-func (s *Server) apiGetSeries(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	libID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
+func (s *Server) apiGetSeries(w http.ResponseWriter, r *http.Request, libID int64) {
 
 	// Get pagination and filter params
 	limit := 50 // Default limit for virtual scrolling
@@ -526,14 +498,7 @@ type LibraryStatsResponse struct {
 	SeriesCount int64       `json:"series_count"`
 }
 
-func (s *Server) apiGetLibraryStats(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) apiGetLibraryStats(w http.ResponseWriter, r *http.Request, id int64) {
 	lib, err := s.db.GetLibrary(id)
 	if err != nil {
 		s.jsonError(w, "Library not found", http.StatusNotFound)
@@ -554,14 +519,7 @@ func (s *Server) apiGetLibraryStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) apiUpdateLibrary(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) apiUpdateLibrary(w http.ResponseWriter, r *http.Request, id int64) {
 	var req struct {
 		Name    string `json:"name"`
 		Path    string `json:"path"`
@@ -596,14 +554,7 @@ func (s *Server) apiUpdateLibrary(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, lib)
 }
 
-func (s *Server) apiToggleLibrary(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "libID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid library ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) apiToggleLibrary(w http.ResponseWriter, r *http.Request, id int64) {
 	var req struct {
 		Enabled bool `json:"enabled"`
 	}

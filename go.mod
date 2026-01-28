@@ -6,7 +6,6 @@ toolchain go1.24.12
 
 require (
 	github.com/fogleman/gg v1.3.0
-	github.com/go-chi/chi/v5 v5.2.4
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.33

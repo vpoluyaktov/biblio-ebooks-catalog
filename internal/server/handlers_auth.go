@@ -3,13 +3,10 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"biblio-opds-server/internal/auth"
 	"biblio-opds-server/internal/db"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type LoginRequest struct {
@@ -145,14 +142,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, user)
 }
 
-func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "userID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request, id int64) {
 	user, err := s.auth.GetUser(id)
 	if err != nil {
 		s.jsonError(w, "User not found", http.StatusNotFound)
@@ -162,14 +152,7 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, user)
 }
 
-func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "userID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request, id int64) {
 	var req UpdatePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
@@ -189,14 +172,7 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 	s.jsonResponse(w, map[string]bool{"success": true})
 }
 
-func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "userID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
+func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, id int64) {
 	var req UpdateRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
@@ -216,15 +192,7 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request) {
 	s.jsonResponse(w, map[string]bool{"success": true})
 }
 
-func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "userID")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		s.jsonError(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
-	// Prevent deleting yourself
+func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, id int64) {
 	currentUser := auth.GetUserFromContext(r.Context())
 	if currentUser != nil && currentUser.ID == id {
 		s.jsonError(w, "Cannot delete your own account", http.StatusBadRequest)
