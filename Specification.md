@@ -589,4 +589,26 @@ opds-server:
 
 ---
 
+### refactor/centralize-basepath-handling - Centralized Base Path Handling (2026-01-28)
+
+**Problem**: Base path handling was scattered throughout the codebase with manual string concatenation (`s.config.Server.BasePath + "/path"`), making the code harder to maintain and more prone to errors.
+
+**Solution**:
+- Created `Server.apiURL()` helper method to centralize base path handling in the backend
+- Updated all OPDS handlers to use the helper method instead of manual concatenation
+- Frontend already had `App.apiUrl()` helper that works consistently
+- Reduced code duplication and improved maintainability
+
+**Files Changed**:
+- `internal/server/server.go` - Added `apiURL()` helper method
+- `internal/server/handlers_opds.go` - Replaced 9 instances of manual `basePath` concatenation with `apiURL()` calls
+
+**Impact**:
+- Centralized base path logic in a single helper method
+- Easier to maintain and modify base path handling in the future
+- Consistent pattern between frontend and backend
+- Reduced code duplication across OPDS handlers
+
+---
+
 *Last updated: 2026-01-28*
