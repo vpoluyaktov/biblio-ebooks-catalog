@@ -57,10 +57,129 @@ func (s *Server) setupRoutes() *http.ServeMux {
 	return mux
 }
 
-// handleOPDSRoutes routes OPDS requests - will be implemented
+// handleOPDSRoutes routes OPDS requests
 func (s *Server) handleOPDSRoutes(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement OPDS routing
-	http.Error(w, "OPDS routes not yet implemented", http.StatusNotImplemented)
+	path := r.URL.Path
+	basePath := s.config.Server.BasePath
+
+	// Strip base path and /opds prefix
+	opdsPrefix := basePath + "/opds"
+	if len(path) <= len(opdsPrefix) {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	path = path[len(opdsPrefix):]
+
+	// Check auth (session or basic auth for e-readers)
+	if !s.auth.CheckSessionOrBasicAuth(w, r) {
+		return
+	}
+
+	// Route based on path pattern
+	// Pattern: /{libID}/...
+	if len(path) > 1 && path[0] == '/' {
+		remaining := path[1:]
+		s.handleOPDSLibraryRoutes(w, r, remaining)
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+// handleOPDSLibraryRoutes handles /opds/{libID}/... routes
+func (s *Server) handleOPDSLibraryRoutes(w http.ResponseWriter, r *http.Request, remaining string) {
+	// Extract library ID
+	var idStr string
+	var action string
+	if idx := indexOf(remaining, "/"); idx != -1 {
+		idStr = remaining[:idx]
+		action = remaining[idx+1:]
+	} else {
+		idStr = remaining
+	}
+
+	// Parse library ID
+	libID, err := parseInt64(idStr)
+	if err != nil {
+		http.Error(w, "Invalid library ID", http.StatusBadRequest)
+		return
+	}
+
+	// Route based on action
+	if action == "" {
+		s.handleOPDSRoot(w, r)
+	} else if action == "authors" {
+		s.handleOPDSAuthors(w, r)
+	} else if indexOf(action, "authors/") == 0 {
+		// /authors/{letter}
+		letter := action[8:]
+		s.handleOPDSAuthorsByLetterWithParams(w, r, libID, letter)
+	} else if indexOf(action, "author/") == 0 {
+		// /author/{authorID}
+		authorIDStr := action[7:]
+		if authorID, err := parseInt64(authorIDStr); err == nil {
+			s.handleOPDSAuthorWithParams(w, r, libID, authorID)
+		} else {
+			http.Error(w, "Invalid author ID", http.StatusBadRequest)
+		}
+	} else if action == "series" {
+		s.handleOPDSSeries(w, r)
+	} else if indexOf(action, "series/") == 0 {
+		// /series/{seriesID}
+		seriesIDStr := action[7:]
+		if seriesID, err := parseInt64(seriesIDStr); err == nil {
+			s.handleOPDSSeriesBooksWithParams(w, r, libID, seriesID)
+		} else {
+			http.Error(w, "Invalid series ID", http.StatusBadRequest)
+		}
+	} else if action == "genres" {
+		s.handleOPDSGenres(w, r)
+	} else if indexOf(action, "genres/") == 0 {
+		// /genres/{genreID}
+		genreIDStr := action[7:]
+		s.handleOPDSGenreBooksWithParams(w, r, libID, genreIDStr)
+	} else if indexOf(action, "book/") == 0 {
+		// /book/{bookID}/{format}
+		parts := action[5:]
+		if idx := indexOf(parts, "/"); idx != -1 {
+			bookIDStr := parts[:idx]
+			format := parts[idx+1:]
+			if bookID, err := parseInt64(bookIDStr); err == nil {
+				s.handleOPDSBookWithParams(w, r, libID, bookID, format)
+			} else {
+				http.Error(w, "Invalid book ID", http.StatusBadRequest)
+			}
+		} else {
+			http.Error(w, "Format required", http.StatusBadRequest)
+		}
+	} else if indexOf(action, "covers/") == 0 {
+		// /covers/{bookID}/cover.jpg
+		parts := action[7:]
+		if idx := indexOf(parts, "/"); idx != -1 {
+			bookIDStr := parts[:idx]
+			if bookID, err := parseInt64(bookIDStr); err == nil {
+				s.handleOPDSCoverWithParams(w, r, libID, bookID)
+			} else {
+				http.Error(w, "Invalid book ID", http.StatusBadRequest)
+			}
+		} else {
+			http.Error(w, "Invalid cover path", http.StatusBadRequest)
+		}
+	} else if indexOf(action, "annotation/") == 0 {
+		// /annotation/{bookID}
+		bookIDStr := action[11:]
+		if bookID, err := parseInt64(bookIDStr); err == nil {
+			s.handleOPDSAnnotationWithParams(w, r, libID, bookID)
+		} else {
+			http.Error(w, "Invalid book ID", http.StatusBadRequest)
+		}
+	} else if action == "search" {
+		s.handleOPDSSearch(w, r)
+	} else if action == "opensearch.xml" {
+		s.handleOpenSearch(w, r)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 // handleAPIRoutes routes API requests
