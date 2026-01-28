@@ -10,19 +10,35 @@ import (
 )
 
 type Server struct {
-	config *config.Config
-	db     *db.DB
-	auth   *auth.Auth
-	mux    *http.ServeMux
+	config      *config.Config
+	db          *db.DB
+	auth        *auth.Auth
+	authManager *auth.Manager
+	mux         *http.ServeMux
 }
 
-func New(cfg *config.Config, database *db.DB) *Server {
-	s := &Server{
-		config: cfg,
-		db:     database,
-		auth:   auth.New(database),
+func New(cfg *config.Config, database *db.DB) (*Server, error) {
+	// Create auth manager based on AUTH_MODE
+	keycloakCfg := auth.KeycloakConfig{
+		URL:          cfg.Keycloak.URL,
+		Realm:        cfg.Keycloak.Realm,
+		ClientID:     cfg.Keycloak.ClientID,
+		ClientSecret: cfg.Keycloak.ClientSecret,
+		RedirectURL:  cfg.Keycloak.RedirectURL,
 	}
-	return s
+
+	authManager, err := auth.NewManager(cfg.Auth.Mode, database, keycloakCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth manager: %w", err)
+	}
+
+	s := &Server{
+		config:      cfg,
+		db:          database,
+		auth:        auth.New(database), // Keep for backward compatibility
+		authManager: authManager,
+	}
+	return s, nil
 }
 
 // apiURL generates a URL with the configured base path
@@ -76,7 +92,7 @@ func (s *Server) handleOPDSRoutes(w http.ResponseWriter, r *http.Request) {
 	path = path[len(opdsPrefix):]
 
 	// Check auth (session or basic auth for e-readers)
-	if !s.auth.CheckSessionOrBasicAuth(w, r) {
+	if !s.authManager.CheckSessionOrBasicAuth(w, r) {
 		return
 	}
 
@@ -209,13 +225,31 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleSetup(w, r)
 		return
 	}
+	if path == "/auth/info" && r.Method == "GET" {
+		s.handleAuthInfo(w, r)
+		return
+	}
+	// Internal auth endpoints
 	if path == "/auth/login" && r.Method == "POST" {
 		s.handleLogin(w, r)
 		return
 	}
+	// Keycloak auth endpoints
+	if path == "/auth/keycloak/login" && r.Method == "GET" {
+		s.handleKeycloakLogin(w, r)
+		return
+	}
+	if path == "/auth/keycloak/callback" && r.Method == "GET" {
+		s.handleKeycloakCallback(w, r)
+		return
+	}
+	if path == "/auth/keycloak/logout" && r.Method == "POST" {
+		s.handleKeycloakLogout(w, r)
+		return
+	}
 
 	// All other routes require session auth
-	if !s.auth.CheckSession(w, r) {
+	if !s.authManager.CheckSession(w, r) {
 		return
 	}
 
@@ -242,7 +276,7 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 	// Special library routes (must be before /libraries/ pattern matching)
 	if path == "/libraries/import" && r.Method == "GET" {
 		// Admin only
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiImportLibrarySSE(w, r)
@@ -250,7 +284,7 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "/libraries/reindex" && r.Method == "POST" {
 		// Admin only
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiReindex(w, r)
@@ -272,7 +306,7 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(path) > len("/users/") && path[:len("/users/")] == "/users/" {
 		// Admin only
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.handleUserRoutes(w, r, path[len("/users/"):])
@@ -280,7 +314,7 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Admin-only routes
-	if !s.auth.CheckAdmin(w, r) {
+	if !s.authManager.CheckAdmin(w, r) {
 		return
 	}
 

@@ -611,4 +611,101 @@ opds-server:
 
 ---
 
+### Dual Authentication Mode Support (2026-01-28)
+
+**Overview**: Implemented support for two authentication modes to enable both standalone deployment (internal auth) and BiblioHub swarm deployment (Keycloak SSO).
+
+**Authentication Modes**:
+
+1. **Internal Mode** (`AUTH_MODE=internal`)
+   - Standalone deployment with local SQLite user database
+   - Session-based authentication with cookies
+   - HTTP Basic Auth support for e-readers (OPDS clients)
+   - User management via web UI
+   - Default mode for standalone Docker containers
+
+2. **Keycloak Mode** (`AUTH_MODE=keycloak`)
+   - Integration with Keycloak for centralized SSO
+   - OAuth2 Authorization Code flow
+   - Token-based authentication (ID tokens, access tokens)
+   - User management via Keycloak Admin Console
+   - Default mode for BiblioHub swarm deployment
+
+**Architecture**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Auth Manager                          │
+│  (Factory pattern - switches based on AUTH_MODE)        │
+└─────────────────────────────────────────────────────────┘
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+┌──────────────────┐    ┌──────────────────┐
+│  Internal Auth   │    │  Keycloak Auth   │
+│  - SQLite DB     │    │  - OIDC Provider │
+│  - bcrypt hash   │    │  - OAuth2 flow   │
+│  - Sessions      │    │  - JWT tokens    │
+│  - Basic Auth    │    │  - Role mapping  │
+└──────────────────┘    └──────────────────┘
+```
+
+**Implementation Details**:
+
+- **Config**: Added `AUTH_MODE`, `KeycloakConfig` to `internal/config/config.go`
+- **Auth Manager**: Created `internal/auth/manager.go` - factory pattern for mode switching
+- **Keycloak Provider**: Created `internal/auth/keycloak.go` - OIDC/OAuth2 implementation
+- **Handlers**: 
+  - New: `internal/server/handlers_keycloak.go` - Keycloak login/callback/logout
+  - Updated: `internal/server/handlers_auth.go` - Mode-aware internal auth handlers
+- **Server**: Updated `internal/server/server.go` to use auth manager
+
+**Environment Variables**:
+
+```bash
+# Authentication mode
+AUTH_MODE=keycloak  # or 'internal'
+
+# Keycloak configuration (required when AUTH_MODE=keycloak)
+KEYCLOAK_URL=http://localhost:9900/auth
+KEYCLOAK_REALM=biblio
+KEYCLOAK_CLIENT_ID=opds-server
+KEYCLOAK_CLIENT_SECRET=your-secret-here
+KEYCLOAK_REDIRECT_URL=http://localhost:9900/catalog/api/auth/keycloak/callback
+```
+
+**API Endpoints**:
+
+Internal Auth (AUTH_MODE=internal):
+- `POST /api/auth/login` - Login with username/password
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/me` - Get current user
+- `GET /api/users` - List users (admin only)
+- `POST /api/users` - Create user (admin only)
+
+Keycloak Auth (AUTH_MODE=keycloak):
+- `GET /api/auth/keycloak/login` - Initiate OAuth2 flow
+- `GET /api/auth/keycloak/callback` - OAuth2 callback handler
+- `POST /api/auth/keycloak/logout` - Keycloak logout
+- `GET /api/auth/info` - Get auth mode and user info
+
+**Dependencies Added**:
+- `github.com/coreos/go-oidc/v3/oidc` - OIDC client library
+- `golang.org/x/oauth2` - OAuth2 client library
+
+**Migration Path**:
+- Existing deployments continue to work with `AUTH_MODE=internal`
+- BiblioHub swarm deployments use `AUTH_MODE=keycloak`
+- No data migration required - modes are independent
+- E-reader OPDS access works in internal mode via Basic Auth
+- E-reader OPDS access in Keycloak mode requires web login first
+
+**Impact**:
+- Enables seamless integration with BiblioHub's centralized authentication
+- Maintains backward compatibility for standalone deployments
+- Provides flexible deployment options for different use cases
+- Supports both web UI and e-reader clients
+
+---
+
 *Last updated: 2026-01-28*
