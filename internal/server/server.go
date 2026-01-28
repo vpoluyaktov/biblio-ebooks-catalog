@@ -1,10 +1,9 @@
 package server
 
 import (
+	"log"
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"strings"
 
 	"biblio-opds-server/internal/auth"
 	"biblio-opds-server/internal/config"
@@ -15,7 +14,7 @@ type Server struct {
 	config *config.Config
 	db     *db.DB
 	auth   *auth.Auth
-	router *chi.Mux
+	mux    *http.ServeMux
 }
 
 func New(cfg *config.Config, database *db.DB) *Server {
@@ -23,28 +22,16 @@ func New(cfg *config.Config, database *db.DB) *Server {
 		config: cfg,
 		db:     database,
 		auth:   auth.New(database),
-		router: chi.NewRouter(),
+		mux:    http.NewServeMux(),
 	}
 
-	s.setupMiddleware()
 	s.setupRoutes()
 
 	return s
 }
 
-func (s *Server) setupMiddleware() {
-	s.router.Use(middleware.Logger)
-	s.router.Use(middleware.Recoverer)
-	s.router.Use(s.corsMiddleware)
-	s.router.Use(middleware.Compress(5))
-
-	if s.config.Auth.Enabled {
-		s.router.Use(s.basicAuth)
-	}
-}
-
-func (s *Server) corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -56,124 +43,173 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		next.ServeHTTP(w, r)
-	})
+		next(w, r)
+	}
 }
 
-func (s *Server) basicAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != s.config.Auth.User || pass != s.config.Auth.Password {
-			w.Header().Set("WWW-Authenticate", `Basic realm="fb2-server"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+func (s *Server) loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s", r.Method, r.URL.Path)
+		next(w, r)
+	}
 }
 
 func (s *Server) setupRoutes() {
+	// Note: Routes are registered WITH the base path prefix.
+	// Nginx preserves the full path when forwarding requests.
+	// This allows the service to work on a sub-path.
+
 	basePath := s.config.Server.BasePath
 	if basePath == "" {
-		basePath = "/"
-	}
-	// Ensure base path ends with /
-	if basePath != "/" && basePath[len(basePath)-1] != '/' {
-		basePath += "/"
+		basePath = ""
 	}
 
-	// If we have a base path, mount everything under it
-	if basePath != "/" {
-		s.router.Route(basePath[:len(basePath)-1], func(r chi.Router) {
-			s.setupRoutesWithBase(r)
-		})
-		// Redirect from base path without trailing slash
-		s.router.Get(basePath[:len(basePath)-1], func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, basePath, http.StatusMovedPermanently)
-		})
+	// Static files - serve from web/static directory
+	staticPath := basePath + "/static/"
+	s.mux.Handle(staticPath, http.StripPrefix(basePath+"/static", http.FileServer(http.Dir("web/static"))))
+
+	// Web UI routes
+	s.mux.HandleFunc(basePath+"/", s.loggingMiddleware(s.corsMiddleware(s.handleIndex)))
+	s.mux.HandleFunc(basePath+"/library/", s.loggingMiddleware(s.corsMiddleware(s.handleLibrary)))
+
+	// OPDS routes (support both session auth for web UI and Basic Auth for e-readers)
+	s.mux.HandleFunc(basePath+"/opds/", s.loggingMiddleware(s.corsMiddleware(s.handleOPDSRoutes)))
+
+	// REST API routes
+	s.mux.HandleFunc(basePath+"/api/", s.loggingMiddleware(s.corsMiddleware(s.handleAPIRoutes)))
+}
+
+// handleOPDSRoutes routes OPDS-specific requests
+func (s *Server) handleOPDSRoutes(w http.ResponseWriter, r *http.Request) {
+	// Apply auth middleware
+	if !s.auth.CheckSessionOrBasicAuth(w, r) {
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, s.config.Server.BasePath+"/opds")
+
+	// Route based on path patterns
+	if strings.HasSuffix(path, "/authors") {
+		s.handleOPDSAuthors(w, r)
+	} else if strings.Contains(path, "/authors/") {
+		s.handleOPDSAuthorsByLetter(w, r)
+	} else if strings.Contains(path, "/author/") {
+		s.handleOPDSAuthor(w, r)
+	} else if strings.HasSuffix(path, "/series") {
+		s.handleOPDSSeries(w, r)
+	} else if strings.Contains(path, "/series/") {
+		s.handleOPDSSeriesBooks(w, r)
+	} else if strings.HasSuffix(path, "/genres") {
+		s.handleOPDSGenres(w, r)
+	} else if strings.Contains(path, "/genres/") {
+		s.handleOPDSGenreBooks(w, r)
+	} else if strings.Contains(path, "/book/") {
+		s.handleOPDSBook(w, r)
+	} else if strings.Contains(path, "/covers/") {
+		s.handleOPDSCover(w, r)
+	} else if strings.Contains(path, "/annotation/") {
+		s.handleOPDSAnnotation(w, r)
+	} else if strings.HasSuffix(path, "/search") {
+		s.handleOPDSSearch(w, r)
+	} else if strings.HasSuffix(path, "/opensearch.xml") {
+		s.handleOpenSearch(w, r)
 	} else {
-		s.setupRoutesWithBase(s.router)
+		s.handleOPDSRoot(w, r)
 	}
 }
 
-func (s *Server) setupRoutesWithBase(r chi.Router) {
-	// Static files - serve from web/static directory
-	// chi.Route() already strips the base path, so we just need to handle /static/*
-	fileServer := http.FileServer(http.Dir("web/static"))
-	r.Handle("/static/*", http.StripPrefix("/static", fileServer))
+// handleAPIRoutes routes API requests
+func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, s.config.Server.BasePath+"/api")
 
-	// Web UI routes
-	r.Get("/", s.handleIndex)
-	r.Get("/library/{libID}", s.handleLibrary)
+	// Public auth endpoints (no session required)
+	if path == "/setup/check" && r.Method == "GET" {
+		s.handleSetupCheck(w, r)
+		return
+	}
+	if path == "/setup" && r.Method == "POST" {
+		s.handleSetup(w, r)
+		return
+	}
+	if path == "/auth/login" && r.Method == "POST" {
+		s.handleLogin(w, r)
+		return
+	}
 
-	// OPDS routes (support both session auth for web UI and Basic Auth for e-readers)
-	r.Route("/opds", func(r chi.Router) {
-		r.Use(s.auth.SessionMiddleware)
-		r.Use(s.auth.BasicAuthMiddleware)
-		r.Get("/{libID}", s.handleOPDSRoot)
-		r.Get("/{libID}/authors", s.handleOPDSAuthors)
-		r.Get("/{libID}/authors/{letter}", s.handleOPDSAuthorsByLetter)
-		r.Get("/{libID}/author/{authorID}", s.handleOPDSAuthor)
-		r.Get("/{libID}/series", s.handleOPDSSeries)
-		r.Get("/{libID}/series/{seriesID}", s.handleOPDSSeriesBooks)
-		r.Get("/{libID}/genres", s.handleOPDSGenres)
-		r.Get("/{libID}/genres/{genreID}", s.handleOPDSGenreBooks)
-		r.Get("/{libID}/book/{bookID}/{format}", s.handleOPDSBook)
-		r.Get("/{libID}/covers/{bookID}/cover.jpg", s.handleOPDSCover)
-		r.Get("/{libID}/annotation/{bookID}", s.handleOPDSAnnotation)
-		r.Get("/{libID}/search", s.handleOPDSSearch)
-		r.Get("/{libID}/opensearch.xml", s.handleOpenSearch)
-	})
+	// All other API routes require session auth
+	if !s.auth.CheckSession(w, r) {
+		return
+	}
 
-	// REST API routes
-	r.Route("/api", func(r chi.Router) {
-		// Apply session middleware to all API routes
-		r.Use(s.auth.SessionMiddleware)
-
-		// Public auth endpoints
-		r.Get("/setup/check", s.handleSetupCheck)
-		r.Post("/setup", s.handleSetup)
-		r.Post("/auth/login", s.handleLogin)
-		r.Post("/auth/logout", s.handleLogout)
-		r.Get("/auth/me", s.handleCurrentUser)
-
-		// Library routes (read-only for all authenticated users)
-		r.Get("/libraries", s.apiGetLibraries)
-		r.Get("/libraries/{libID}", s.apiGetLibrary)
-		r.Get("/libraries/{libID}/books", s.apiGetBooks)
-		r.Get("/libraries/{libID}/authors", s.apiGetAuthors)
-		r.Get("/libraries/{libID}/series", s.apiGetSeries)
-		r.Get("/books/{bookID}", s.apiGetBook)
-		r.Get("/authors/{authorID}", s.apiGetAuthor)
-		r.Get("/genres", s.apiGetGenres)
-
+	// Route based on path and method
+	switch {
+	case path == "/auth/logout" && r.Method == "POST":
+		s.handleLogout(w, r)
+	case path == "/auth/me" && r.Method == "GET":
+		s.handleCurrentUser(w, r)
+	case path == "/libraries" && r.Method == "GET":
+		s.apiGetLibraries(w, r)
+	case strings.HasPrefix(path, "/libraries/") && strings.HasSuffix(path, "/books") && r.Method == "GET":
+		s.apiGetBooks(w, r)
+	case strings.HasPrefix(path, "/libraries/") && strings.HasSuffix(path, "/authors") && r.Method == "GET":
+		s.apiGetAuthors(w, r)
+	case strings.HasPrefix(path, "/libraries/") && strings.HasSuffix(path, "/series") && r.Method == "GET":
+		s.apiGetSeries(w, r)
+	case strings.HasPrefix(path, "/libraries/") && !strings.Contains(path[11:], "/") && r.Method == "GET":
+		s.apiGetLibrary(w, r)
+	case strings.HasPrefix(path, "/books/") && r.Method == "GET":
+		s.apiGetBook(w, r)
+	case strings.HasPrefix(path, "/authors/") && r.Method == "GET":
+		s.apiGetAuthor(w, r)
+	case path == "/genres" && r.Method == "GET":
+		s.apiGetGenres(w, r)
+	default:
 		// Admin-only routes
-		r.Group(func(r chi.Router) {
-			r.Use(s.auth.RequireAdmin)
+		if !s.auth.CheckAdmin(w, r) {
+			return
+		}
+		s.handleAdminAPIRoutes(w, r, path)
+	}
+}
 
-			// File browser for path selection
-			r.Get("/browse", s.apiBrowseFiles)
-
-			// Library management
-			r.Post("/libraries", s.apiCreateLibrary)
-			r.Get("/libraries/import", s.apiImportLibrarySSE)
-			r.Post("/libraries/reindex", s.apiReindex)
-			r.Put("/libraries/{libID}", s.apiUpdateLibrary)
-			r.Delete("/libraries/{libID}", s.apiDeleteLibrary)
-			r.Get("/libraries/{libID}/stats", s.apiGetLibraryStats)
-			r.Put("/libraries/{libID}/toggle", s.apiToggleLibrary)
-
-			// User management
-			r.Get("/users", s.handleGetUsers)
-			r.Post("/users", s.handleCreateUser)
-			r.Get("/users/{userID}", s.handleGetUser)
-			r.Put("/users/{userID}/password", s.handleUpdateUserPassword)
-			r.Put("/users/{userID}/role", s.handleUpdateUserRole)
-			r.Delete("/users/{userID}", s.handleDeleteUser)
-		})
-	})
+// handleAdminAPIRoutes handles admin-only API routes
+func (s *Server) handleAdminAPIRoutes(w http.ResponseWriter, r *http.Request, path string) {
+	switch {
+	case path == "/browse" && r.Method == "GET":
+		s.apiBrowseFiles(w, r)
+	case path == "/libraries" && r.Method == "POST":
+		s.apiCreateLibrary(w, r)
+	case path == "/libraries/import" && r.Method == "GET":
+		s.apiImportLibrarySSE(w, r)
+	case path == "/libraries/reindex" && r.Method == "POST":
+		s.apiReindex(w, r)
+	case strings.HasPrefix(path, "/libraries/") && r.Method == "PUT":
+		if strings.HasSuffix(path, "/toggle") {
+			s.apiToggleLibrary(w, r)
+		} else {
+			s.apiUpdateLibrary(w, r)
+		}
+	case strings.HasPrefix(path, "/libraries/") && r.Method == "DELETE":
+		s.apiDeleteLibrary(w, r)
+	case strings.HasPrefix(path, "/libraries/") && strings.HasSuffix(path, "/stats") && r.Method == "GET":
+		s.apiGetLibraryStats(w, r)
+	case path == "/users" && r.Method == "GET":
+		s.handleGetUsers(w, r)
+	case path == "/users" && r.Method == "POST":
+		s.handleCreateUser(w, r)
+	case strings.HasPrefix(path, "/users/") && r.Method == "GET":
+		s.handleGetUser(w, r)
+	case strings.HasPrefix(path, "/users/") && strings.HasSuffix(path, "/password") && r.Method == "PUT":
+		s.handleUpdateUserPassword(w, r)
+	case strings.HasPrefix(path, "/users/") && strings.HasSuffix(path, "/role") && r.Method == "PUT":
+		s.handleUpdateUserRole(w, r)
+	case strings.HasPrefix(path, "/users/") && r.Method == "DELETE":
+		s.handleDeleteUser(w, r)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func (s *Server) Run(addr string) error {
-	return http.ListenAndServe(addr, s.router)
+	return http.ListenAndServe(addr, s.mux)
 }

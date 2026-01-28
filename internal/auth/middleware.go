@@ -146,3 +146,78 @@ func (a *Auth) requestBasicAuth(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
 }
+
+// CheckSessionOrBasicAuth checks for session or basic auth and returns true if authenticated
+func (a *Auth) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request) bool {
+	// Check session first
+	cookie, err := r.Cookie("session")
+	if err == nil {
+		user, err := a.ValidateSession(cookie.Value)
+		if err == nil {
+			ctx := context.WithValue(r.Context(), UserContextKey, user)
+			*r = *r.WithContext(ctx)
+			return true
+		}
+	}
+
+	// Try Basic Auth
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" && strings.HasPrefix(authHeader, "Basic ") {
+		decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
+		if err == nil {
+			parts := strings.SplitN(string(decoded), ":", 2)
+			if len(parts) == 2 {
+				user, err := a.Authenticate(parts[0], parts[1])
+				if err == nil {
+					ctx := context.WithValue(r.Context(), UserContextKey, user)
+					*r = *r.WithContext(ctx)
+					return true
+				}
+			}
+		}
+	}
+
+	a.requestBasicAuth(w)
+	return false
+}
+
+// CheckSession checks for session auth and returns true if authenticated
+func (a *Auth) CheckSession(w http.ResponseWriter, r *http.Request) bool {
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"Not authenticated. Please log in again."}`))
+		return false
+	}
+
+	user, err := a.ValidateSession(cookie.Value)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"Session expired. Please log in again."}`))
+		return false
+	}
+
+	ctx := context.WithValue(r.Context(), UserContextKey, user)
+	*r = *r.WithContext(ctx)
+	return true
+}
+
+// CheckAdmin checks if the current user is an admin
+func (a *Auth) CheckAdmin(w http.ResponseWriter, r *http.Request) bool {
+	user := GetUserFromContext(r.Context())
+	if user == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"Not authenticated. Please log in again."}`))
+		return false
+	}
+	if !user.IsAdmin() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error":"Admin access required"}`))
+		return false
+	}
+	return true
+}
