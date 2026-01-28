@@ -33,8 +33,8 @@ Biblio OPDS Server provides:
 ┌─────────────────────────────────────────────────────────────────┐
 │                      OPDS Server (Go)                            │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐  │
-│  │ chi HTTP │  │  SQLite  │  │ Importer │  │  Book Files    │  │
-│  │  Router  │  │    DB    │  │  (INPX)  │  │  (ZIP/FB2)     │  │
+│  │ net/http │  │  SQLite  │  │ Importer │  │  Book Files    │  │
+│  │ ServeMux │  │    DB    │  │  (INPX)  │  │  (ZIP/FB2)     │  │
 │  └──────────┘  └──────────┘  └──────────┘  └────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -101,16 +101,23 @@ biblio-opds-server/
 
 ## OPDS Endpoints
 
+OPDS feeds are served at `{BASE_PATH}/opds/{lib_id}/...` where `BASE_PATH` is configurable (e.g., `/catalog`).
+
 | Endpoint | Description |
 |----------|-------------|
-| `/opds/{lib_id}` | OPDS catalog root |
-| `/opds/{lib_id}/new` | New books feed |
-| `/opds/{lib_id}/authors` | Authors navigation |
-| `/opds/{lib_id}/authors/{id}` | Author's books |
-| `/opds/{lib_id}/series` | Series navigation |
-| `/opds/{lib_id}/series/{id}` | Series books |
-| `/opds/{lib_id}/genres` | Genres navigation |
-| `/opds/{lib_id}/search` | Search endpoint |
+| `{BASE_PATH}/opds/{lib_id}` | OPDS catalog root |
+| `{BASE_PATH}/opds/{lib_id}/authors` | Authors navigation |
+| `{BASE_PATH}/opds/{lib_id}/authors/{letter}` | Authors by letter |
+| `{BASE_PATH}/opds/{lib_id}/author/{id}` | Author's books |
+| `{BASE_PATH}/opds/{lib_id}/series` | Series navigation |
+| `{BASE_PATH}/opds/{lib_id}/series/{id}` | Series books |
+| `{BASE_PATH}/opds/{lib_id}/genres` | Genres navigation |
+| `{BASE_PATH}/opds/{lib_id}/genres/{id}` | Genre books |
+| `{BASE_PATH}/opds/{lib_id}/book/{id}/{format}` | Download book |
+| `{BASE_PATH}/opds/{lib_id}/covers/{id}/cover.jpg` | Book cover image |
+| `{BASE_PATH}/opds/{lib_id}/annotation/{id}` | Book annotation |
+| `{BASE_PATH}/opds/{lib_id}/search` | Search endpoint |
+| `{BASE_PATH}/opds/{lib_id}/opensearch.xml` | OpenSearch descriptor |
 
 ## Configuration
 
@@ -120,6 +127,7 @@ biblio-opds-server/
 |----------|-------------|---------|
 | `OPDS_SERVER_HOST` | Server host | `0.0.0.0` |
 | `OPDS_SERVER_PORT` | Server port | `9903` |
+| `OPDS_BASE_PATH` | Base URL path for deployment | `/catalog` |
 | `OPDS_DATABASE_PATH` | SQLite database path | `./data/library.db` |
 | `OPDS_LIBRARY_PATH` | Book files directory | `./libraries` |
 | `OPDS_LOG_LEVEL` | Logging level | `info` |
@@ -222,6 +230,15 @@ opds-server:
   - Touch-optimized with 44px minimum touch targets
   - Full-screen views for all sections
   - Desktop UI completely preserved and unchanged
+- **Path-Based Routing Refactoring** (2026-01-27)
+  - Removed chi router dependency completely
+  - Migrated to standard `net/http.ServeMux` with manual path parsing
+  - All handlers accept IDs as function parameters (no context extraction)
+  - Base path support for deployment under sub-paths (e.g., `/catalog`)
+  - Fixed OPDS feed URL generation to use configured base path
+  - Fixed JavaScript cover URL generation to use `APP_BASE_PATH`
+  - Fixed API route ordering to prevent `/libraries/import` conflict
+  - Consistent routing approach across API and OPDS endpoints
 
 ### In Progress 🚧
 
@@ -514,9 +531,9 @@ book.epub (ZIP archive)
 
 ### Go Modules
 
-- `github.com/go-chi/chi/v5` - HTTP router
 - `github.com/mattn/go-sqlite3` - SQLite driver (with ICU)
 - `github.com/fogleman/gg` - Cover image generation
+- Standard library `net/http` - HTTP server and routing
 
 ### Build Requirements
 
