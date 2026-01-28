@@ -85,7 +85,7 @@ const App = {
 
   async checkAuth() {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch(this.apiUrl('/api/auth/me'));
       const data = await res.json();
       if (data.authenticated) {
         this.user = data.user;
@@ -97,7 +97,7 @@ const App = {
 
   async checkSetup() {
     try {
-      const res = await fetch('/api/setup/check');
+      const res = await fetch(this.apiUrl('/api/setup/check'));
       const data = await res.json();
       return data.setup_required;
     } catch (e) {
@@ -840,7 +840,7 @@ const App = {
     if (!this.currentLibrary) return;
     
     try {
-      const res = await fetch(`/api/libraries/${this.currentLibrary}/stats`);
+      const res = await fetch(this.apiUrl(`/api/libraries/${this.currentLibrary}/stats`));
       const data = await res.json();
       
       const statsEl = document.getElementById('library-stats');
@@ -876,7 +876,7 @@ const App = {
 
     try {
       const filter = encodeURIComponent(this.vsAuthors.filter);
-      const res = await fetch(`/api/libraries/${this.currentLibrary}/authors?limit=${this.VS_PAGE_SIZE}&offset=${this.vsAuthors.offset}&filter=${filter}`);
+      const res = await fetch(this.apiUrl(`/api/libraries/${this.currentLibrary}/authors?limit=${this.VS_PAGE_SIZE}&offset=${this.vsAuthors.offset}&filter=${filter}`));
       const data = await res.json();
 
       if (this.vsAuthors.offset === 0) {
@@ -1027,7 +1027,7 @@ const App = {
 
     try {
       const filter = encodeURIComponent(this.vsSeries.filter);
-      const res = await fetch(`/api/libraries/${this.currentLibrary}/series?limit=${this.VS_PAGE_SIZE}&offset=${this.vsSeries.offset}&filter=${filter}`);
+      const res = await fetch(this.apiUrl(`/api/libraries/${this.currentLibrary}/series?limit=${this.VS_PAGE_SIZE}&offset=${this.vsSeries.offset}&filter=${filter}`));
       const data = await res.json();
 
       if (this.vsSeries.offset === 0) {
@@ -1215,7 +1215,7 @@ const App = {
     this.booksLoading = true;
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(this.apiUrl(url));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1392,7 +1392,7 @@ const App = {
     let description = book.content || '';
     if (!description && book.id) {
       try {
-        const res = await fetch(`/opds/${this.currentLibrary}/annotation/${book.id}`);
+        const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/annotation/${book.id}`));
         if (res.ok) {
           description = await res.text();
         }
@@ -1561,7 +1561,7 @@ const App = {
     
     try {
       // Don't double-encode - the letter is already a string
-      const res = await fetch(`/opds/${this.currentLibrary}/authors/${letter}`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/authors/${letter}`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1596,7 +1596,7 @@ const App = {
     container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     
     try {
-      const res = await fetch(`/opds/${this.currentLibrary}/series`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/series`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1673,7 +1673,7 @@ const App = {
     `;
 
     try {
-      const res = await fetch(`/opds/${this.currentLibrary}/author/${authorId}`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/author/${authorId}`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1701,7 +1701,7 @@ const App = {
     `;
 
     try {
-      const res = await fetch(`/opds/${this.currentLibrary}/series/${seriesId}`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/series/${seriesId}`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1729,7 +1729,7 @@ const App = {
     `;
 
     try {
-      const res = await fetch(`/opds/${this.currentLibrary}/genres/${genreId}`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/genres/${genreId}`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -1782,7 +1782,7 @@ const App = {
     const resultsEl = document.getElementById('search-results');
     
     try {
-      const res = await fetch(`/opds/${this.currentLibrary}/search?q=${encodeURIComponent(query)}`);
+      const res = await fetch(this.apiUrl(`/opds/${this.currentLibrary}/search?q=${encodeURIComponent(query)}`));
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
@@ -2005,7 +2005,7 @@ const App = {
     const enabled = btn.checked;
     
     try {
-      await fetch(`/api/libraries/${id}/toggle`, {
+      await fetch(this.apiUrl(`/api/libraries/${id}/toggle`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled })
@@ -2091,7 +2091,7 @@ const App = {
     }
     
     try {
-      const res = await fetch(`/api/libraries/${id}`, {
+      const res = await fetch(this.apiUrl(`/api/libraries/${id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
@@ -2171,7 +2171,7 @@ const App = {
     progressEl.style.width = '0%';
     
     try {
-      const res = await fetch('/api/libraries/reindex', {
+      const res = await fetch(this.apiUrl('/api/libraries/reindex'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -2208,7 +2208,7 @@ const App = {
     }
     
     try {
-      await fetch(`/api/libraries/${id}`, { method: 'DELETE' });
+      await fetch(this.apiUrl(`/api/libraries/${id}`), { method: 'DELETE' });
       this.renderLibraries();
     } catch (e) {
       alert('Failed to delete library');
@@ -2270,7 +2270,7 @@ const App = {
     progressEl.style.width = '0%';
     
     try {
-      const res = await fetch('/api/libraries/reindex', {
+      const res = await fetch(this.apiUrl('/api/libraries/reindex'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -2317,7 +2317,7 @@ const App = {
     }
     
     try {
-      await fetch(`/api/libraries/${id}`, { method: 'DELETE' });
+      await fetch(this.apiUrl(`/api/libraries/${id}`), { method: 'DELETE' });
       this.closeModal();
       this.renderLibraries();
     } catch (e) {
@@ -2370,7 +2370,7 @@ const App = {
 
     try {
       console.log('Import request:', `/api/libraries/import?${params}`);
-      const response = await fetch(`/api/libraries/import?${params}`, {
+      const response = await fetch(this.apiUrl(`/api/libraries/import?${params}`), {
         credentials: 'include'
       });
       
@@ -2658,7 +2658,7 @@ const App = {
     }
 
     try {
-      const res = await fetch('/api/setup', {
+      const res = await fetch(this.apiUrl('/api/setup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -2680,7 +2680,7 @@ const App = {
     const data = new FormData(form);
     
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(this.apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2702,7 +2702,7 @@ const App = {
   },
 
   async logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch(this.apiUrl('/api/auth/logout'), { method: 'POST' });
     this.user = null;
     window.location.hash = '#login';
   },
@@ -2711,7 +2711,7 @@ const App = {
     if (!confirm('Are you sure you want to delete this user?')) return;
     
     const id = btn.dataset.id;
-    await fetch(`/api/users/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(this.apiUrl(`/api/users/${id}`), { method: 'DELETE', credentials: 'include' });
     this.renderSettings();
   },
 
@@ -2758,7 +2758,7 @@ const App = {
     const errorEl = document.getElementById('add-user-error');
     
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetch(this.apiUrl('/api/users'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -2910,9 +2910,14 @@ const App = {
   },
 
   // API Helper
+  apiUrl(path) {
+    const basePath = window.APP_BASE_PATH || '';
+    return basePath + path;
+  },
+
   async fetchAPI(url) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(this.apiUrl(url));
       return await res.json();
     } catch (e) {
       console.error('API error:', e);
