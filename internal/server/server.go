@@ -234,6 +234,24 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Special library routes (must be before /libraries/ pattern matching)
+	if path == "/libraries/import" && r.Method == "GET" {
+		// Admin only
+		if !s.auth.CheckAdmin(w, r) {
+			return
+		}
+		s.apiImportLibrarySSE(w, r)
+		return
+	}
+	if path == "/libraries/reindex" && r.Method == "POST" {
+		// Admin only
+		if !s.auth.CheckAdmin(w, r) {
+			return
+		}
+		s.apiReindex(w, r)
+		return
+	}
+
 	// Routes with IDs - delegate to specific handlers
 	if len(path) > len("/libraries/") && path[:len("/libraries/")] == "/libraries/" {
 		s.handleLibraryRoutes(w, r, path[len("/libraries/"):])
@@ -263,14 +281,6 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 
 	if path == "/browse" && r.Method == "GET" {
 		s.apiBrowseFiles(w, r)
-		return
-	}
-	if path == "/libraries/import" && r.Method == "GET" {
-		s.apiImportLibrarySSE(w, r)
-		return
-	}
-	if path == "/libraries/reindex" && r.Method == "POST" {
-		s.apiReindex(w, r)
 		return
 	}
 	if path == "/users" && r.Method == "GET" {
