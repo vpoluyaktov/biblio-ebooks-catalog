@@ -168,9 +168,9 @@ func (m *Manager) GetLoginURL() (string, string, error) {
 }
 
 // HandleCallback handles OAuth2 callback (Keycloak mode only)
-func (m *Manager) HandleCallback(code, state string) (*db.User, error) {
+func (m *Manager) HandleCallback(code, state string) (*db.User, string, string, string, error) {
 	if m.mode != AuthModeKeycloak {
-		return nil, fmt.Errorf("handle callback not supported in %s mode", m.mode)
+		return nil, "", "", "", fmt.Errorf("handle callback not supported in %s mode", m.mode)
 	}
 	return m.keycloakAuth.HandleCallback(code, state)
 }

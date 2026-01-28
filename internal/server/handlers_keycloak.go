@@ -77,26 +77,17 @@ func (s *Server) handleKeycloakCallback(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Exchange code for tokens and get user info
-	user, err := s.authManager.HandleCallback(code, state)
+	user, idToken, accessToken, refreshToken, err := s.authManager.HandleCallback(code, state)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Authentication failed: %v", err), http.StatusUnauthorized)
 		return
 	}
 
-	// Get the Keycloak provider to access tokens
-	kcProvider := s.authManager.GetKeycloakAuth()
-	if kcProvider == nil {
-		http.Error(w, "Keycloak provider not available", http.StatusInternalServerError)
-		return
-	}
-
-	// Create a Keycloak session
-	// Note: In a real implementation, we'd store the actual OAuth2 tokens
-	// For now, we'll create a simplified session
+	// Create a Keycloak session with actual tokens
 	session := &auth.KeycloakSession{
-		IDToken:      "placeholder", // Would be the actual ID token
-		AccessToken:  "placeholder", // Would be the actual access token
-		RefreshToken: "placeholder", // Would be the actual refresh token
+		IDToken:      idToken,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 		ExpiresAt:    time.Now().Add(8 * time.Hour),
 		Username:     user.Username,
 		Role:         user.Role,

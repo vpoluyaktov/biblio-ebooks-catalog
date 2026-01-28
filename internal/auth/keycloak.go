@@ -89,16 +89,16 @@ func (kp *KeycloakProvider) GetLoginURL() (string, string, error) {
 	return url, state, nil
 }
 
-// HandleCallback processes the OAuth2 callback and returns user info
-func (kp *KeycloakProvider) HandleCallback(code, state string) (*db.User, error) {
+// HandleCallback processes the OAuth2 callback and returns user info and tokens
+func (kp *KeycloakProvider) HandleCallback(code, state string) (*db.User, string, string, string, error) {
 	// Verify state
 	expiry, exists := kp.states[state]
 	if !exists {
-		return nil, ErrInvalidState
+		return nil, "", "", "", ErrInvalidState
 	}
 	if time.Now().After(expiry) {
 		delete(kp.states, state)
-		return nil, ErrInvalidState
+		return nil, "", "", "", ErrInvalidState
 	}
 	delete(kp.states, state)
 
@@ -107,19 +107,19 @@ func (kp *KeycloakProvider) HandleCallback(code, state string) (*db.User, error)
 	// Exchange code for token
 	oauth2Token, err := kp.oauth2Config.Exchange(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("failed to exchange token: %w", err)
+		return nil, "", "", "", fmt.Errorf("failed to exchange token: %w", err)
 	}
 
 	// Extract ID token
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, ErrNoIDToken
+		return nil, "", "", "", ErrNoIDToken
 	}
 
 	// Verify ID token
 	idToken, err := kp.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify ID token: %w", err)
+		return nil, "", "", "", fmt.Errorf("failed to verify ID token: %w", err)
 	}
 
 	// Extract claims
@@ -134,7 +134,7 @@ func (kp *KeycloakProvider) HandleCallback(code, state string) (*db.User, error)
 	}
 
 	if err := idToken.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("failed to parse claims: %w", err)
+		return nil, "", "", "", fmt.Errorf("failed to parse claims: %w", err)
 	}
 
 	// Determine role (check if user has 'admin' role in Keycloak)
@@ -153,7 +153,13 @@ func (kp *KeycloakProvider) HandleCallback(code, state string) (*db.User, error)
 		Role:     role,
 	}
 
-	return user, nil
+	// Get refresh token if available
+	refreshToken := ""
+	if oauth2Token.RefreshToken != "" {
+		refreshToken = oauth2Token.RefreshToken
+	}
+
+	return user, rawIDToken, oauth2Token.AccessToken, refreshToken, nil
 }
 
 // ValidateToken validates a Keycloak token and returns user info
