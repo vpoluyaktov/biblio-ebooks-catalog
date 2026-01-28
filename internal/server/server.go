@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -97,8 +98,14 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) setupRoutesWithBase(r chi.Router) {
-	// Static files
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	// Static files - when mounted under base path, chi already strips the base path,
+	// so we only need to strip /static/
+	fileServer := http.FileServer(http.Dir("web/static"))
+	r.Handle("/static/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Strip /static/ prefix from the URL path
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/static")
+		fileServer.ServeHTTP(w, r)
+	}))
 
 	// Web UI routes
 	r.Get("/", s.handleIndex)
