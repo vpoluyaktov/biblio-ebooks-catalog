@@ -47,7 +47,7 @@ func (s *Server) setupRoutes() *http.ServeMux {
 		mux.HandleFunc(basePath+"/library/", s.handleLibrary)
 	}
 
-	// OPDS routes
+	// OPDS routes - /opds/opds/{libID}/...
 	mux.HandleFunc(basePath+"/opds/", s.handleOPDSRoutes)
 
 	// API routes
