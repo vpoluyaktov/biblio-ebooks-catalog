@@ -25,6 +25,11 @@ func New(cfg *config.Config, database *db.DB) *Server {
 	return s
 }
 
+// apiURL generates a URL with the configured base path
+func (s *Server) apiURL(path string) string {
+	return s.config.Server.BasePath + path
+}
+
 func (s *Server) setupRoutes() *http.ServeMux {
 	// Note: Routes are registered WITH the base path prefix.
 	// Nginx preserves the full path when forwarding requests.
