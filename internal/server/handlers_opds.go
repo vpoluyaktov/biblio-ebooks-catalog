@@ -54,7 +54,7 @@ func (s *Server) getLibraryID(r *http.Request) int64 {
 
 func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	feed := opds.NewFeed("urn:opds-server:root", "opds-server")
 	feed.AddLink("self", baseURL, "application/atom+xml;profile=opds-catalog;kind=navigation")
@@ -70,7 +70,7 @@ func (s *Server) handleOPDSRoot(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOPDSAuthors(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	feed := opds.NewFeed("urn:opds-server:authors", "Авторы")
 	feed.AddLink("self", baseURL+"/authors", "application/atom+xml;profile=opds-catalog;kind=navigation")
@@ -105,7 +105,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 	if decoded, err := url.QueryUnescape(letter); err == nil {
 		letter = decoded
 	}
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	authors, err := s.db.GetAuthorsByLetter(libID, letter)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, libID int64, authorID int64) {
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	author, err := s.db.GetAuthor(authorID)
 	if err != nil {
@@ -177,7 +177,7 @@ func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, 
 
 func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
@@ -215,7 +215,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, seriesID int64) {
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	series, err := s.db.GetSeriesByID(seriesID)
 	if err != nil {
@@ -256,7 +256,7 @@ func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleOPDSGenres(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	genres, err := s.db.GetTopLevelGenres()
 	if err != nil {
@@ -281,7 +281,7 @@ func (s *Server) handleOPDSGenres(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOPDSGenreBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, genreIDStr string) {
 	genreID, _ := strconv.Atoi(genreIDStr)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	// Check if this is a parent genre (show subgenres) or leaf genre (show books)
 	subGenres, err := s.db.GetSubGenres(genreID)
@@ -515,7 +515,7 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
-	baseURL := fmt.Sprintf("/opds/opds/%d", libID)
+	baseURL := fmt.Sprintf("%s/opds/%d", s.config.Server.BasePath, libID)
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
