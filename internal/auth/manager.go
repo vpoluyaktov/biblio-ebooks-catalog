@@ -20,7 +20,7 @@ const (
 // Manager handles authentication for both internal and OIDC modes
 type Manager struct {
 	mode         AuthMode
-	internalAuth *Auth
+	internalAuth *Auth // Always initialized for Basic Auth support on OPDS feeds
 	oidcAuth     *OIDCProvider
 }
 
@@ -30,9 +30,14 @@ func NewManager(mode string, database *db.DB, oidcCfg OIDCConfig) (*Manager, err
 		mode: AuthMode(mode),
 	}
 
+	// Always initialize internal auth for Basic Auth support on OPDS feeds
+	// This allows e-readers and service-to-service calls to authenticate
+	// via HTTP Basic Auth regardless of the primary auth mode
+	m.internalAuth = New(database)
+
 	switch m.mode {
 	case AuthModeInternal:
-		m.internalAuth = New(database)
+		// Internal auth already initialized above
 	case AuthModeOIDC:
 		oidc, err := NewOIDCProvider(oidcCfg)
 		if err != nil {
@@ -192,12 +197,13 @@ func (m *Manager) GetLogoutURL(redirectURL string) string {
 }
 
 // CheckSessionOrBasicAuth checks for session or basic auth (works in both modes)
+// In OIDC mode, this also supports Basic Auth for OPDS e-readers and service-to-service calls
 func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request) bool {
 	if m.mode == AuthModeInternal {
 		return m.internalAuth.CheckSessionOrBasicAuth(w, r)
 	}
 
-	// In OIDC mode, check for OIDC session cookie
+	// In OIDC mode, check for OIDC session cookie first
 	cookie, err := r.Cookie("oidc_session")
 	if err == nil {
 		session, err := OIDCSessionFromJSON(cookie.Value)
@@ -214,11 +220,9 @@ func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// For OPDS e-readers, we can't support OIDC in this mode
-	// Return 401 to prompt for authentication
-	w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
-	http.Error(w, "OIDC authentication required. Please use web interface to login.", http.StatusUnauthorized)
-	return false
+	// For OPDS e-readers and service-to-service calls, also support Basic Auth
+	// This uses the internal user database for authentication
+	return m.internalAuth.CheckSessionOrBasicAuth(w, r)
 }
 
 // CheckSession checks for session auth (works in both modes)

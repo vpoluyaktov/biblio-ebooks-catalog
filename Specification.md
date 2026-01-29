@@ -698,13 +698,44 @@ Keycloak Auth (AUTH_MODE=keycloak):
 - BiblioHub swarm deployments use `AUTH_MODE=keycloak`
 - No data migration required - modes are independent
 - E-reader OPDS access works in internal mode via Basic Auth
-- E-reader OPDS access in Keycloak mode requires web login first
+- E-reader OPDS access in OIDC mode also works via Basic Auth (see fix below)
 
 **Impact**:
 - Enables seamless integration with BiblioHub's centralized authentication
 - Maintains backward compatibility for standalone deployments
 - Provides flexible deployment options for different use cases
 - Supports both web UI and e-reader clients
+
+---
+
+### fix/opds-basic-auth-in-oidc-mode - OPDS Basic Auth Support in OIDC Mode (2026-01-28)
+
+**Problem**: When running in OIDC mode (`AUTH_MODE=oidc`), the OPDS feed endpoints rejected HTTP Basic Auth credentials, returning 401 Unauthorized. This broke:
+- E-reader OPDS clients that use Basic Auth
+- Service-to-service calls (e.g., abb_tts connecting to opds-server)
+
+**Root Cause**: The `CheckSessionOrBasicAuth` method in `internal/auth/manager.go` only checked for OIDC session cookies in OIDC mode, ignoring Basic Auth headers entirely.
+
+**Solution**:
+- Always initialize internal auth provider (for Basic Auth) regardless of auth mode
+- In OIDC mode, `CheckSessionOrBasicAuth` now:
+  1. First checks for OIDC session cookie (for web UI users)
+  2. Falls back to Basic Auth using internal user database (for e-readers and services)
+
+**Files Changed**:
+- `internal/auth/manager.go`:
+  - Always initialize `internalAuth` in `NewManager()` for Basic Auth support
+  - Modified `CheckSessionOrBasicAuth()` to fall back to Basic Auth in OIDC mode
+
+**Behavior**:
+- **Web UI**: Uses OIDC flow (login via Keycloak/OIDC provider)
+- **OPDS feeds**: Accept both OIDC session cookies AND HTTP Basic Auth
+- **Service-to-service**: Use Basic Auth with credentials from internal user database
+
+**Note**: Users for Basic Auth must exist in the opds-server's internal SQLite database. Create them via CLI:
+```bash
+./biblio-opds-server create-user --username admin --password secret --role admin
+```
 
 ---
 
