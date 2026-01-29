@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"biblio-opds-server/internal/auth"
+	"biblio-catalog/internal/auth"
 )
 
 // handleOIDCLogin initiates the OIDC OAuth2 login flow

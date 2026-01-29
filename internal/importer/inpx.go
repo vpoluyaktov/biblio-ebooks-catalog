@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/db"
 )
 
 const fieldSeparator = "\x04"

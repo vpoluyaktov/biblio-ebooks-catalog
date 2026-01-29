@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build the application with ICU support for proper Unicode case conversion
-RUN CGO_ENABLED=1 GOOS=linux go build -tags "icu" -o biblio-opds-server .
+RUN CGO_ENABLED=1 GOOS=linux go build -tags "icu" -o biblio-catalog .
 
 # Runtime stage
 FROM alpine:latest
@@ -25,7 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata icu-libs
 
 # Copy binary from builder
-COPY --from=builder /app/biblio-opds-server .
+COPY --from=builder /app/biblio-catalog .
 
 # Copy static files and templates
 COPY --from=builder /app/web ./web
@@ -46,4 +46,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:9988/api/setup/check || exit 1
 
 # Run the server
-CMD ["./biblio-opds-server"]
+CMD ["./biblio-catalog"]

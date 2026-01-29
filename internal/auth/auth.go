@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/db"
 )
 
 var (

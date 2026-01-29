@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"biblio-opds-server/internal/db"
-	"biblio-opds-server/internal/parser"
+	"biblio-catalog/internal/db"
+	"biblio-catalog/internal/parser"
 )
 
 // ScannedBook represents a book found during directory scanning

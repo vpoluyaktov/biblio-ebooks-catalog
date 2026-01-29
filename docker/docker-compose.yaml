@@ -1,9 +1,9 @@
 services:
-  biblio-opds-server:
+  biblio-catalog:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: biblio-opds-server
+    container_name: biblio-catalog
     restart: unless-stopped
     ports:
       - "9988:9988"

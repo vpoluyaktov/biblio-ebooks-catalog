@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"biblio-opds-server/internal/auth"
-	"biblio-opds-server/internal/config"
-	"biblio-opds-server/internal/db"
-	"biblio-opds-server/internal/importer"
-	"biblio-opds-server/internal/server"
+	"biblio-catalog/internal/auth"
+	"biblio-catalog/internal/config"
+	"biblio-catalog/internal/db"
+	"biblio-catalog/internal/importer"
+	"biblio-catalog/internal/server"
 )
 
 // Run with: go run .
@@ -26,7 +26,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version":
-			fmt.Printf("biblio-opds-server %s\n", version)
+			fmt.Printf("biblio-catalog %s\n", version)
 			return
 		case "import":
 			runImport()
@@ -95,7 +95,7 @@ func runServer() {
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("Starting biblio-opds-server %s on http://%s", version, addr)
+	log.Printf("Starting biblio-catalog %s on http://%s", version, addr)
 	log.Printf("Authentication mode: %s", cfg.Auth.Mode)
 
 	if err := srv.Run(addr); err != nil {
@@ -267,7 +267,7 @@ func runDeleteLibrary() {
 	fs.Parse(os.Args[2:])
 
 	if *libraryID <= 0 {
-		log.Fatal("Library ID is required. Usage: biblio-opds-server delete-library --id <library_id>")
+		log.Fatal("Library ID is required. Usage: biblio-catalog delete-library --id <library_id>")
 	}
 
 	cfg, err := config.Load(*configPath)
@@ -307,7 +307,7 @@ func runCreateUser() {
 	fs.Parse(os.Args[2:])
 
 	if *username == "" || *password == "" {
-		log.Fatal("Username and password are required. Usage: biblio-opds-server create-user --username <user> --password <pass> [--role admin|readonly]")
+		log.Fatal("Username and password are required. Usage: biblio-catalog create-user --username <user> --password <pass> [--role admin|readonly]")
 	}
 
 	if *role != "admin" && *role != "readonly" {

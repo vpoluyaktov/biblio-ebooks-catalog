@@ -1,4 +1,4 @@
-# Biblio OPDS Server
+# Biblio Catalog
 
 > Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
@@ -39,8 +39,8 @@ A lightweight OPDS (Open Publication Distribution System) catalog server for e-b
 ### Option 1: Docker (Recommended)
 
 ```bash
-git clone https://github.com/vpoluyaktov/biblio-opds-server.git
-cd biblio-opds-server/docker
+git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
+cd biblio-ebooks-catalog/docker
 
 # Create directories for data and books
 mkdir -p data books
@@ -64,24 +64,24 @@ The server will be available at `http://localhost:9988`.
 **Prerequisites:** Go 1.21 or later
 
 ```bash
-git clone https://github.com/vpoluyaktov/biblio-opds-server.git
-cd biblio-opds-server
-go build -o biblio-opds-server .
+git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
+cd biblio-ebooks-catalog
+go build -o biblio-catalog .
 ```
 
 ## Usage
 
 ### Start the server
 ```bash
-./biblio-opds-server
+./biblio-catalog
 ```
 
 The server starts on `http://0.0.0.0:9988` by default.
 
 ### Command line options
 ```bash
-./biblio-opds-server --help
-./biblio-opds-server --restart  # Kill existing process on port and restart
+./biblio-catalog --help
+./biblio-catalog --restart  # Kill existing process on port and restart
 ```
 
 ### CLI Commands
@@ -89,7 +89,7 @@ The server starts on `http://0.0.0.0:9988` by default.
 #### Import from INPX (Fast)
 Import a library using an existing INPX index file:
 ```bash
-./biblio-opds-server import \
+./biblio-catalog import \
   --inpx /path/to/library.inpx \
   --name "My Library" \
   --path /path/to/books \
@@ -99,7 +99,7 @@ Import a library using an existing INPX index file:
 #### Scan Import (No INPX needed)
 Scan a directory and import EPUB/FB2 files directly:
 ```bash
-./biblio-opds-server scan \
+./biblio-catalog scan \
   --name "My EPUB Library" \
   --path /path/to/epub/books \
   --workers 4 \
@@ -112,7 +112,7 @@ Scan a directory and import EPUB/FB2 files directly:
 
 **Example with recreate:**
 ```bash
-./biblio-opds-server scan \
+./biblio-catalog scan \
   --name "My Library" \
   --path /path/to/books \
   --recreate
@@ -122,12 +122,12 @@ Scan a directory and import EPUB/FB2 files directly:
 Export library metadata from database to INPX format:
 ```bash
 # By library ID
-./biblio-opds-server reindex \
+./biblio-catalog reindex \
   --library-id 1 \
   --output /path/to/output.inpx
 
 # By library name
-./biblio-opds-server reindex \
+./biblio-catalog reindex \
   --library-name "My Library" \
   --output /path/to/output.inpx
 ```
@@ -135,16 +135,16 @@ Export library metadata from database to INPX format:
 #### Other Commands
 ```bash
 # Delete a library
-./biblio-opds-server delete-library --id 1
+./biblio-catalog delete-library --id 1
 
 # Create a user
-./biblio-opds-server create-user \
+./biblio-catalog create-user \
   --username admin \
   --password secret \
   --role admin
 
 # Show version
-./biblio-opds-server version
+./biblio-catalog version
 ```
 
 ### First-time setup
@@ -163,7 +163,7 @@ Configure your e-reader with this URL and your credentials.
 ## Project Structure
 
 ```
-biblio-opds-server/
+biblio-ebooks-catalog/
 ├── main.go                 # Entry point
 ├── internal/
 │   ├── db/                 # Database layer (SQLite)

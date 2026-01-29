@@ -12,7 +12,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/db"
 )
 
 var (

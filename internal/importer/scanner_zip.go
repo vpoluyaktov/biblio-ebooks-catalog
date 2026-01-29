@@ -2,7 +2,7 @@ package importer
 
 import (
 	"archive/zip"
-	"biblio-opds-server/internal/parser"
+	"biblio-catalog/internal/parser"
 	"io"
 	"log"
 	"strings"

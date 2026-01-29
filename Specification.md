@@ -1,4 +1,4 @@
-# Biblio OPDS Server
+# Biblio Catalog
 
 > Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
 
@@ -6,7 +6,7 @@ A Go-based web server for managing e-book libraries with OPDS catalog support fo
 
 ## Overview
 
-Biblio OPDS Server provides:
+Biblio Catalog provides:
 - **Web-based UI** for browsing and managing e-book libraries
 - **OPDS catalog server** for e-reader compatibility
 - **REST API** for programmatic access
@@ -42,7 +42,7 @@ Biblio OPDS Server provides:
 ## Project Structure
 
 ```
-biblio-opds-server/
+biblio-ebooks-catalog/
 ├── main.go                      # Application entry point
 ├── Specification.md             # This file
 ├── internal/
@@ -194,8 +194,8 @@ go run . --port 9903
 Part of BiblioHub Docker Swarm stack:
 
 ```yaml
-opds-server:
-  image: vpoluyaktov/bibliohub-opds-server:dev-latest
+biblio-catalog:
+  image: vpoluyaktov/bibliohub-catalog:dev-latest
   ports:
     - "9903:9903"
   environment:
@@ -368,17 +368,17 @@ The streaming import flow ensures:
 
 ```bash
 # Import with INPX (existing)
-./biblio-opds-server import --inpx /path/to/file.inpx --name "My Library" --path /path/to/books
+./biblio-catalog import --inpx /path/to/file.inpx --name "My Library" --path /path/to/books
 
 # Import by scanning directory (new)
-./biblio-opds-server import --scan --name "My Library" --path /path/to/books
+./biblio-catalog import --scan --name "My Library" --path /path/to/books
 
 # Recreate library (delete existing and reimport)
-./biblio-opds-server import --scan --recreate --name "My Library" --path /path/to/books
+./biblio-catalog import --scan --recreate --name "My Library" --path /path/to/books
 
 # Generate INPX from existing library (new)
-./biblio-opds-server reindex --library-id 1 --output /path/to/output.inpx
-./biblio-opds-server reindex --library-name "My Library" --output /path/to/output.inpx
+./biblio-catalog reindex --library-id 1 --output /path/to/output.inpx
+./biblio-catalog reindex --library-name "My Library" --output /path/to/output.inpx
 ```
 
 #### Recreate Mode Behavior

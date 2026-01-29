@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"biblio-opds-server/internal/parser"
+	"biblio-catalog/internal/parser"
 )
 
 // processZipFile processes all books inside a ZIP archive

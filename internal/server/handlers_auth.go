@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"biblio-opds-server/internal/auth"
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/auth"
+	"biblio-catalog/internal/db"
 )
 
 type LoginRequest struct {

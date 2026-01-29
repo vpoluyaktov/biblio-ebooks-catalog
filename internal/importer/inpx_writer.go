@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/db"
 )
 
 // INPXWriter handles exporting library data to INPX format

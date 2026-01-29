@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"biblio-opds-server/internal/db"
+	"biblio-catalog/internal/db"
 )
 
 // AuthMode represents the authentication mode

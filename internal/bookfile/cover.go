@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"biblio-opds-server/internal/parser"
+	"biblio-catalog/internal/parser"
 )
 
 type fb2Document struct {

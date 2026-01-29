@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 
-	"biblio-opds-server/internal/db"
-	"biblio-opds-server/internal/parser"
+	"biblio-catalog/internal/db"
+	"biblio-catalog/internal/parser"
 )
 
 // StreamingImporter imports books one-by-one with frequent cancellation checks

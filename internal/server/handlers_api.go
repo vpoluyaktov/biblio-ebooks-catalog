@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"biblio-opds-server/internal/db"
-	"biblio-opds-server/internal/importer"
+	"biblio-catalog/internal/db"
+	"biblio-catalog/internal/importer"
 )
 
 // API handlers for opds-server
