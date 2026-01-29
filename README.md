@@ -1,6 +1,6 @@
 # Biblio Catalog
 
-> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
 A lightweight OPDS (Open Publication Distribution System) catalog server for e-book libraries, written in Go. Import your EPUB and FB2 book collections with or without INPX index files and serve them via OPDS protocol to e-readers and reading apps.
 
@@ -36,30 +36,36 @@ A lightweight OPDS (Open Publication Distribution System) catalog server for e-b
 
 ## Installation
 
-### Option 1: Docker (Recommended)
+### Option 1: BiblioHub (Recommended)
+
+The recommended way to run Biblio Catalog is as part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) Docker Swarm stack:
+
+```bash
+# Clone BiblioHub and service repositories
+git clone https://github.com/vpoluyaktov/biblio-hub.git
+git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
+
+# Start the stack
+cd biblio-hub
+cp .env.example .env
+# Edit .env to set EBOOKS_PATH to your book library
+./scripts/start_stack.sh
+```
+
+Access at: `http://localhost:9900/catalog/`
+
+### Option 2: Standalone Docker
 
 ```bash
 git clone https://github.com/vpoluyaktov/biblio-ebooks-catalog.git
 cd biblio-ebooks-catalog/docker
-
-# Create directories for data and books
 mkdir -p data books
-
-# Copy your INPX and ZIP files to the books directory
-cp /path/to/your/library.inpx books/
-cp /path/to/your/*.zip books/
-
-# Start the server
 docker-compose up -d
 ```
 
 The server will be available at `http://localhost:9988`.
 
-**Volume mounts:**
-- `./docker/data` - Database and configuration (persisted)
-- `./docker/books` - Your book library (INPX and ZIP files)
-
-### Option 2: Build from source
+### Option 3: Build from source
 
 **Prerequisites:** Go 1.21 or later
 
