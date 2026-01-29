@@ -150,7 +150,12 @@ func (s *Server) handleOIDCLogout(w http.ResponseWriter, r *http.Request) {
 	if basePath == "" {
 		basePath = "/"
 	}
-	redirectURL := fmt.Sprintf("%s%s/", r.Host, basePath)
+	// Determine scheme (default to http, use https if X-Forwarded-Proto indicates it)
+	scheme := "http"
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	redirectURL := fmt.Sprintf("%s://%s%s/", scheme, r.Host, basePath)
 	logoutURL := s.authManager.GetLogoutURL(redirectURL)
 
 	// Return the logout URL for the client to redirect to

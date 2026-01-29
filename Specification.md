@@ -572,6 +572,10 @@ Biblio Catalog supports two authentication modes:
 - **Root Cause**: The `router()` function was redirecting to `#login` before `checkAuth()` could complete the OIDC redirect
 - **Fix**: Added `oidcRedirectPending` flag to track when OIDC redirect is in progress, preventing the router from showing the internal login screen and keeping the loading spinner visible during redirect
 
+- **Issue**: Logout button in OIDC mode showed internal login screen instead of logging out via Keycloak
+- **Root Cause**: The `logout()` function only called internal logout endpoint and redirected to `#login`
+- **Fix**: Updated `logout()` to check auth mode and call OIDC logout endpoint, then redirect to Keycloak logout URL. Also fixed missing scheme in redirect URL construction in backend.
+
 ---
 
 *Last updated: 2026-01-29*

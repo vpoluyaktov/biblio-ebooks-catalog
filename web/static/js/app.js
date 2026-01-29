@@ -2728,7 +2728,27 @@ const App = {
   },
 
   async logout() {
-    await fetch(this.apiUrl('/api/auth/logout'), { method: 'POST' });
+    try {
+      // Check auth mode first
+      const authInfoRes = await fetch(this.apiUrl('/api/auth/info'));
+      const authInfo = await authInfoRes.json();
+      
+      if (authInfo.mode === 'oidc') {
+        // OIDC mode: call OIDC logout endpoint and redirect to Keycloak
+        const logoutRes = await fetch(this.apiUrl('/api/auth/oidc/logout'), { method: 'POST' });
+        const logoutData = await logoutRes.json();
+        this.user = null;
+        if (logoutData.logout_url) {
+          window.location.href = logoutData.logout_url;
+          return;
+        }
+      } else {
+        // Internal mode: use internal logout
+        await fetch(this.apiUrl('/api/auth/logout'), { method: 'POST' });
+      }
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
     this.user = null;
     window.location.hash = '#login';
   },
