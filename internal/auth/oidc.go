@@ -251,9 +251,12 @@ func (kp *OIDCProvider) GetUserInfo(accessToken string) (map[string]interface{},
 
 // GetLogoutURL returns the OIDC logout URL
 func (kp *OIDCProvider) GetLogoutURL(redirectURL string) string {
-	return fmt.Sprintf("%s/protocol/openid-connect/logout?redirect_uri=%s",
-		kp.oauth2Config.Endpoint.AuthURL[:len(kp.oauth2Config.Endpoint.AuthURL)-5], // Remove "/auth" suffix
-		redirectURL)
+	// AuthURL is like: http://keycloak:8080/auth/realms/biblio/protocol/openid-connect/auth
+	// We need:         http://keycloak:8080/auth/realms/biblio/protocol/openid-connect/logout
+	// So we replace the trailing "/auth" with "/logout"
+	authURL := kp.oauth2Config.Endpoint.AuthURL
+	logoutURL := authURL[:len(authURL)-5] + "/logout" // Replace "/auth" with "/logout"
+	return fmt.Sprintf("%s?redirect_uri=%s", logoutURL, redirectURL)
 }
 
 // AuthenticateWithPassword authenticates a user using Resource Owner Password Credentials (ROPC) grant.
