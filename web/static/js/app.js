@@ -6,6 +6,7 @@ const App = {
   currentView: 'home',
   theme: 'dark',
   libraries: [],
+  oidcRedirectPending: false,
   currentTab: 'authors',
   currentAuthor: null,
   currentSeries: null,
@@ -91,12 +92,15 @@ const App = {
       
       // If in OIDC mode and not authenticated, redirect to OIDC login
       if (authInfo.mode === 'oidc' && !authInfo.authenticated) {
+        // Set flag to prevent router from showing internal login screen
+        this.oidcRedirectPending = true;
         const loginRes = await fetch(this.apiUrl('/api/auth/oidc/login'));
         const loginData = await loginRes.json();
         if (loginData.login_url) {
           window.location.href = loginData.login_url;
           return;
         }
+        this.oidcRedirectPending = false;
       }
       
       // If authenticated (either mode), set user
@@ -105,6 +109,7 @@ const App = {
       }
     } catch (e) {
       console.error('Auth check failed:', e);
+      this.oidcRedirectPending = false;
     }
   },
 
@@ -154,8 +159,14 @@ const App = {
     }
 
     // Check auth for protected routes
-    if (!this.user && !['login', 'setup'].includes(view)) {
+    // Skip redirect to login if OIDC redirect is pending (prevents flash of internal login screen)
+    if (!this.user && !['login', 'setup'].includes(view) && !this.oidcRedirectPending) {
       window.location.hash = '#login';
+      return;
+    }
+    
+    // If OIDC redirect is pending, keep showing loading spinner
+    if (this.oidcRedirectPending) {
       return;
     }
 

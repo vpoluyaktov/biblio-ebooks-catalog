@@ -565,4 +565,13 @@ Biblio Catalog supports two authentication modes:
 
 ---
 
+## Recent Changes
+
+### fix/oidc-login-flash (2026-01-29)
+- **Issue**: When accessing the catalog in OIDC mode, the internal login screen would briefly flash before redirecting to Keycloak
+- **Root Cause**: The `router()` function was redirecting to `#login` before `checkAuth()` could complete the OIDC redirect
+- **Fix**: Added `oidcRedirectPending` flag to track when OIDC redirect is in progress, preventing the router from showing the internal login screen and keeping the loading spinner visible during redirect
+
+---
+
 *Last updated: 2026-01-29*
