@@ -1,6 +1,6 @@
 # Biblio Catalog
 
-> Part of the [BiblioHub](https://github.com/vpoluyaktov/BiblioHub) application suite
+> Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
 A Go-based web server for managing e-book libraries with OPDS catalog support for e-readers.
 
@@ -126,8 +126,9 @@ OPDS feeds are served at `{BASE_PATH}/opds/{lib_id}/...` where `BASE_PATH` is co
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OPDS_SERVER_HOST` | Server host | `0.0.0.0` |
-| `OPDS_SERVER_PORT` | Server port | `9903` |
-| `OPDS_BASE_PATH` | Base URL path for deployment | `/catalog` |
+| `OPDS_SERVER_PORT` | Server port | `80` |
+| `OPDS_BASE_PATH` | Base URL path for path-based routing | `/catalog` |
+| `AUTH_MODE` | Authentication mode (`internal` or `oidc`) | `oidc` |
 | `OPDS_DATABASE_PATH` | SQLite database path | `./data/library.db` |
 | `OPDS_LIBRARY_PATH` | Book files directory | `./libraries` |
 | `OPDS_LOG_LEVEL` | Logging level | `info` |
@@ -191,19 +192,22 @@ go run . --port 9903
 
 ## Docker Deployment
 
-Part of BiblioHub Docker Swarm stack:
+Part of BiblioHub Docker Swarm stack. Access via `http://localhost:9900/catalog/`
 
 ```yaml
 biblio-catalog:
   image: vpoluyaktov/bibliohub-catalog:dev-latest
-  ports:
-    - "9903:9903"
   environment:
     - OPDS_SERVER_HOST=0.0.0.0
-    - OPDS_SERVER_PORT=9903
+    - OPDS_SERVER_PORT=80
+    - OPDS_BASE_PATH=/catalog
+    - AUTH_MODE=${AUTH_MODE:-oidc}
+    - OIDC_URL=http://${BIBLIO_HUB_HOSTNAME:-localhost}:${BIBLIO_HUB_PORT:-9900}/auth
+    - OIDC_REALM=biblio
+    - OIDC_CLIENT_ID=biblio-catalog
   volumes:
     - ./data/opds/db:/db
-    - ./data/opds/books:/books
+    - ${EBOOKS_PATH}:/books:ro
 ```
 
 ## Development Status
@@ -527,12 +531,30 @@ book.epub (ZIP archive)
 - Format conversion (FB2 → EPUB)
 - Reading progress tracking
 
+## Authentication
+
+Biblio Catalog supports two authentication modes:
+
+### Internal Mode (`AUTH_MODE=internal`)
+- Standalone deployment with local SQLite user database
+- Session-based authentication with cookies
+- HTTP Basic Auth support for e-readers (OPDS clients)
+- User management via web UI
+
+### OIDC Mode (`AUTH_MODE=oidc`)
+- Integration with Keycloak for centralized SSO
+- OAuth2 Authorization Code flow for web UI
+- HTTP Basic Auth for e-readers (validated via Keycloak ROPC)
+- User management via Keycloak Admin Console
+
 ## Dependencies
 
 ### Go Modules
 
 - `github.com/mattn/go-sqlite3` - SQLite driver (with ICU)
 - `github.com/fogleman/gg` - Cover image generation
+- `github.com/coreos/go-oidc/v3/oidc` - OIDC client (for Keycloak)
+- `golang.org/x/oauth2` - OAuth2 client
 - Standard library `net/http` - HTTP server and routing
 
 ### Build Requirements
@@ -543,211 +565,4 @@ book.epub (ZIP archive)
 
 ---
 
-## Recent Changes
-
-### Path-Based Routing Implementation (2026-01-28)
-
-**Overview**: Implemented support for running the OPDS server on a sub-path (e.g., `/opds`) as part of the BiblioHub unified deployment architecture.
-
-**Architecture Approach**:
-- Backend routes registered **WITH** base path prefix (e.g., `/opds/api/libraries`)
-- Nginx gateway preserves full path when forwarding (no trailing slash in `proxy_pass`)
-- Frontend JavaScript uses `apiUrl()` helper to prepend base path to all API calls
-- Each service isolated in its own namespace, preventing route conflicts
-
-**Backend Changes**:
-- Added `BASE_PATH` environment variable support in `config.go` (default: `/`)
-- Routes registered with base path prefix in `server.go`
-- Path parsing in handlers uses `strings.Index()` to find prefix position
-- Fixed `handleOPDSSource()` to correctly extract source ID with base path
-
-**Frontend Changes**:
-- Added `window.APP_BASE_PATH` injection in HTML template
-- Created `apiUrl()` helper function in `app.js` to prefix all API calls
-- Fixed mobile UI (`mobile.js`): 4 OPDS feed URLs now use `App.apiUrl()`
-  - Author books URL
-  - Series books URL  
-  - Genre books URL
-  - Search URL
-- Fixed user management (`app.js`): 2 endpoints now use `this.apiUrl()`
-  - Change password endpoint
-  - Change role endpoint
-
-**Configuration**:
-```yaml
-# stack.yaml
-opds-server:
-  environment:
-    - BASE_PATH=/opds
-```
-
-**Impact**: 
-- Resolves "no books found" issue in mobile UI when selecting authors/series
-- Fixes user management operations (password/role changes)
-- Enables deployment behind reverse proxy with path-based routing
-- All API calls now work correctly with base path prefix
-
----
-
-### refactor/centralize-basepath-handling - Centralized Base Path Handling (2026-01-28)
-
-**Problem**: Base path handling was scattered throughout the codebase with manual string concatenation (`s.config.Server.BasePath + "/path"`), making the code harder to maintain and more prone to errors.
-
-**Solution**:
-- Created `Server.apiURL()` helper method to centralize base path handling in the backend
-- Updated all OPDS handlers to use the helper method instead of manual concatenation
-- Frontend already had `App.apiUrl()` helper that works consistently
-- Reduced code duplication and improved maintainability
-
-**Files Changed**:
-- `internal/server/server.go` - Added `apiURL()` helper method
-- `internal/server/handlers_opds.go` - Replaced 9 instances of manual `basePath` concatenation with `apiURL()` calls
-
-**Impact**:
-- Centralized base path logic in a single helper method
-- Easier to maintain and modify base path handling in the future
-- Consistent pattern between frontend and backend
-- Reduced code duplication across OPDS handlers
-
----
-
-### Dual Authentication Mode Support (2026-01-28)
-
-**Overview**: Implemented support for two authentication modes to enable both standalone deployment (internal auth) and BiblioHub swarm deployment (Keycloak SSO).
-
-**Authentication Modes**:
-
-1. **Internal Mode** (`AUTH_MODE=internal`)
-   - Standalone deployment with local SQLite user database
-   - Session-based authentication with cookies
-   - HTTP Basic Auth support for e-readers (OPDS clients)
-   - User management via web UI
-   - Default mode for standalone Docker containers
-
-2. **Keycloak Mode** (`AUTH_MODE=keycloak`)
-   - Integration with Keycloak for centralized SSO
-   - OAuth2 Authorization Code flow
-   - Token-based authentication (ID tokens, access tokens)
-   - User management via Keycloak Admin Console
-   - Default mode for BiblioHub swarm deployment
-
-**Architecture**:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Auth Manager                          │
-│  (Factory pattern - switches based on AUTH_MODE)        │
-└─────────────────────────────────────────────────────────┘
-                    │
-        ┌───────────┴───────────┐
-        ▼                       ▼
-┌──────────────────┐    ┌──────────────────┐
-│  Internal Auth   │    │  Keycloak Auth   │
-│  - SQLite DB     │    │  - OIDC Provider │
-│  - bcrypt hash   │    │  - OAuth2 flow   │
-│  - Sessions      │    │  - JWT tokens    │
-│  - Basic Auth    │    │  - Role mapping  │
-└──────────────────┘    └──────────────────┘
-```
-
-**Implementation Details**:
-
-- **Config**: Added `AUTH_MODE`, `KeycloakConfig` to `internal/config/config.go`
-- **Auth Manager**: Created `internal/auth/manager.go` - factory pattern for mode switching
-- **Keycloak Provider**: Created `internal/auth/keycloak.go` - OIDC/OAuth2 implementation
-- **Handlers**: 
-  - New: `internal/server/handlers_keycloak.go` - Keycloak login/callback/logout
-  - Updated: `internal/server/handlers_auth.go` - Mode-aware internal auth handlers
-- **Server**: Updated `internal/server/server.go` to use auth manager
-
-**Environment Variables**:
-
-```bash
-# Authentication mode
-AUTH_MODE=keycloak  # or 'internal'
-
-# Keycloak configuration (required when AUTH_MODE=keycloak)
-KEYCLOAK_URL=http://localhost:9900/auth
-KEYCLOAK_REALM=biblio
-KEYCLOAK_CLIENT_ID=opds-server
-KEYCLOAK_CLIENT_SECRET=your-secret-here
-KEYCLOAK_REDIRECT_URL=http://localhost:9900/catalog/api/auth/keycloak/callback
-```
-
-**API Endpoints**:
-
-Internal Auth (AUTH_MODE=internal):
-- `POST /api/auth/login` - Login with username/password
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
-- `GET /api/users` - List users (admin only)
-- `POST /api/users` - Create user (admin only)
-
-Keycloak Auth (AUTH_MODE=keycloak):
-- `GET /api/auth/keycloak/login` - Initiate OAuth2 flow
-- `GET /api/auth/keycloak/callback` - OAuth2 callback handler
-- `POST /api/auth/keycloak/logout` - Keycloak logout
-- `GET /api/auth/info` - Get auth mode and user info
-
-**Dependencies Added**:
-- `github.com/coreos/go-oidc/v3/oidc` - OIDC client library
-- `golang.org/x/oauth2` - OAuth2 client library
-
-**Migration Path**:
-- Existing deployments continue to work with `AUTH_MODE=internal`
-- BiblioHub swarm deployments use `AUTH_MODE=keycloak`
-- No data migration required - modes are independent
-- E-reader OPDS access works in internal mode via Basic Auth
-- E-reader OPDS access in OIDC mode also works via Basic Auth (see fix below)
-
-**Impact**:
-- Enables seamless integration with BiblioHub's centralized authentication
-- Maintains backward compatibility for standalone deployments
-- Provides flexible deployment options for different use cases
-- Supports both web UI and e-reader clients
-
----
-
-### fix/opds-basic-auth-in-oidc-mode - OPDS Basic Auth via Keycloak ROPC (2026-01-28)
-
-**Problem**: When running in OIDC mode (`AUTH_MODE=oidc`), the OPDS feed endpoints rejected HTTP Basic Auth credentials, returning 401 Unauthorized. This broke:
-- E-reader OPDS clients that use Basic Auth
-- Service-to-service calls (e.g., abb_tts connecting to opds-server)
-
-**Root Cause**: The `CheckSessionOrBasicAuth` method in `internal/auth/manager.go` only checked for OIDC session cookies in OIDC mode, ignoring Basic Auth headers entirely.
-
-**Solution**: Implemented Keycloak ROPC (Resource Owner Password Credentials) authentication for Basic Auth in OIDC mode. This allows using the same Keycloak user accounts for both Web UI (OAuth2 flow) and OPDS feeds (Basic Auth).
-
-**Keycloak Configuration** (in `biblio-hub/keycloak/biblio-realm.json`):
-- Added `opds_user` realm role - required for OPDS feed access
-- Added `opds_users` group with `opds_user` role
-- Test users (`testadmin`, `testuser`) assigned to `opds_users` group
-- `opds-server` client has `directAccessGrantsEnabled: true` (ROPC support)
-
-**Files Changed**:
-- `internal/auth/oidc.go`:
-  - Added `AuthenticateWithPassword()` method using ROPC grant
-  - Validates user has `opds_user` role for OPDS access
-- `internal/auth/manager.go`:
-  - Modified `CheckSessionOrBasicAuth()` to use OIDC ROPC for Basic Auth in OIDC mode
-
-**Authentication Flow**:
-
-| Mode | Web UI | OPDS Feeds |
-|------|--------|------------|
-| `internal` | Internal DB (session) | Internal DB (Basic Auth) |
-| `oidc` | Keycloak (OAuth2 flow) | Keycloak (Basic Auth via ROPC) |
-
-**OPDS Access Requirements** (OIDC mode):
-1. User must exist in Keycloak
-2. User must have `opds_user` role (via `opds_users` group or direct assignment)
-3. User authenticates via HTTP Basic Auth with Keycloak credentials
-
-**Benefits**:
-- Single user database (Keycloak) for both Web UI and OPDS
-- Centralized role management
-- No need for separate opds-server internal users in OIDC mode
-
----
-
-*Last updated: 2026-01-28*
+*Last updated: 2026-01-29*
