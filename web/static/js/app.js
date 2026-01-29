@@ -89,9 +89,9 @@ const App = {
       const authInfoRes = await fetch(this.apiUrl('/api/auth/info'));
       const authInfo = await authInfoRes.json();
       
-      // If in Keycloak mode and not authenticated, redirect to Keycloak login
-      if (authInfo.mode === 'keycloak' && !authInfo.authenticated) {
-        const loginRes = await fetch(this.apiUrl('/api/auth/keycloak/login'));
+      // If in OIDC mode and not authenticated, redirect to OIDC login
+      if (authInfo.mode === 'oidc' && !authInfo.authenticated) {
+        const loginRes = await fetch(this.apiUrl('/api/auth/oidc/login'));
         const loginData = await loginRes.json();
         if (loginData.login_url) {
           window.location.href = loginData.login_url;

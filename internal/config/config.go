@@ -13,7 +13,7 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Library  LibraryConfig  `yaml:"library"`
 	Auth     AuthConfig     `yaml:"auth"`
-	Keycloak KeycloakConfig `yaml:"keycloak"`
+	OIDC     OIDCConfig     `yaml:"oidc"`
 	OPDS     OPDSConfig     `yaml:"opds"`
 }
 
@@ -38,7 +38,7 @@ type AuthConfig struct {
 	Password string `yaml:"password"`
 }
 
-type KeycloakConfig struct {
+type OIDCConfig struct {
 	URL          string `yaml:"url"`
 	Realm        string `yaml:"realm"`
 	ClientID     string `yaml:"client_id"`
@@ -68,11 +68,11 @@ func Default() *Config {
 			Mode:    "internal",
 			User:    "admin",
 		},
-		Keycloak: KeycloakConfig{
+		OIDC: OIDCConfig{
 			URL:         "http://localhost:8080/auth",
 			Realm:       "biblio",
 			ClientID:    "opds-server",
-			RedirectURL: "http://localhost:9900/catalog/auth/callback",
+			RedirectURL: "http://localhost:9900/catalog/api/auth/oidc/callback",
 		},
 		OPDS: OPDSConfig{
 			ShowCovers:      true,
@@ -131,21 +131,21 @@ func (c *Config) loadFromEnv() {
 		c.Auth.Mode = v
 	}
 
-	// Keycloak configuration
-	if v := os.Getenv("KEYCLOAK_URL"); v != "" {
-		c.Keycloak.URL = v
+	// OIDC configuration
+	if v := os.Getenv("OIDC_URL"); v != "" {
+		c.OIDC.URL = v
 	}
-	if v := os.Getenv("KEYCLOAK_REALM"); v != "" {
-		c.Keycloak.Realm = v
+	if v := os.Getenv("OIDC_REALM"); v != "" {
+		c.OIDC.Realm = v
 	}
-	if v := os.Getenv("KEYCLOAK_CLIENT_ID"); v != "" {
-		c.Keycloak.ClientID = v
+	if v := os.Getenv("OIDC_CLIENT_ID"); v != "" {
+		c.OIDC.ClientID = v
 	}
-	if v := os.Getenv("KEYCLOAK_CLIENT_SECRET"); v != "" {
-		c.Keycloak.ClientSecret = v
+	if v := os.Getenv("OIDC_CLIENT_SECRET"); v != "" {
+		c.OIDC.ClientSecret = v
 	}
-	if v := os.Getenv("KEYCLOAK_REDIRECT_URL"); v != "" {
-		c.Keycloak.RedirectURL = v
+	if v := os.Getenv("OIDC_REDIRECT_URL"); v != "" {
+		c.OIDC.RedirectURL = v
 	}
 }
 

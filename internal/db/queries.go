@@ -574,3 +574,33 @@ func (db *DB) DeleteUserSessions(userID int64) error {
 	_, err := db.Exec("DELETE FROM session WHERE user_id = ?", userID)
 	return err
 }
+
+// OIDC Session queries
+
+func (db *DB) GetOIDCSession(sessionID string) (*OIDCSession, error) {
+	var session OIDCSession
+	err := db.Get(&session, "SELECT * FROM oidc_session WHERE id = ?", sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (db *DB) CreateOIDCSession(session *OIDCSession) error {
+	_, err := db.Exec(`
+		INSERT INTO oidc_session (id, username, role, id_token, access_token, refresh_token, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		session.ID, session.Username, session.Role, session.IDToken, session.AccessToken, session.RefreshToken, session.ExpiresAt,
+	)
+	return err
+}
+
+func (db *DB) DeleteOIDCSession(sessionID string) error {
+	_, err := db.Exec("DELETE FROM oidc_session WHERE id = ?", sessionID)
+	return err
+}
+
+func (db *DB) DeleteExpiredOIDCSessions() error {
+	_, err := db.Exec("DELETE FROM oidc_session WHERE expires_at < CURRENT_TIMESTAMP")
+	return err
+}

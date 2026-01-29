@@ -1,36 +1,35 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('OPDS Server Keycloak Authentication', () => {
-  const BASE_URL = 'http://localhost:9900/catalog';
   const KEYCLOAK_USERNAME = 'testadmin';
   const KEYCLOAK_PASSWORD = 'admin123';
 
   test('should redirect to Keycloak login when accessing OPDS catalog', async ({ page }) => {
     // Navigate to OPDS catalog
-    await page.goto(BASE_URL);
+    await page.goto('http://localhost:9900/catalog/');
     
     // Should be redirected to Keycloak login page
     await expect(page).toHaveURL(/\/auth\/realms\/biblio\/protocol\/openid-connect\/auth/);
     
     // Verify Keycloak login page elements
-    await expect(page.locator('text=Sign in to BiblioHub')).toBeVisible();
-    await expect(page.locator('input[name="username"]')).toBeVisible();
-    await expect(page.locator('input[name="password"]')).toBeVisible();
+    await expect(page.locator('text=Sign in to your account')).toBeVisible();
+    await expect(page.locator('input[id="username"]')).toBeVisible();
+    await expect(page.locator('input[id="password"]')).toBeVisible();
   });
 
   test('should successfully authenticate with Keycloak and access OPDS catalog', async ({ page }) => {
     // Navigate to OPDS catalog
-    await page.goto(BASE_URL);
+    await page.goto('http://localhost:9900/catalog/');
     
     // Wait for redirect to Keycloak
     await page.waitForURL(/\/auth\/realms\/biblio\/protocol\/openid-connect\/auth/);
     
     // Fill in Keycloak login form
-    await page.fill('input[name="username"]', KEYCLOAK_USERNAME);
-    await page.fill('input[name="password"]', KEYCLOAK_PASSWORD);
+    await page.fill('input[id="username"]', KEYCLOAK_USERNAME);
+    await page.fill('input[id="password"]', KEYCLOAK_PASSWORD);
     
-    // Submit login form
-    await page.click('input[type="submit"]');
+    // Submit login form by pressing Enter
+    await page.press('input[id="password"]', 'Enter');
     
     // Should be redirected back to OPDS catalog
     await page.waitForURL(/\/catalog/);
@@ -49,15 +48,15 @@ test.describe('OPDS Server Keycloak Authentication', () => {
 
   test('should show OPDS dashboard after successful login', async ({ page }) => {
     // Navigate to OPDS catalog
-    await page.goto(BASE_URL);
+    await page.goto('http://localhost:9900/catalog/');
     
     // Wait for redirect to Keycloak
     await page.waitForURL(/\/auth\/realms\/biblio\/protocol\/openid-connect\/auth/);
     
     // Login
-    await page.fill('input[name="username"]', KEYCLOAK_USERNAME);
-    await page.fill('input[name="password"]', KEYCLOAK_PASSWORD);
-    await page.click('input[type="submit"]');
+    await page.fill('input[id="username"]', KEYCLOAK_USERNAME);
+    await page.fill('input[id="password"]', KEYCLOAK_PASSWORD);
+    await page.press('input[id="password"]', 'Enter');
     
     // Wait for redirect back to OPDS
     await page.waitForURL(/\/catalog/);
@@ -75,11 +74,11 @@ test.describe('OPDS Server Keycloak Authentication', () => {
 
   test('should have access to admin features after Keycloak login', async ({ page }) => {
     // Navigate and login
-    await page.goto(BASE_URL);
+    await page.goto('http://localhost:9900/catalog/');
     await page.waitForURL(/\/auth\/realms\/biblio\/protocol\/openid-connect\/auth/);
-    await page.fill('input[name="username"]', KEYCLOAK_USERNAME);
-    await page.fill('input[name="password"]', KEYCLOAK_PASSWORD);
-    await page.click('input[type="submit"]');
+    await page.fill('input[id="username"]', KEYCLOAK_USERNAME);
+    await page.fill('input[id="password"]', KEYCLOAK_PASSWORD);
+    await page.press('input[id="password"]', 'Enter');
     await page.waitForURL(/\/catalog/);
     
     // Wait for page to load

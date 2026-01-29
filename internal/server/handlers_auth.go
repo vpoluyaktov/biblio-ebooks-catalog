@@ -164,7 +164,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request, id int64) {
-	user, err := s.auth.GetUser(id)
+	user, err := s.authManager.GetUser(id)
 	if err != nil {
 		s.jsonError(w, "User not found", http.StatusNotFound)
 		return
@@ -185,7 +185,7 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := s.auth.UpdateUserPassword(id, req.Password); err != nil {
+	if err := s.authManager.UpdateUserPassword(id, req.Password); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -205,7 +205,7 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	if err := s.auth.UpdateUserRole(id, req.Role); err != nil {
+	if err := s.authManager.UpdateUserRole(id, req.Role); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -220,7 +220,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
-	if err := s.auth.DeleteUser(id); err != nil {
+	if err := s.authManager.DeleteUser(id); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

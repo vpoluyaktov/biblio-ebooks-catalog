@@ -135,3 +135,15 @@ type Session struct {
 	ExpiresAt time.Time `db:"expires_at"`
 	CreatedAt time.Time `db:"created_at"`
 }
+
+// OIDCSession stores OAuth2/OIDC tokens server-side
+type OIDCSession struct {
+	ID           string    `db:"id"`
+	Username     string    `db:"username"`
+	Role         string    `db:"role"`
+	IDToken      string    `db:"id_token"`
+	AccessToken  string    `db:"access_token"`
+	RefreshToken string    `db:"refresh_token"`
+	ExpiresAt    time.Time `db:"expires_at"`
+	CreatedAt    time.Time `db:"created_at"`
+}

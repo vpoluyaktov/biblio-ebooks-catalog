@@ -133,3 +133,17 @@ CREATE TABLE IF NOT EXISTS session (
 
 CREATE INDEX IF NOT EXISTS idx_session_user ON session(user_id);
 CREATE INDEX IF NOT EXISTS idx_session_expires ON session(expires_at);
+
+-- OIDC Sessions (for OAuth2/OIDC token storage)
+CREATE TABLE IF NOT EXISTS oidc_session (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    role TEXT NOT NULL,
+    id_token TEXT,
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_oidc_session_expires ON oidc_session(expires_at);

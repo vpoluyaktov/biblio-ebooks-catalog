@@ -19,15 +19,15 @@ type Server struct {
 
 func New(cfg *config.Config, database *db.DB) (*Server, error) {
 	// Create auth manager based on AUTH_MODE
-	keycloakCfg := auth.KeycloakConfig{
-		URL:          cfg.Keycloak.URL,
-		Realm:        cfg.Keycloak.Realm,
-		ClientID:     cfg.Keycloak.ClientID,
-		ClientSecret: cfg.Keycloak.ClientSecret,
-		RedirectURL:  cfg.Keycloak.RedirectURL,
+	oidcCfg := auth.OIDCConfig{
+		URL:          cfg.OIDC.URL,
+		Realm:        cfg.OIDC.Realm,
+		ClientID:     cfg.OIDC.ClientID,
+		ClientSecret: cfg.OIDC.ClientSecret,
+		RedirectURL:  cfg.OIDC.RedirectURL,
 	}
 
-	authManager, err := auth.NewManager(cfg.Auth.Mode, database, keycloakCfg)
+	authManager, err := auth.NewManager(cfg.Auth.Mode, database, oidcCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth manager: %w", err)
 	}
@@ -234,17 +234,17 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleLogin(w, r)
 		return
 	}
-	// Keycloak auth endpoints
-	if path == "/auth/keycloak/login" && r.Method == "GET" {
-		s.handleKeycloakLogin(w, r)
+	// OIDC auth endpoints
+	if path == "/auth/oidc/login" && r.Method == "GET" {
+		s.handleOIDCLogin(w, r)
 		return
 	}
-	if path == "/auth/keycloak/callback" && r.Method == "GET" {
-		s.handleKeycloakCallback(w, r)
+	if path == "/auth/oidc/callback" && r.Method == "GET" {
+		s.handleOIDCCallback(w, r)
 		return
 	}
-	if path == "/auth/keycloak/logout" && r.Method == "POST" {
-		s.handleKeycloakLogout(w, r)
+	if path == "/auth/oidc/logout" && r.Method == "POST" {
+		s.handleOIDCLogout(w, r)
 		return
 	}
 
@@ -363,22 +363,22 @@ func (s *Server) handleLibraryRoutes(w http.ResponseWriter, r *http.Request, rem
 	} else if action == "series" && r.Method == "GET" {
 		s.apiGetSeriesWithID(w, r, libID)
 	} else if action == "stats" && r.Method == "GET" {
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiGetLibraryStatsWithID(w, r, libID)
 	} else if action == "toggle" && r.Method == "PUT" {
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiToggleLibraryWithID(w, r, libID)
 	} else if action == "" && r.Method == "PUT" {
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiUpdateLibraryWithID(w, r, libID)
 	} else if action == "" && r.Method == "DELETE" {
-		if !s.auth.CheckAdmin(w, r) {
+		if !s.authManager.CheckAdmin(w, r) {
 			return
 		}
 		s.apiDeleteLibraryWithID(w, r, libID)
