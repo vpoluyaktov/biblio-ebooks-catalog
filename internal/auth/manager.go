@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"biblio-opds-server/internal/db"
@@ -20,7 +22,7 @@ const (
 // Manager handles authentication for both internal and OIDC modes
 type Manager struct {
 	mode         AuthMode
-	internalAuth *Auth // Always initialized for Basic Auth support on OPDS feeds
+	internalAuth *Auth // Only used in internal mode
 	oidcAuth     *OIDCProvider
 }
 
@@ -30,15 +32,13 @@ func NewManager(mode string, database *db.DB, oidcCfg OIDCConfig) (*Manager, err
 		mode: AuthMode(mode),
 	}
 
-	// Always initialize internal auth for Basic Auth support on OPDS feeds
-	// This allows e-readers and service-to-service calls to authenticate
-	// via HTTP Basic Auth regardless of the primary auth mode
-	m.internalAuth = New(database)
-
 	switch m.mode {
 	case AuthModeInternal:
-		// Internal auth already initialized above
+		// Initialize internal auth for local user database
+		m.internalAuth = New(database)
 	case AuthModeOIDC:
+		// Initialize OIDC provider for Keycloak authentication
+		// Basic Auth on OPDS feeds uses OIDC ROPC grant (same Keycloak users)
 		oidc, err := NewOIDCProvider(oidcCfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
@@ -220,9 +220,28 @@ func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// For OPDS e-readers and service-to-service calls, also support Basic Auth
-	// This uses the internal user database for authentication
-	return m.internalAuth.CheckSessionOrBasicAuth(w, r)
+	// For OPDS e-readers and service-to-service calls, support Basic Auth via OIDC ROPC
+	// This authenticates against Keycloak using Resource Owner Password Credentials grant
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" && len(authHeader) > 6 && authHeader[:6] == "Basic " {
+		decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
+		if err == nil {
+			parts := strings.SplitN(string(decoded), ":", 2)
+			if len(parts) == 2 {
+				user, err := m.oidcAuth.AuthenticateWithPassword(parts[0], parts[1])
+				if err == nil {
+					ctx := context.WithValue(r.Context(), UserContextKey, user)
+					*r = *r.WithContext(ctx)
+					return true
+				}
+			}
+		}
+	}
+
+	// Return 401 to prompt for Basic Auth
+	w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
+	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	return false
 }
 
 // CheckSession checks for session auth (works in both modes)

@@ -708,7 +708,7 @@ Keycloak Auth (AUTH_MODE=keycloak):
 
 ---
 
-### fix/opds-basic-auth-in-oidc-mode - OPDS Basic Auth Support in OIDC Mode (2026-01-28)
+### fix/opds-basic-auth-in-oidc-mode - OPDS Basic Auth via Keycloak ROPC (2026-01-28)
 
 **Problem**: When running in OIDC mode (`AUTH_MODE=oidc`), the OPDS feed endpoints rejected HTTP Basic Auth credentials, returning 401 Unauthorized. This broke:
 - E-reader OPDS clients that use Basic Auth
@@ -716,26 +716,37 @@ Keycloak Auth (AUTH_MODE=keycloak):
 
 **Root Cause**: The `CheckSessionOrBasicAuth` method in `internal/auth/manager.go` only checked for OIDC session cookies in OIDC mode, ignoring Basic Auth headers entirely.
 
-**Solution**:
-- Always initialize internal auth provider (for Basic Auth) regardless of auth mode
-- In OIDC mode, `CheckSessionOrBasicAuth` now:
-  1. First checks for OIDC session cookie (for web UI users)
-  2. Falls back to Basic Auth using internal user database (for e-readers and services)
+**Solution**: Implemented Keycloak ROPC (Resource Owner Password Credentials) authentication for Basic Auth in OIDC mode. This allows using the same Keycloak user accounts for both Web UI (OAuth2 flow) and OPDS feeds (Basic Auth).
+
+**Keycloak Configuration** (in `biblio-hub/keycloak/biblio-realm.json`):
+- Added `opds_user` realm role - required for OPDS feed access
+- Added `opds_users` group with `opds_user` role
+- Test users (`testadmin`, `testuser`) assigned to `opds_users` group
+- `opds-server` client has `directAccessGrantsEnabled: true` (ROPC support)
 
 **Files Changed**:
+- `internal/auth/oidc.go`:
+  - Added `AuthenticateWithPassword()` method using ROPC grant
+  - Validates user has `opds_user` role for OPDS access
 - `internal/auth/manager.go`:
-  - Always initialize `internalAuth` in `NewManager()` for Basic Auth support
-  - Modified `CheckSessionOrBasicAuth()` to fall back to Basic Auth in OIDC mode
+  - Modified `CheckSessionOrBasicAuth()` to use OIDC ROPC for Basic Auth in OIDC mode
 
-**Behavior**:
-- **Web UI**: Uses OIDC flow (login via Keycloak/OIDC provider)
-- **OPDS feeds**: Accept both OIDC session cookies AND HTTP Basic Auth
-- **Service-to-service**: Use Basic Auth with credentials from internal user database
+**Authentication Flow**:
 
-**Note**: Users for Basic Auth must exist in the opds-server's internal SQLite database. Create them via CLI:
-```bash
-./biblio-opds-server create-user --username admin --password secret --role admin
-```
+| Mode | Web UI | OPDS Feeds |
+|------|--------|------------|
+| `internal` | Internal DB (session) | Internal DB (Basic Auth) |
+| `oidc` | Keycloak (OAuth2 flow) | Keycloak (Basic Auth via ROPC) |
+
+**OPDS Access Requirements** (OIDC mode):
+1. User must exist in Keycloak
+2. User must have `opds_user` role (via `opds_users` group or direct assignment)
+3. User authenticates via HTTP Basic Auth with Keycloak credentials
+
+**Benefits**:
+- Single user database (Keycloak) for both Web UI and OPDS
+- Centralized role management
+- No need for separate opds-server internal users in OIDC mode
 
 ---
 

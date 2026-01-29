@@ -256,6 +256,73 @@ func (kp *OIDCProvider) GetLogoutURL(redirectURL string) string {
 		redirectURL)
 }
 
+// AuthenticateWithPassword authenticates a user using Resource Owner Password Credentials (ROPC) grant.
+// This is used for Basic Auth on OPDS feeds when running in OIDC mode.
+// The user must have the 'opds_user' role to access OPDS feeds.
+func (kp *OIDCProvider) AuthenticateWithPassword(username, password string) (*db.User, error) {
+	ctx := context.Background()
+
+	// Use ROPC grant to get token
+	token, err := kp.oauth2Config.PasswordCredentialsToken(ctx, username, password)
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+
+	// Extract ID token
+	rawIDToken, ok := token.Extra("id_token").(string)
+	if !ok {
+		return nil, ErrNoIDToken
+	}
+
+	// Verify ID token
+	idToken, err := kp.verifier.Verify(ctx, rawIDToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify ID token: %w", err)
+	}
+
+	// Extract claims
+	var claims struct {
+		Sub               string `json:"sub"`
+		PreferredUsername string `json:"preferred_username"`
+		RealmAccess       struct {
+			Roles []string `json:"roles"`
+		} `json:"realm_access"`
+	}
+
+	if err := idToken.Claims(&claims); err != nil {
+		return nil, fmt.Errorf("failed to parse claims: %w", err)
+	}
+
+	// Check if user has opds_user role (required for OPDS feed access)
+	hasOPDSAccess := false
+	for _, r := range claims.RealmAccess.Roles {
+		if r == "opds_user" {
+			hasOPDSAccess = true
+			break
+		}
+	}
+	if !hasOPDSAccess {
+		return nil, fmt.Errorf("user does not have opds_user role")
+	}
+
+	// Determine role (check if user has 'admin' role)
+	role := db.RoleReadonly
+	for _, r := range claims.RealmAccess.Roles {
+		if r == "admin" {
+			role = db.RoleAdmin
+			break
+		}
+	}
+
+	user := &db.User{
+		ID:       0, // OIDC users don't have local DB IDs
+		Username: claims.PreferredUsername,
+		Role:     role,
+	}
+
+	return user, nil
+}
+
 // cleanupStates periodically removes expired state parameters
 func (kp *OIDCProvider) cleanupStates() {
 	ticker := time.NewTicker(5 * time.Minute)
