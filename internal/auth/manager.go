@@ -223,17 +223,21 @@ func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request
 	// For OPDS e-readers and service-to-service calls, support Basic Auth via OIDC ROPC
 	// This authenticates against Keycloak using Resource Owner Password Credentials grant
 	authHeader := r.Header.Get("Authorization")
+	fmt.Printf("[DEBUG] ROPC Basic Auth check - authHeader present: %v\n", authHeader != "")
 	if authHeader != "" && len(authHeader) > 6 && authHeader[:6] == "Basic " {
 		decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
 		if err == nil {
 			parts := strings.SplitN(string(decoded), ":", 2)
 			if len(parts) == 2 {
+				fmt.Printf("[DEBUG] ROPC attempting auth for user: %s\n", parts[0])
 				user, err := m.oidcAuth.AuthenticateWithPassword(parts[0], parts[1])
 				if err == nil {
+					fmt.Printf("[DEBUG] ROPC auth successful for user: %s\n", parts[0])
 					ctx := context.WithValue(r.Context(), UserContextKey, user)
 					*r = *r.WithContext(ctx)
 					return true
 				}
+				fmt.Printf("[DEBUG] ROPC auth failed: %v\n", err)
 			}
 		}
 	}
