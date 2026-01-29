@@ -256,7 +256,8 @@ func (kp *OIDCProvider) GetLogoutURL(redirectURL string) string {
 	// So we replace the trailing "/auth" with "/logout"
 	authURL := kp.oauth2Config.Endpoint.AuthURL
 	logoutURL := authURL[:len(authURL)-5] + "/logout" // Replace "/auth" with "/logout"
-	return fmt.Sprintf("%s?redirect_uri=%s", logoutURL, redirectURL)
+	// Use post_logout_redirect_uri instead of redirect_uri (Keycloak 18+ requirement)
+	return fmt.Sprintf("%s?post_logout_redirect_uri=%s&client_id=%s", logoutURL, redirectURL, kp.oauth2Config.ClientID)
 }
 
 // AuthenticateWithPassword authenticates a user using Resource Owner Password Credentials (ROPC) grant.
