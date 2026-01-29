@@ -20,3 +20,12 @@ testdata/
 data/
 books/
 db/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Playwright
+playwright/test-results/
+playwright/playwright-report/
+playwright/.cache/

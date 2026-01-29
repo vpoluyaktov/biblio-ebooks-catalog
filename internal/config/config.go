@@ -13,6 +13,7 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Library  LibraryConfig  `yaml:"library"`
 	Auth     AuthConfig     `yaml:"auth"`
+	OIDC     OIDCConfig     `yaml:"oidc"`
 	OPDS     OPDSConfig     `yaml:"opds"`
 }
 
@@ -32,8 +33,17 @@ type LibraryConfig struct {
 
 type AuthConfig struct {
 	Enabled  bool   `yaml:"enabled"`
+	Mode     string `yaml:"mode"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+}
+
+type OIDCConfig struct {
+	URL          string `yaml:"url"`
+	Realm        string `yaml:"realm"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
 }
 
 type OPDSConfig struct {
@@ -55,7 +65,14 @@ func Default() *Config {
 		},
 		Auth: AuthConfig{
 			Enabled: false,
+			Mode:    "internal",
 			User:    "admin",
+		},
+		OIDC: OIDCConfig{
+			URL:         "http://localhost:8080/auth",
+			Realm:       "biblio",
+			ClientID:    "opds-server",
+			RedirectURL: "http://localhost:9900/catalog/api/auth/oidc/callback",
 		},
 		OPDS: OPDSConfig{
 			ShowCovers:      true,
@@ -109,6 +126,26 @@ func (c *Config) loadFromEnv() {
 	}
 	if v := os.Getenv("OPDS_AUTH_PASSWORD"); v != "" {
 		c.Auth.Password = v
+	}
+	if v := os.Getenv("AUTH_MODE"); v != "" {
+		c.Auth.Mode = v
+	}
+
+	// OIDC configuration
+	if v := os.Getenv("OIDC_URL"); v != "" {
+		c.OIDC.URL = v
+	}
+	if v := os.Getenv("OIDC_REALM"); v != "" {
+		c.OIDC.Realm = v
+	}
+	if v := os.Getenv("OIDC_CLIENT_ID"); v != "" {
+		c.OIDC.ClientID = v
+	}
+	if v := os.Getenv("OIDC_CLIENT_SECRET"); v != "" {
+		c.OIDC.ClientSecret = v
+	}
+	if v := os.Getenv("OIDC_REDIRECT_URL"); v != "" {
+		c.OIDC.RedirectURL = v
 	}
 }
 

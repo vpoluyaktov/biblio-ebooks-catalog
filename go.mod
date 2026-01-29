@@ -14,4 +14,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require golang.org/x/image v0.35.0 // indirect
+require (
+	github.com/coreos/go-oidc/v3 v3.17.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	golang.org/x/image v0.35.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+)

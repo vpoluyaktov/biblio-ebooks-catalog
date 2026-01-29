@@ -89,9 +89,14 @@ func runServer() {
 		log.Printf("Warning: Failed to load genres: %v", err)
 	}
 
-	srv := server.New(cfg, database)
+	srv, err := server.New(cfg, database)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
+
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	log.Printf("Starting biblio-opds-server %s on http://%s", version, addr)
+	log.Printf("Authentication mode: %s", cfg.Auth.Mode)
 
 	if err := srv.Run(addr); err != nil {
 		log.Fatalf("Server error: %v", err)

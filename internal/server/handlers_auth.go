@@ -35,19 +35,25 @@ type UpdateRoleRequest struct {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	// Check if internal auth mode
+	if !s.authManager.IsInternalMode() {
+		s.jsonError(w, "Internal login not available. Please use Keycloak authentication.", http.StatusBadRequest)
+		return
+	}
+
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	user, err := s.auth.Authenticate(req.Username, req.Password)
+	user, err := s.authManager.Authenticate(req.Username, req.Password)
 	if err != nil {
 		s.jsonError(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	session, err := s.auth.CreateSession(user.ID)
+	session, err := s.authManager.CreateSession(user.ID)
 	if err != nil {
 		s.jsonError(w, "Failed to create session", http.StatusInternalServerError)
 		return
@@ -70,9 +76,15 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// Check if internal auth mode
+	if !s.authManager.IsInternalMode() {
+		s.jsonError(w, "Internal logout not available. Please use Keycloak logout.", http.StatusBadRequest)
+		return
+	}
+
 	cookie, err := r.Cookie("session")
 	if err == nil {
-		s.auth.DeleteSession(cookie.Value)
+		s.authManager.DeleteSession(cookie.Value)
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -100,7 +112,11 @@ func (s *Server) handleCurrentUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := s.auth.GetUsers()
+	if !s.authManager.IsInternalMode() {
+		s.jsonError(w, "User management not available in Keycloak mode. Manage users in Keycloak Admin Console.", http.StatusBadRequest)
+		return
+	}
+	users, err := s.authManager.GetUsers()
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -109,6 +125,11 @@ func (s *Server) handleGetUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	if !s.authManager.IsInternalMode() {
+		s.jsonError(w, "User creation not available in Keycloak mode. Create users in Keycloak Admin Console.", http.StatusBadRequest)
+		return
+	}
+
 	var req CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.jsonError(w, "Invalid request body", http.StatusBadRequest)
@@ -129,7 +150,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.auth.CreateUser(req.Username, req.Password, req.Role)
+	user, err := s.authManager.CreateUser(req.Username, req.Password, req.Role)
 	if err != nil {
 		if err == auth.ErrUserExists {
 			s.jsonError(w, "User already exists", http.StatusConflict)
@@ -143,7 +164,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request, id int64) {
-	user, err := s.auth.GetUser(id)
+	user, err := s.authManager.GetUser(id)
 	if err != nil {
 		s.jsonError(w, "User not found", http.StatusNotFound)
 		return
@@ -164,7 +185,7 @@ func (s *Server) handleUpdateUserPassword(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := s.auth.UpdateUserPassword(id, req.Password); err != nil {
+	if err := s.authManager.UpdateUserPassword(id, req.Password); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -184,7 +205,7 @@ func (s *Server) handleUpdateUserRole(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	if err := s.auth.UpdateUserRole(id, req.Role); err != nil {
+	if err := s.authManager.UpdateUserRole(id, req.Role); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -199,7 +220,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
-	if err := s.auth.DeleteUser(id); err != nil {
+	if err := s.authManager.DeleteUser(id); err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -208,7 +229,13 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, id int
 }
 
 func (s *Server) handleSetupCheck(w http.ResponseWriter, r *http.Request) {
-	hasUsers, err := s.auth.HasUsers()
+	// In Keycloak mode, setup is not required (users managed in Keycloak)
+	if !s.authManager.IsInternalMode() {
+		s.jsonResponse(w, map[string]bool{"setup_required": false})
+		return
+	}
+
+	hasUsers, err := s.authManager.HasUsers()
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -218,7 +245,12 @@ func (s *Server) handleSetupCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
-	hasUsers, err := s.auth.HasUsers()
+	if !s.authManager.IsInternalMode() {
+		s.jsonError(w, "Setup not available in Keycloak mode. Users are managed in Keycloak.", http.StatusBadRequest)
+		return
+	}
+
+	hasUsers, err := s.authManager.HasUsers()
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -241,14 +273,14 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// First user is always admin
-	user, err := s.auth.CreateUser(req.Username, req.Password, db.RoleAdmin)
+	user, err := s.authManager.CreateUser(req.Username, req.Password, db.RoleAdmin)
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Auto-login after setup
-	session, err := s.auth.CreateSession(user.ID)
+	session, err := s.authManager.CreateSession(user.ID)
 	if err != nil {
 		s.jsonError(w, "Failed to create session", http.StatusInternalServerError)
 		return

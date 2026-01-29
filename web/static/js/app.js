@@ -85,10 +85,23 @@ const App = {
 
   async checkAuth() {
     try {
-      const res = await fetch(this.apiUrl('/api/auth/me'));
-      const data = await res.json();
-      if (data.authenticated) {
-        this.user = data.user;
+      // First check auth mode and current auth status
+      const authInfoRes = await fetch(this.apiUrl('/api/auth/info'));
+      const authInfo = await authInfoRes.json();
+      
+      // If in OIDC mode and not authenticated, redirect to OIDC login
+      if (authInfo.mode === 'oidc' && !authInfo.authenticated) {
+        const loginRes = await fetch(this.apiUrl('/api/auth/oidc/login'));
+        const loginData = await loginRes.json();
+        if (loginData.login_url) {
+          window.location.href = loginData.login_url;
+          return;
+        }
+      }
+      
+      // If authenticated (either mode), set user
+      if (authInfo.authenticated) {
+        this.user = authInfo.user;
       }
     } catch (e) {
       console.error('Auth check failed:', e);
