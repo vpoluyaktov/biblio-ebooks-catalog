@@ -567,6 +567,11 @@ Biblio Catalog supports two authentication modes:
 
 ## Recent Changes
 
+### fix/opensearch-basepath (2026-01-29)
+- **Issue**: OPDS search from ABB-TTS returned 404 when catalog is deployed behind path-based proxy (e.g., `/catalog`)
+- **Root Cause**: `handleOpenSearch()` constructed the search URL template without the base path - generated `/opds/1/search` instead of `/catalog/opds/1/search`
+- **Fix**: Updated `handleOpenSearch()` to use `s.apiURL()` which includes the configured base path
+
 ### fix/oidc-login-flash (2026-01-29)
 - **Issue**: When accessing the catalog in OIDC mode, the internal login screen would briefly flash before redirecting to Keycloak
 - **Root Cause**: The `router()` function was redirecting to `#login` before `checkAuth()` could complete the OIDC redirect
