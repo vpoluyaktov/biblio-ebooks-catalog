@@ -136,20 +136,21 @@ func (s *Server) handleOIDCLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear the session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "oidc_session",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
-
-	// Get the OIDC logout URL
+	// Get basePath for cookie and redirect URL
 	basePath := s.config.Server.BasePath
 	if basePath == "" {
 		basePath = "/"
 	}
+
+	// Clear the session cookie (path must match the path used when setting the cookie)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oidc_session",
+		Value:    "",
+		Path:     basePath,
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
 	// Determine scheme (default to http, use https if X-Forwarded-Proto indicates it)
 	scheme := "http"
 	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
