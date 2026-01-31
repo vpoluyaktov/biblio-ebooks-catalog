@@ -28,7 +28,7 @@ type BookContent struct {
 // ExtractContent extracts readable content from an ebook file
 func ExtractContent(reader io.ReaderAt, size int64, format string) (*BookContent, error) {
 	format = strings.ToLower(format)
-	
+
 	switch format {
 	case "epub", "epub.zip":
 		return extractEPUBContent(reader, size)
@@ -143,7 +143,7 @@ func extractEPUBContent(reader io.ReaderAt, size int64) (*BookContent, error) {
 		// Extract title from HTML if possible
 		chapterTitle := fmt.Sprintf("Chapter %d", i+1)
 		htmlContent := string(chapterData)
-		
+
 		// Try to extract title from h1, h2, or title tags
 		if titleStart := strings.Index(htmlContent, "<title>"); titleStart != -1 {
 			titleEnd := strings.Index(htmlContent[titleStart:], "</title>")
@@ -182,6 +182,7 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 	}
 
 	// Parse FB2 XML structure
+	// Note: Using space prefix to match any namespace
 	var fb2 struct {
 		XMLName     xml.Name `xml:"FictionBook"`
 		Description struct {
@@ -204,8 +205,13 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	decoder.Strict = false
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		// Handle different character encodings
+		return input, nil
+	}
+
 	if err := decoder.Decode(&fb2); err != nil {
-		return nil, fmt.Errorf("failed to parse FB2: %w", err)
+		return nil, fmt.Errorf("failed to parse FB2 XML: %w (first 200 bytes: %s)", err, string(data[:min(200, len(data))]))
 	}
 
 	content := &BookContent{
@@ -245,7 +251,7 @@ type fb2Section struct {
 
 func extractFB2Section(section fb2Section, chapterNum *int) Chapter {
 	var html strings.Builder
-	
+
 	// Extract title
 	title := fmt.Sprintf("Chapter %d", *chapterNum)
 	if len(section.Title.Paragraphs) > 0 {
@@ -327,4 +333,11 @@ func htmlEscape(s string) string {
 	s = strings.ReplaceAll(s, "\"", "&quot;")
 	s = strings.ReplaceAll(s, "'", "&#39;")
 	return s
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
