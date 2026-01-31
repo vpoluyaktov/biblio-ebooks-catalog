@@ -191,6 +191,9 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return nil, fmt.Errorf("failed to convert encoding: %w", err)
 	}
 
+	// Remove null bytes and other illegal XML characters
+	data = removeIllegalXMLChars(data)
+
 	// Parse FB2 XML structure
 	// Note: Using space prefix to match any namespace
 	var fb2 struct {
@@ -350,6 +353,19 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// removeIllegalXMLChars removes null bytes and other illegal XML characters
+func removeIllegalXMLChars(data []byte) []byte {
+	result := make([]byte, 0, len(data))
+	for _, b := range data {
+		// Skip null bytes and other control characters except tab, newline, and carriage return
+		if b == 0x00 || (b < 0x20 && b != 0x09 && b != 0x0A && b != 0x0D) {
+			continue
+		}
+		result = append(result, b)
+	}
+	return result
 }
 
 // convertToUTF8 detects encoding from XML declaration and converts to UTF-8
