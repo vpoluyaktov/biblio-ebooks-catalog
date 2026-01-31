@@ -196,6 +196,10 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return "</"
 	})
 
+	// Remove null bytes and illegal XML characters before parsing
+	contentBytes := []byte(contentStr)
+	contentBytes = removeIllegalXMLChars(contentBytes)
+
 	// Parse FB2 XML structure with proper charset handling
 	var fb2 struct {
 		XMLName     xml.Name `xml:"FictionBook"`
@@ -218,7 +222,7 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		} `xml:"body"`
 	}
 
-	decoder := xml.NewDecoder(bytes.NewReader([]byte(contentStr)))
+	decoder := xml.NewDecoder(bytes.NewReader(contentBytes))
 	decoder.Strict = false
 	// Use CharsetReader to handle non-UTF-8 encodings (e.g., windows-1251)
 	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
