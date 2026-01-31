@@ -186,7 +186,7 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return nil, fmt.Errorf("failed to read FB2 file: %w", err)
 	}
 
-	// Strip namespace prefixes for easier parsing
+	// Strip namespace prefixes for easier parsing (exactly like proven parser)
 	contentStr := string(data)
 	contentStr = regexp.MustCompile(`xmlns[^=]*="[^"]*"`).ReplaceAllString(contentStr, "")
 	contentStr = regexp.MustCompile(`<[a-zA-Z]+:`).ReplaceAllStringFunc(contentStr, func(s string) string {
@@ -196,11 +196,7 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return "</"
 	})
 
-	// Remove null bytes and illegal XML characters before parsing
-	contentBytes := []byte(contentStr)
-	contentBytes = removeIllegalXMLChars(contentBytes)
-
-	// Parse FB2 XML structure with proper charset handling
+	// Parse FB2 XML structure with proper charset handling (exactly like proven parser)
 	var fb2 struct {
 		XMLName     xml.Name `xml:"FictionBook"`
 		Description struct {
@@ -222,9 +218,9 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		} `xml:"body"`
 	}
 
-	decoder := xml.NewDecoder(bytes.NewReader(contentBytes))
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(contentStr)))
 	decoder.Strict = false
-	// Use CharsetReader to handle non-UTF-8 encodings (e.g., windows-1251)
+	// Use CharsetReader to handle non-UTF-8 encodings (e.g., windows-1251) - exactly like proven parser
 	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
 		enc, err := ianaindex.IANA.Encoding(charset)
 		if err != nil {
