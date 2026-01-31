@@ -1,0 +1,382 @@
+/* Ebook Reader Styles */
+
+.reader-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-color);
+    z-index: 10000;
+    display: none;
+    flex-direction: column;
+}
+
+.reader-overlay.active {
+    display: flex;
+}
+
+/* Reader Toolbar */
+.reader-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.reader-toolbar-left,
+.reader-toolbar-center,
+.reader-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.reader-toolbar-center {
+    flex: 1;
+    justify-content: center;
+}
+
+.reader-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color);
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reader-author {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.reader-btn {
+    padding: 8px 12px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color 0.2s;
+}
+
+.reader-btn:hover {
+    background: var(--button-hover-bg);
+}
+
+.reader-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.reader-btn-icon {
+    font-size: 16px;
+}
+
+/* Reader Settings */
+.reader-settings {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.reader-setting-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reader-setting-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.reader-select {
+    padding: 6px 10px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.reader-icon-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--button-bg);
+    color: var(--button-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.reader-icon-btn:hover {
+    background: var(--button-hover-bg);
+}
+
+/* Reader Content Area */
+.reader-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+}
+
+.reader-chapter {
+    max-width: 800px;
+    width: 100%;
+    padding: 40px;
+    background: var(--reader-bg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+/* Reader Typography */
+.reader-chapter h1,
+.reader-chapter h2,
+.reader-chapter h3 {
+    color: var(--text-color);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.4;
+}
+
+.reader-chapter h1 {
+    font-size: 2em;
+    margin-top: 0;
+}
+
+.reader-chapter h2 {
+    font-size: 1.5em;
+}
+
+.reader-chapter h3 {
+    font-size: 1.2em;
+}
+
+.reader-chapter p {
+    color: var(--text-color);
+    margin-bottom: 1em;
+    text-align: justify;
+    line-height: var(--reader-line-height, 1.6);
+}
+
+.reader-chapter img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 20px auto;
+}
+
+/* Reader Footer */
+.reader-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.reader-progress {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.reader-navigation {
+    display: flex;
+    gap: 12px;
+}
+
+/* Loading State */
+.reader-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+}
+
+.reader-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: reader-spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes reader-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Theme Variables */
+:root {
+    --reader-bg: #ffffff;
+}
+
+[data-theme="dark"] {
+    --reader-bg: #2a2a2a;
+}
+
+/* Reader Themes */
+.reader-overlay[data-reader-theme="light"] {
+    --reader-bg: #ffffff;
+    --text-color: #1a1a1a;
+    --text-secondary: #666666;
+}
+
+.reader-overlay[data-reader-theme="dark"] {
+    --reader-bg: #2a2a2a;
+    --text-color: #e0e0e0;
+    --text-secondary: #999999;
+}
+
+.reader-overlay[data-reader-theme="sepia"] {
+    --reader-bg: #f4ecd8;
+    --text-color: #5c4a3a;
+    --text-secondary: #8b7355;
+}
+
+/* Font Size Classes */
+.reader-chapter[data-font-size="small"] {
+    font-size: 14px;
+}
+
+.reader-chapter[data-font-size="medium"] {
+    font-size: 16px;
+}
+
+.reader-chapter[data-font-size="large"] {
+    font-size: 18px;
+}
+
+.reader-chapter[data-font-size="xlarge"] {
+    font-size: 20px;
+}
+
+/* Font Family Classes */
+.reader-chapter[data-font-family="serif"] {
+    font-family: Georgia, 'Times New Roman', serif;
+}
+
+.reader-chapter[data-font-family="sans-serif"] {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+
+.reader-chapter[data-font-family="monospace"] {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .reader-toolbar {
+        flex-wrap: wrap;
+        padding: 8px 12px;
+    }
+
+    .reader-toolbar-center {
+        order: -1;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .reader-settings {
+        display: none;
+    }
+
+    .reader-chapter {
+        padding: 20px;
+        max-width: 100%;
+    }
+
+    .reader-content {
+        padding: 20px 12px;
+    }
+
+    .reader-title {
+        font-size: 14px;
+        max-width: 200px;
+    }
+
+    .reader-btn {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}
+
+/* Chapter Navigation Dropdown */
+.reader-chapters-dropdown {
+    position: relative;
+}
+
+.reader-chapters-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    min-width: 250px;
+    z-index: 1000;
+    display: none;
+}
+
+.reader-chapters-menu.active {
+    display: block;
+}
+
+.reader-chapter-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    color: var(--text-color);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s;
+}
+
+.reader-chapter-item:last-child {
+    border-bottom: none;
+}
+
+.reader-chapter-item:hover {
+    background: var(--hover-bg);
+}
+
+.reader-chapter-item.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.reader-chapter-number {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-right: 8px;
+}
+
+.reader-chapter-item.active .reader-chapter-number {
+    color: rgba(255, 255, 255, 0.8);
+}

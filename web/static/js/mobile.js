@@ -524,6 +524,11 @@ const MobileUI = {
               ` : ''}
             </div>
             <div class="mobile-book-actions">
+              ${(book.format === 'epub' || book.format === 'fb2' || book.format === 'epub.zip' || book.format === 'fb2.zip') ? `
+                <button class="mobile-btn-primary" onclick="openEbookReader(${book.id})" style="margin-bottom: 10px;">
+                  📖 Read
+                </button>
+              ` : ''}
               <a href="${book.download_url || '#'}" class="mobile-btn-primary mobile-btn-download" ${!book.download_url ? 'style="opacity:0.5;pointer-events:none"' : ''}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

@@ -1471,6 +1471,9 @@ const App = {
           </div>
         ` : ''}
         <div class="book-actions">
+          ${(book.format === 'epub' || book.format === 'fb2' || book.format === 'epub.zip' || book.format === 'fb2.zip') ? `
+            <button class="btn btn-primary btn-sm" onclick="openEbookReader(${book.id})">📖 Read</button>
+          ` : ''}
           ${book.downloadLink ? `
             <a href="${book.downloadLink}" class="btn btn-primary btn-sm" download>Download</a>
           ` : ''}

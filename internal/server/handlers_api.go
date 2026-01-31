@@ -12,8 +12,10 @@ import (
 	"strconv"
 	"strings"
 
+	"biblio-catalog/internal/bookfile"
 	"biblio-catalog/internal/db"
 	"biblio-catalog/internal/importer"
+	"biblio-catalog/internal/reader"
 )
 
 // API handlers for opds-server
@@ -656,4 +658,72 @@ func (s *Server) apiReindex(w http.ResponseWriter, r *http.Request) {
 		OutputPath: req.OutputPath,
 		BookCount:  int(bookCount),
 	})
+}
+
+// apiGetBookContent extracts and returns the readable content of a book
+func (s *Server) apiGetBookContent(w http.ResponseWriter, r *http.Request, bookID int64) {
+	// Get book details from database
+	book, err := s.db.GetBook(bookID)
+	if err != nil {
+		s.jsonError(w, "Book not found", http.StatusNotFound)
+		return
+	}
+
+	// Get library details
+	library, err := s.db.GetLibrary(book.LibraryID)
+	if err != nil {
+		s.jsonError(w, "Library not found", http.StatusNotFound)
+		return
+	}
+
+	// Create bookfile instance
+	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+
+	// Get reader for the book file
+	bookReader, size, err := bf.GetReader()
+	if err != nil {
+		s.jsonError(w, "Failed to open book file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer bookReader.Close()
+
+	// Read the entire file into memory (needed for ReaderAt interface)
+	data := make([]byte, size)
+	_, err = bookReader.Read(data)
+	if err != nil {
+		s.jsonError(w, "Failed to read book file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Create a ReaderAt from the data
+	readerAt := &bytesReaderAt{data: data}
+
+	// Extract content using the reader package
+	content, err := reader.ExtractContent(readerAt, size, book.Format)
+	if err != nil {
+		s.jsonError(w, "Failed to extract book content: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return the content as JSON
+	s.jsonResponse(w, content)
+}
+
+// bytesReaderAt implements io.ReaderAt for a byte slice
+type bytesReaderAt struct {
+	data []byte
+}
+
+func (b *bytesReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	if off < 0 {
+		return 0, fmt.Errorf("negative offset")
+	}
+	if off >= int64(len(b.data)) {
+		return 0, fmt.Errorf("offset beyond end of data")
+	}
+	n = copy(p, b.data[off:])
+	if n < len(p) {
+		err = fmt.Errorf("short read")
+	}
+	return n, err
 }

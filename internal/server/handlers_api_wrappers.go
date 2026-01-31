@@ -42,6 +42,10 @@ func (s *Server) apiGetBookWithID(w http.ResponseWriter, r *http.Request, bookID
 	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
 
+func (s *Server) apiGetBookContentWithID(w http.ResponseWriter, r *http.Request, bookID int64) {
+	s.apiGetBookContent(w, r, bookID)
+}
+
 func (s *Server) apiGetAuthorWithID(w http.ResponseWriter, r *http.Request, authorID int64) {
 	http.Error(w, "Not implemented", http.StatusNotImplemented)
 }
