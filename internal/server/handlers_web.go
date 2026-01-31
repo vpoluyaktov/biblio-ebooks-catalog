@@ -76,3 +76,29 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLibrary(w http.ResponseWriter, r *http.Request) {
 	s.handleIndex(w, r)
 }
+
+func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
+	// Check auth
+	if !s.authManager.CheckSession(w, r) {
+		return
+	}
+
+	tmpl, err := template.ParseFiles("web/templates/reader.html")
+	if err != nil {
+		http.Error(w, "Template not found", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		BasePath string
+		Version  string
+	}{
+		BasePath: s.config.Server.BasePath,
+		Version:  computeStaticVersion(),
+	}
+
+	if err := tmpl.Execute(w, data); err != nil {
+		http.Error(w, "Failed to render template", http.StatusInternalServerError)
+		return
+	}
+}

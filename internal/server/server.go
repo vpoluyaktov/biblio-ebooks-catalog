@@ -62,10 +62,12 @@ func (s *Server) setupRoutes() *http.ServeMux {
 	if basePath == "" {
 		mux.HandleFunc("/", s.handleIndex)
 		mux.HandleFunc("/library/", s.handleLibrary)
+		mux.HandleFunc("/reader", s.handleReader)
 	} else {
 		mux.HandleFunc(basePath+"/", s.handleIndex)
 		mux.HandleFunc(basePath, s.handleIndex)
 		mux.HandleFunc(basePath+"/library/", s.handleLibrary)
+		mux.HandleFunc(basePath+"/reader", s.handleReader)
 	}
 
 	// OPDS routes - /opds/opds/{libID}/...

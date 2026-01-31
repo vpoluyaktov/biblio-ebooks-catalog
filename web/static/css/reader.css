@@ -1,12 +1,20 @@
 /* Ebook Reader Styles */
 
+/* For standalone page */
+.reader-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* For overlay mode (legacy) */
 .reader-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--bg-color);
+    background: #ffffff;
     z-index: 10000;
     display: none;
     flex-direction: column;
@@ -137,6 +145,7 @@
     display: flex;
     justify-content: center;
     padding: 40px 20px;
+    background: #f5f5f5;
 }
 
 .reader-chapter {
@@ -244,18 +253,33 @@
     --reader-bg: #ffffff;
     --text-color: #1a1a1a;
     --text-secondary: #666666;
+    background: #ffffff;
+}
+
+.reader-overlay[data-reader-theme="light"] .reader-content {
+    background: #f5f5f5;
 }
 
 .reader-overlay[data-reader-theme="dark"] {
     --reader-bg: #2a2a2a;
     --text-color: #e0e0e0;
     --text-secondary: #999999;
+    background: #1a1a1a;
+}
+
+.reader-overlay[data-reader-theme="dark"] .reader-content {
+    background: #0d0d0d;
 }
 
 .reader-overlay[data-reader-theme="sepia"] {
     --reader-bg: #f4ecd8;
     --text-color: #5c4a3a;
     --text-secondary: #8b7355;
+    background: #f4ecd8;
+}
+
+.reader-overlay[data-reader-theme="sepia"] .reader-content {
+    background: #e8dcc0;
 }
 
 /* Font Size Classes */
