@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/ianaindex"
 	"golang.org/x/text/transform"
 )
 
@@ -185,17 +186,17 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return nil, fmt.Errorf("failed to read FB2 file: %w", err)
 	}
 
-	// Convert from windows-1251 to UTF-8 if needed
-	data, err = convertToUTF8(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert encoding: %w", err)
-	}
+	// Strip namespace prefixes for easier parsing
+	contentStr := string(data)
+	contentStr = regexp.MustCompile(`xmlns[^=]*="[^"]*"`).ReplaceAllString(contentStr, "")
+	contentStr = regexp.MustCompile(`<[a-zA-Z]+:`).ReplaceAllStringFunc(contentStr, func(s string) string {
+		return "<"
+	})
+	contentStr = regexp.MustCompile(`</[a-zA-Z]+:`).ReplaceAllStringFunc(contentStr, func(s string) string {
+		return "</"
+	})
 
-	// Remove null bytes and other illegal XML characters
-	data = removeIllegalXMLChars(data)
-
-	// Parse FB2 XML structure
-	// Note: Using space prefix to match any namespace
+	// Parse FB2 XML structure with proper charset handling
 	var fb2 struct {
 		XMLName     xml.Name `xml:"FictionBook"`
 		Description struct {
@@ -209,22 +210,31 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 			} `xml:"title-info"`
 		} `xml:"description"`
 		Body []struct {
+			Name  string `xml:"name,attr"`
 			Title struct {
-				Paragraphs []string `xml:"p"`
+				Content string `xml:",innerxml"`
 			} `xml:"title"`
 			Sections []fb2Section `xml:"section"`
 		} `xml:"body"`
 	}
 
-	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(contentStr)))
 	decoder.Strict = false
+	// Use CharsetReader to handle non-UTF-8 encodings (e.g., windows-1251)
 	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
-		// Handle different character encodings
-		return input, nil
+		enc, err := ianaindex.IANA.Encoding(charset)
+		if err != nil {
+			return nil, fmt.Errorf("unsupported charset %q: %w", charset, err)
+		}
+		if enc == nil {
+			// nil encoding means UTF-8
+			return input, nil
+		}
+		return enc.NewDecoder().Reader(input), nil
 	}
 
 	if err := decoder.Decode(&fb2); err != nil {
-		return nil, fmt.Errorf("failed to parse FB2 XML: %w (first 200 bytes: %s)", err, string(data[:min(200, len(data))]))
+		return nil, fmt.Errorf("failed to parse FB2 XML: %w", err)
 	}
 
 	content := &BookContent{
@@ -243,6 +253,11 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 	// Extract chapters from body sections
 	chapterNum := 1
 	for _, body := range fb2.Body {
+		// Skip notes and comments sections
+		if body.Name == "notes" || body.Name == "comments" {
+			continue
+		}
+
 		for _, section := range body.Sections {
 			chapter := extractFB2Section(section, &chapterNum)
 			if chapter.Content != "" {
