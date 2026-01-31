@@ -1302,6 +1302,7 @@ const App = {
           date: updated ? new Date(updated).toLocaleDateString() : '',
           genre,
           lang,
+          format,
           downloadLink,
           content
         };
