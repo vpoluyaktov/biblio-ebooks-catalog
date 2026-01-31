@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 // Chapter represents a chapter in an ebook
@@ -181,6 +185,12 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 		return nil, fmt.Errorf("failed to read FB2 file: %w", err)
 	}
 
+	// Convert from windows-1251 to UTF-8 if needed
+	data, err = convertToUTF8(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert encoding: %w", err)
+	}
+
 	// Parse FB2 XML structure
 	// Note: Using space prefix to match any namespace
 	var fb2 struct {
@@ -340,4 +350,63 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// convertToUTF8 detects encoding from XML declaration and converts to UTF-8
+func convertToUTF8(data []byte) ([]byte, error) {
+	// Extract encoding from XML declaration
+	encodingRegex := regexp.MustCompile(`encoding="([^"]+)"`)
+	matches := encodingRegex.FindSubmatch(data[:min(200, len(data))])
+
+	if len(matches) < 2 {
+		// No encoding specified, assume UTF-8
+		return data, nil
+	}
+
+	encoding := strings.ToLower(string(matches[1]))
+
+	// If already UTF-8, return as-is
+	if encoding == "utf-8" || encoding == "utf8" {
+		return data, nil
+	}
+
+	// Handle windows-1251 (Cyrillic)
+	if encoding == "windows-1251" || encoding == "cp1251" {
+		decoder := charmap.Windows1251.NewDecoder()
+		utf8Data, _, err := transform.Bytes(decoder, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert from windows-1251: %w", err)
+		}
+
+		// Update XML declaration to UTF-8
+		utf8Data = encodingRegex.ReplaceAll(utf8Data, []byte(`encoding="UTF-8"`))
+		return utf8Data, nil
+	}
+
+	// Handle other common encodings
+	var decoder transform.Transformer
+	switch encoding {
+	case "windows-1252", "cp1252":
+		decoder = charmap.Windows1252.NewDecoder()
+	case "iso-8859-1", "latin1":
+		decoder = charmap.ISO8859_1.NewDecoder()
+	case "koi8-r":
+		decoder = charmap.KOI8R.NewDecoder()
+	default:
+		// Unknown encoding, try to parse as-is
+		return data, nil
+	}
+
+	if decoder != nil {
+		utf8Data, _, err := transform.Bytes(decoder, data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert from %s: %w", encoding, err)
+		}
+
+		// Update XML declaration to UTF-8
+		utf8Data = encodingRegex.ReplaceAll(utf8Data, []byte(`encoding="UTF-8"`))
+		return utf8Data, nil
+	}
+
+	return data, nil
 }
