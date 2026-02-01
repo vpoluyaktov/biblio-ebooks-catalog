@@ -30,24 +30,31 @@ class ReadingHistory {
     // Add or update a book in history (moves to top)
     addOrUpdate(entry) {
         const history = this.getAll();
+        const bookId = parseInt(entry.bookId, 10);
+        const libraryId = entry.libraryId ? parseInt(entry.libraryId, 10) : null;
+        
+        console.log('[ReadingHistory] addOrUpdate called for bookId:', bookId);
         
         // Remove existing entry for this book if present
-        const existingIndex = history.findIndex(h => h.bookId === entry.bookId);
+        const existingIndex = history.findIndex(h => parseInt(h.bookId, 10) === bookId);
         if (existingIndex !== -1) {
+            console.log('[ReadingHistory] Removing existing entry at index:', existingIndex);
             history.splice(existingIndex, 1);
         }
         
         // Add new entry at the beginning
-        history.unshift({
-            bookId: entry.bookId,
-            libraryId: entry.libraryId,
+        const newEntry = {
+            bookId: bookId,
+            libraryId: libraryId,
             title: entry.title,
             author: entry.author,
             chapterIndex: entry.chapterIndex || 0,
             scrollPosition: entry.scrollPosition || 0,
             totalChapters: entry.totalChapters || 1,
             lastRead: new Date().toISOString()
-        });
+        };
+        history.unshift(newEntry);
+        console.log('[ReadingHistory] Added entry:', newEntry);
         
         // Keep only maxEntries
         while (history.length > this.maxEntries) {
@@ -55,24 +62,33 @@ class ReadingHistory {
         }
         
         this.save(history);
+        console.log('[ReadingHistory] Saved history, total entries:', history.length);
     }
 
     // Update position for a book (without moving to top)
     updatePosition(bookId, chapterIndex, scrollPosition) {
         const history = this.getAll();
-        const entry = history.find(h => h.bookId === bookId);
+        const numBookId = parseInt(bookId, 10);
+        const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
         if (entry) {
             entry.chapterIndex = chapterIndex;
             entry.scrollPosition = scrollPosition;
             entry.lastRead = new Date().toISOString();
             this.save(history);
+            console.log('[ReadingHistory] Updated position for bookId:', numBookId, 'chapter:', chapterIndex, 'scroll:', scrollPosition.toFixed(3));
+        } else {
+            console.warn('[ReadingHistory] updatePosition: No entry found for bookId:', numBookId);
         }
     }
 
     // Get saved position for a book
     getPosition(bookId) {
         const history = this.getAll();
-        const entry = history.find(h => h.bookId === bookId);
+        const numBookId = parseInt(bookId, 10);
+        const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
+        if (entry) {
+            console.log('[ReadingHistory] Found saved position for bookId:', numBookId, 'chapter:', entry.chapterIndex);
+        }
         return entry ? {
             chapterIndex: entry.chapterIndex || 0,
             scrollPosition: entry.scrollPosition || 0
@@ -357,9 +373,11 @@ class EbookReader {
             this.overlay.classList.add('active');
             this.showLoading();
 
-            // Store book ID and library ID
-            this.currentBookId = bookId;
-            this.currentLibraryId = libraryId || (typeof App !== 'undefined' ? App.currentLibrary : null);
+            // Store book ID and library ID (ensure they are numbers)
+            this.currentBookId = parseInt(bookId, 10);
+            this.currentLibraryId = libraryId ? parseInt(libraryId, 10) : (typeof App !== 'undefined' ? App.currentLibrary : null);
+            
+            console.log('[EbookReader] Opening book:', this.currentBookId, 'library:', this.currentLibraryId);
 
             // Fetch book content from API
             const response = await fetch(`${APP_BASE_PATH}/api/books/${bookId}/content`);
