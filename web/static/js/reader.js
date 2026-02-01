@@ -18,7 +18,8 @@ class EbookReader {
     createReaderOverlay() {
         const overlay = document.createElement('div');
         overlay.className = 'reader-overlay';
-        overlay.setAttribute('data-reader-theme', this.settings.theme);
+        const appTheme = localStorage.getItem('theme') || 'dark';
+        overlay.setAttribute('data-reader-theme', appTheme);
         
         overlay.innerHTML = `
             <div class="reader-toolbar">
@@ -47,14 +48,6 @@ class EbookReader {
                             <button class="reader-icon-btn" id="reader-font-increase" title="Increase font size">A+</button>
                         </div>
                         <div class="reader-setting-group">
-                            <span class="reader-setting-label">Theme:</span>
-                            <select class="reader-select" id="reader-theme">
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                                <option value="sepia">Sepia</option>
-                            </select>
-                        </div>
-                        <div class="reader-setting-group">
                             <span class="reader-setting-label">Line Height:</span>
                             <select class="reader-select" id="reader-line-height">
                                 <option value="1.4">Compact</option>
@@ -71,6 +64,7 @@ class EbookReader {
                         </button>
                         <div class="reader-chapters-menu" id="reader-chapters-menu"></div>
                     </div>
+                    <button class="reader-mobile-settings-btn" id="reader-mobile-settings-btn" title="Settings">⚙</button>
                 </div>
             </div>
             <div class="reader-content" id="reader-content">
@@ -90,6 +84,40 @@ class EbookReader {
                         Next
                         <span class="reader-btn-icon">→</span>
                     </button>
+                </div>
+            </div>
+            <div class="reader-mobile-settings" id="reader-mobile-settings">
+                <div class="reader-mobile-settings-header">
+                    <span class="reader-mobile-settings-title">Settings</span>
+                    <button class="reader-mobile-settings-close" id="reader-mobile-settings-close">✕</button>
+                </div>
+                <div class="reader-mobile-setting-row">
+                    <span class="reader-mobile-setting-label">Chapter</span>
+                    <select class="reader-mobile-select" id="reader-mobile-chapter"></select>
+                </div>
+                <div class="reader-mobile-setting-row">
+                    <span class="reader-mobile-setting-label">Font</span>
+                    <select class="reader-mobile-select" id="reader-mobile-font-family">
+                        <option value="serif">Serif</option>
+                        <option value="sans-serif">Sans-serif</option>
+                        <option value="monospace">Monospace</option>
+                    </select>
+                </div>
+                <div class="reader-mobile-setting-row">
+                    <span class="reader-mobile-setting-label">Font Size</span>
+                    <div class="reader-mobile-setting-control">
+                        <button class="reader-icon-btn" id="reader-mobile-font-decrease">A-</button>
+                        <button class="reader-icon-btn" id="reader-mobile-font-increase">A+</button>
+                    </div>
+                </div>
+                <div class="reader-mobile-setting-row">
+                    <span class="reader-mobile-setting-label">Line Height</span>
+                    <select class="reader-mobile-select" id="reader-mobile-line-height">
+                        <option value="1.4">Compact</option>
+                        <option value="1.6">Normal</option>
+                        <option value="1.8">Relaxed</option>
+                        <option value="2.0">Loose</option>
+                    </select>
                 </div>
             </div>
         `;
@@ -116,12 +144,6 @@ class EbookReader {
         document.getElementById('reader-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
         document.getElementById('reader-font-increase').addEventListener('click', () => this.changeFontSize(1));
 
-        // Theme control
-        document.getElementById('reader-theme').addEventListener('change', (e) => {
-            this.settings.theme = e.target.value;
-            this.saveSettings();
-            this.applySettings();
-        });
 
         // Line height control
         document.getElementById('reader-line-height').addEventListener('change', (e) => {
@@ -144,6 +166,40 @@ class EbookReader {
             if (!menu.contains(e.target) && !btn.contains(e.target)) {
                 menu.classList.remove('active');
             }
+        });
+
+        // Mobile settings panel
+        document.getElementById('reader-mobile-settings-btn').addEventListener('click', () => {
+            this.openMobileSettings();
+        });
+
+        document.getElementById('reader-mobile-settings-close').addEventListener('click', () => {
+            this.closeMobileSettings();
+        });
+
+        // Mobile chapter selector
+        document.getElementById('reader-mobile-chapter').addEventListener('change', (e) => {
+            this.currentChapterIndex = parseInt(e.target.value);
+            this.displayChapter();
+            this.closeMobileSettings();
+        });
+
+        // Mobile font family
+        document.getElementById('reader-mobile-font-family').addEventListener('change', (e) => {
+            this.settings.fontFamily = e.target.value;
+            this.saveSettings();
+            this.applySettings();
+        });
+
+        // Mobile font size
+        document.getElementById('reader-mobile-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
+        document.getElementById('reader-mobile-font-increase').addEventListener('click', () => this.changeFontSize(1));
+
+        // Mobile line height
+        document.getElementById('reader-mobile-line-height').addEventListener('change', (e) => {
+            this.settings.lineHeight = e.target.value;
+            this.saveSettings();
+            this.applySettings();
         });
 
         // Keyboard shortcuts
@@ -343,17 +399,43 @@ class EbookReader {
     }
 
     applySettings() {
-        // Apply theme
-        this.overlay.setAttribute('data-reader-theme', this.settings.theme);
-        document.getElementById('reader-theme').value = this.settings.theme;
+        // Apply theme from app's global theme setting
+        const appTheme = localStorage.getItem('theme') || 'dark';
+        this.overlay.setAttribute('data-reader-theme', appTheme);
 
-        // Apply font family
+        // Apply font family (desktop)
         document.getElementById('reader-font-family').value = this.settings.fontFamily;
 
-        // Apply line height
+        // Apply line height (desktop)
         document.getElementById('reader-line-height').value = this.settings.lineHeight;
 
+        // Apply to mobile controls as well
+        document.getElementById('reader-mobile-font-family').value = this.settings.fontFamily;
+        document.getElementById('reader-mobile-line-height').value = this.settings.lineHeight;
+
         // Font size is applied per chapter
+    }
+
+    openMobileSettings() {
+        const panel = document.getElementById('reader-mobile-settings');
+        panel.classList.add('active');
+        
+        // Update chapter selector
+        this.updateMobileChapterSelector();
+    }
+
+    closeMobileSettings() {
+        const panel = document.getElementById('reader-mobile-settings');
+        panel.classList.remove('active');
+    }
+
+    updateMobileChapterSelector() {
+        const select = document.getElementById('reader-mobile-chapter');
+        if (!this.currentBook || !this.currentBook.chapters) return;
+        
+        select.innerHTML = this.currentBook.chapters.map((chapter, index) => 
+            `<option value="${index}" ${index === this.currentChapterIndex ? 'selected' : ''}>${index + 1}. ${chapter.title}</option>`
+        ).join('');
     }
 
     showLoading() {
@@ -376,7 +458,6 @@ class EbookReader {
         const defaults = {
             fontSize: 'medium',
             fontFamily: 'serif',
-            theme: 'light',
             lineHeight: '1.6'
         };
 
