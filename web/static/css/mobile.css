@@ -746,3 +746,25 @@
     font-size: 1rem;
   }
 }
+
+/* Mobile Reading History Styles */
+.mobile-reading-history-item {
+  padding: 1rem;
+}
+
+.mobile-reading-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.mobile-reading-history-progress {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.mobile-reading-history-time {
+  color: var(--text-muted);
+}

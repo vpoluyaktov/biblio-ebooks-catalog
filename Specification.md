@@ -246,7 +246,95 @@ biblio-catalog:
 
 ### In Progress 🚧
 
-- **Ebook Reader** (2026-01-31)
+- **Reading History** (2026-02-01)
+  - Feature branch: `feature/reading-history`
+  - Goal: Track last 10 books opened in reader with reading position, allow quick resume
+
+#### Problem Statement
+
+Users who read multiple books need a way to quickly resume reading from where they left off. Currently:
+1. Users must navigate through the catalog to find a book they were reading
+2. Reading position is not saved - users must manually find their place
+3. No quick access to recently read books
+
+#### Solution Overview
+
+Implement a **reading history system** with:
+- **Position Tracking**: Save chapter index and scroll position when reading
+- **History Storage**: Store last 10 books per user in localStorage (client-side)
+- **Quick Access**: Reader button in toolbar with dropdown showing recent books
+- **Resume Reading**: Click any book in history to continue from saved position
+
+#### Implementation Plan
+
+**Phase 1: Reading Position Storage** ✅
+- [x] Extend reader.js to track scroll position within chapters
+- [x] Save position on chapter change, scroll pause, and reader close
+- [x] Store in localStorage: `{bookId, libraryId, chapterIndex, scrollPosition, timestamp}`
+
+**Phase 2: Reading History Management** ✅
+- [x] Create ReadingHistory class to manage history list
+- [x] Implement add/update book in history (moves to top if exists)
+- [x] Limit to 10 entries, remove oldest when adding new
+- [x] Store book metadata: id, libraryId, title, author, totalChapters
+
+**Phase 3: UI - Reader Button with Dropdown** ✅
+- [x] Add "📖 Reader" button to toolbar (next to theme toggle)
+- [x] Create dropdown showing last 10 books with:
+  - Book title and author
+  - Reading progress (chapter X of Y)
+  - Last read timestamp
+- [x] Click to open book at saved position
+
+**Phase 4: Integration with Reader** ✅
+- [x] On book open: add/update in history, restore position if exists
+- [x] On position change: update history entry
+- [x] On reader close: save final position
+
+**Phase 5: Mobile Support** ✅
+- [x] Add "Continue Reading" menu item to mobile home screen
+- [x] Mobile-friendly reading history screen with book list
+
+#### Technical Design
+
+**localStorage Structure:**
+```javascript
+// Key: 'readingHistory'
+[
+  {
+    bookId: 123,
+    libraryId: 1,
+    title: "Book Title",
+    author: "Author Name",
+    chapterIndex: 5,
+    scrollPosition: 0.45,  // 0-1 percentage
+    totalChapters: 20,
+    lastRead: "2026-02-01T10:30:00Z"
+  },
+  // ... up to 10 entries
+]
+```
+
+**UI Mockup:**
+```
+┌─────────────────────────────────────────────────────┐
+│ [📖 Reader ▼]  [🌙]  [⚙️]  [🚪]                      │
+├─────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ 📚 Recent Books                                 │ │
+│ ├─────────────────────────────────────────────────┤ │
+│ │ Book Title 1                                    │ │
+│ │ Author Name • Ch 5/20 • 2 hours ago            │ │
+│ ├─────────────────────────────────────────────────┤ │
+│ │ Book Title 2                                    │ │
+│ │ Author Name • Ch 12/15 • Yesterday             │ │
+│ └─────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+- **Ebook Reader** (2026-01-31) ✅
   - Feature branch: `feature/ebook-reader`
   - Goal: Add in-browser ebook reader with support for EPUB and FB2 formats
 

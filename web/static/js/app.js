@@ -407,6 +407,24 @@ const App = {
               </svg>
               <input type="text" class="form-input" placeholder="Search..." id="search-input" style="padding-left:32px;height:32px;font-size:0.875rem">
             </div>
+            <div class="reading-history-dropdown" id="reading-history-dropdown">
+              <button class="btn btn-sm btn-outline" id="reading-history-btn" title="Recent Books">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span class="reading-history-label">Reader</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-left:2px">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <div class="reading-history-menu" id="reading-history-menu">
+                <div class="reading-history-header">Recent Books</div>
+                <div class="reading-history-list" id="reading-history-list">
+                  <div class="reading-history-empty">No reading history yet</div>
+                </div>
+              </div>
+            </div>
             <button type="button" class="theme-toggle" data-action="toggleTheme" title="Toggle theme" style="width:32px;height:32px">
               <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="5"></circle>
@@ -589,6 +607,74 @@ const App = {
 
     // Mobile panel toggles
     this.initMobilePanelToggles();
+
+    // Reading history dropdown
+    this.initReadingHistoryDropdown();
+  },
+
+  initReadingHistoryDropdown() {
+    const btn = document.getElementById('reading-history-btn');
+    const menu = document.getElementById('reading-history-menu');
+    const list = document.getElementById('reading-history-list');
+    
+    if (!btn || !menu || !list) return;
+
+    // Toggle dropdown on button click
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = menu.classList.contains('active');
+      if (!isOpen) {
+        this.renderReadingHistoryList();
+      }
+      menu.classList.toggle('active');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('active');
+      }
+    });
+  },
+
+  renderReadingHistoryList() {
+    const list = document.getElementById('reading-history-list');
+    if (!list) return;
+
+    const history = window.getReadingHistory ? window.getReadingHistory() : [];
+    
+    if (history.length === 0) {
+      list.innerHTML = '<div class="reading-history-empty">No reading history yet</div>';
+      return;
+    }
+
+    list.innerHTML = history.map(entry => {
+      const progress = `Ch ${entry.chapterIndex + 1}/${entry.totalChapters}`;
+      const timeAgo = window.readingHistory ? window.readingHistory.formatRelativeTime(entry.lastRead) : '';
+      
+      return `
+        <div class="reading-history-item" data-book-id="${entry.bookId}" data-library-id="${entry.libraryId}">
+          <div class="reading-history-item-title">${this.escapeHtml(entry.title)}</div>
+          <div class="reading-history-item-meta">
+            <span class="reading-history-item-author">${this.escapeHtml(entry.author)}</span>
+            <span class="reading-history-item-progress">${progress}</span>
+            <span class="reading-history-item-time">${timeAgo}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Bind click events to open books
+    list.querySelectorAll('.reading-history-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const bookId = item.dataset.bookId;
+        const libraryId = item.dataset.libraryId;
+        if (bookId && window.openEbookReader) {
+          window.openEbookReader(parseInt(bookId), parseInt(libraryId));
+          document.getElementById('reading-history-menu')?.classList.remove('active');
+        }
+      });
+    });
   },
 
   initPanelResizers() {

@@ -1,11 +1,113 @@
 // Ebook Reader Module
 
+// Reading History Manager - tracks last 10 books with reading position
+class ReadingHistory {
+    constructor() {
+        this.maxEntries = 10;
+        this.storageKey = 'readingHistory';
+    }
+
+    // Get all history entries
+    getAll() {
+        try {
+            const data = localStorage.getItem(this.storageKey);
+            return data ? JSON.parse(data) : [];
+        } catch (e) {
+            console.error('Failed to load reading history:', e);
+            return [];
+        }
+    }
+
+    // Save history to localStorage
+    save(history) {
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify(history));
+        } catch (e) {
+            console.error('Failed to save reading history:', e);
+        }
+    }
+
+    // Add or update a book in history (moves to top)
+    addOrUpdate(entry) {
+        const history = this.getAll();
+        
+        // Remove existing entry for this book if present
+        const existingIndex = history.findIndex(h => h.bookId === entry.bookId);
+        if (existingIndex !== -1) {
+            history.splice(existingIndex, 1);
+        }
+        
+        // Add new entry at the beginning
+        history.unshift({
+            bookId: entry.bookId,
+            libraryId: entry.libraryId,
+            title: entry.title,
+            author: entry.author,
+            chapterIndex: entry.chapterIndex || 0,
+            scrollPosition: entry.scrollPosition || 0,
+            totalChapters: entry.totalChapters || 1,
+            lastRead: new Date().toISOString()
+        });
+        
+        // Keep only maxEntries
+        while (history.length > this.maxEntries) {
+            history.pop();
+        }
+        
+        this.save(history);
+    }
+
+    // Update position for a book (without moving to top)
+    updatePosition(bookId, chapterIndex, scrollPosition) {
+        const history = this.getAll();
+        const entry = history.find(h => h.bookId === bookId);
+        if (entry) {
+            entry.chapterIndex = chapterIndex;
+            entry.scrollPosition = scrollPosition;
+            entry.lastRead = new Date().toISOString();
+            this.save(history);
+        }
+    }
+
+    // Get saved position for a book
+    getPosition(bookId) {
+        const history = this.getAll();
+        const entry = history.find(h => h.bookId === bookId);
+        return entry ? {
+            chapterIndex: entry.chapterIndex || 0,
+            scrollPosition: entry.scrollPosition || 0
+        } : null;
+    }
+
+    // Format relative time (e.g., "2 hours ago")
+    formatRelativeTime(isoString) {
+        const date = new Date(isoString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} min ago`;
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+        return date.toLocaleDateString();
+    }
+}
+
+// Global reading history instance
+const readingHistory = new ReadingHistory();
+
 class EbookReader {
     constructor() {
         this.currentBook = null;
+        this.currentBookId = null;
+        this.currentLibraryId = null;
         this.currentChapterIndex = 0;
         this.settings = this.loadSettings();
         this.overlay = null;
+        this.scrollSaveTimeout = null;
         this.init();
     }
 
@@ -250,10 +352,14 @@ class EbookReader {
         this.handleSwipe = handleSwipe;
     }
 
-    async openBook(bookId) {
+    async openBook(bookId, libraryId = null) {
         try {
             this.overlay.classList.add('active');
             this.showLoading();
+
+            // Store book ID and library ID
+            this.currentBookId = bookId;
+            this.currentLibraryId = libraryId || (typeof App !== 'undefined' ? App.currentLibrary : null);
 
             // Fetch book content from API
             const response = await fetch(`${APP_BASE_PATH}/api/books/${bookId}/content`);
@@ -262,7 +368,14 @@ class EbookReader {
             }
 
             this.currentBook = await response.json();
-            this.currentChapterIndex = 0;
+            
+            // Check for saved position
+            const savedPosition = readingHistory.getPosition(bookId);
+            if (savedPosition) {
+                this.currentChapterIndex = savedPosition.chapterIndex;
+            } else {
+                this.currentChapterIndex = 0;
+            }
 
             // Update UI
             document.getElementById('reader-book-title').textContent = this.currentBook.title || 'Unknown Title';
@@ -271,14 +384,68 @@ class EbookReader {
             // Build chapters menu
             this.buildChaptersMenu();
 
-            // Display first chapter
-            this.displayChapter();
+            // Display chapter (will restore scroll position after render)
+            this.displayChapter(savedPosition?.scrollPosition);
+
+            // Add to reading history
+            readingHistory.addOrUpdate({
+                bookId: this.currentBookId,
+                libraryId: this.currentLibraryId,
+                title: this.currentBook.title || 'Unknown Title',
+                author: this.currentBook.author || 'Unknown Author',
+                chapterIndex: this.currentChapterIndex,
+                scrollPosition: savedPosition?.scrollPosition || 0,
+                totalChapters: this.currentBook.chapters.length
+            });
+
+            // Setup scroll tracking
+            this.setupScrollTracking();
 
         } catch (error) {
             console.error('Error opening book:', error);
             alert('Failed to open book: ' + error.message);
             this.close();
         }
+    }
+
+    setupScrollTracking() {
+        const content = document.getElementById('reader-content');
+        if (!content) return;
+
+        // Remove existing listener if any
+        if (this.scrollHandler) {
+            content.removeEventListener('scroll', this.scrollHandler);
+        }
+
+        // Create scroll handler with debounce
+        this.scrollHandler = () => {
+            if (this.scrollSaveTimeout) {
+                clearTimeout(this.scrollSaveTimeout);
+            }
+            this.scrollSaveTimeout = setTimeout(() => {
+                this.saveCurrentPosition();
+            }, 500); // Save after 500ms of no scrolling
+        };
+
+        content.addEventListener('scroll', this.scrollHandler);
+    }
+
+    saveCurrentPosition() {
+        if (!this.currentBookId || !this.currentBook) return;
+
+        const content = document.getElementById('reader-content');
+        if (!content) return;
+
+        // Calculate scroll position as percentage (0-1)
+        const scrollPosition = content.scrollHeight > content.clientHeight
+            ? content.scrollTop / (content.scrollHeight - content.clientHeight)
+            : 0;
+
+        readingHistory.updatePosition(
+            this.currentBookId,
+            this.currentChapterIndex,
+            scrollPosition
+        );
     }
 
     buildChaptersMenu() {
@@ -307,7 +474,7 @@ class EbookReader {
         });
     }
 
-    displayChapter() {
+    displayChapter(scrollPosition = null) {
         if (!this.currentBook || !this.currentBook.chapters[this.currentChapterIndex]) {
             return;
         }
@@ -329,8 +496,16 @@ class EbookReader {
         content.innerHTML = '';
         content.appendChild(chapterDiv);
 
-        // Scroll to top
-        content.scrollTop = 0;
+        // Restore scroll position or scroll to top
+        if (scrollPosition !== null && scrollPosition > 0) {
+            // Use requestAnimationFrame to ensure content is rendered
+            requestAnimationFrame(() => {
+                const maxScroll = content.scrollHeight - content.clientHeight;
+                content.scrollTop = scrollPosition * maxScroll;
+            });
+        } else {
+            content.scrollTop = 0;
+        }
 
         // Update navigation buttons
         this.updateNavigation();
@@ -340,6 +515,9 @@ class EbookReader {
 
         // Update chapters menu active state
         this.updateChaptersMenuActive();
+
+        // Save position after chapter change
+        this.saveCurrentPosition();
     }
 
     updateNavigation() {
@@ -371,14 +549,14 @@ class EbookReader {
     previousChapter() {
         if (this.currentChapterIndex > 0) {
             this.currentChapterIndex--;
-            this.displayChapter();
+            this.displayChapter(0); // Start at top of new chapter
         }
     }
 
     nextChapter() {
         if (this.currentChapterIndex < this.currentBook.chapters.length - 1) {
             this.currentChapterIndex++;
-            this.displayChapter();
+            this.displayChapter(0); // Start at top of new chapter
         }
     }
 
@@ -449,8 +627,22 @@ class EbookReader {
     }
 
     close() {
+        // Save final position before closing
+        this.saveCurrentPosition();
+
+        // Clean up scroll handler
+        const content = document.getElementById('reader-content');
+        if (content && this.scrollHandler) {
+            content.removeEventListener('scroll', this.scrollHandler);
+        }
+        if (this.scrollSaveTimeout) {
+            clearTimeout(this.scrollSaveTimeout);
+        }
+
         this.overlay.classList.remove('active');
         this.currentBook = null;
+        this.currentBookId = null;
+        this.currentLibraryId = null;
         this.currentChapterIndex = 0;
     }
 
@@ -489,8 +681,15 @@ if (document.readyState === 'loading') {
 }
 
 // Export for use in other modules
-window.openEbookReader = function(bookId) {
+window.openEbookReader = function(bookId, libraryId) {
     if (ebookReader) {
-        ebookReader.openBook(bookId);
+        ebookReader.openBook(bookId, libraryId);
     }
 };
+
+// Export reading history for use in app.js
+window.getReadingHistory = function() {
+    return readingHistory.getAll();
+};
+
+window.readingHistory = readingHistory;
