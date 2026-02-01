@@ -205,6 +205,21 @@
     border-color: var(--reader-accent);
 }
 
+/* Layout Toggle Button */
+.reader-layout-btn {
+    width: auto;
+    padding: 0 10px;
+    gap: 6px;
+}
+
+.reader-layout-icon {
+    font-size: 14px;
+}
+
+.reader-layout-label {
+    font-size: 11px;
+}
+
 /* Main Reading Area */
 .reader-main {
     flex: 1;
@@ -274,6 +289,14 @@
     overflow: hidden;
 }
 
+/* Pages Wrapper */
+.reader-pages-wrapper {
+    display: flex;
+    gap: 0;
+    height: 100%;
+    justify-content: center;
+}
+
 /* The Page (book-like appearance) */
 .reader-page {
     width: 100%;
@@ -285,6 +308,59 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+/* Single page layout (default) */
+.reader-content[data-layout="single"] .reader-pages-wrapper {
+    max-width: 720px;
+}
+
+.reader-content[data-layout="single"] .reader-page-right {
+    display: none;
+}
+
+.reader-content[data-layout="single"] .reader-page-left {
+    border-radius: 2px;
+}
+
+/* Two page layout */
+.reader-content[data-layout="double"] .reader-pages-wrapper {
+    max-width: 1200px;
+}
+
+.reader-content[data-layout="double"] .reader-page {
+    max-width: 600px;
+}
+
+.reader-content[data-layout="double"] .reader-page-left {
+    border-radius: 2px 0 0 2px;
+    box-shadow: -2px 2px 20px var(--reader-page-shadow);
+}
+
+.reader-content[data-layout="double"] .reader-page-right {
+    display: flex;
+    border-radius: 0 2px 2px 0;
+    box-shadow: 2px 2px 20px var(--reader-page-shadow);
+}
+
+/* Hide two-page layout on mobile/narrow screens */
+@media (max-width: 1000px) {
+    .reader-layout-toggle {
+        display: none !important;
+    }
+    
+    .reader-content[data-layout="double"] .reader-pages-wrapper {
+        max-width: 720px;
+    }
+    
+    .reader-content[data-layout="double"] .reader-page-right {
+        display: none;
+    }
+    
+    .reader-content[data-layout="double"] .reader-page-left {
+        border-radius: 2px;
+        box-shadow: 0 2px 20px var(--reader-page-shadow);
+    }
 }
 
 .reader-page-content {

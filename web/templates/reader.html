@@ -63,6 +63,12 @@
               <option value="2.0">Loose</option>
             </select>
           </div>
+          <div class="reader-setting-group reader-layout-toggle" id="reader-layout-group">
+            <button class="reader-icon-btn reader-layout-btn" id="reader-layout-toggle" title="Toggle page layout">
+              <span class="reader-layout-icon" id="reader-layout-icon">☐</span>
+              <span class="reader-layout-label" id="reader-layout-label">1 Page</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -75,13 +81,18 @@
       </div>
 
       <!-- Page Content -->
-      <div class="reader-content" id="reader-content">
-        <div class="reader-page" id="reader-page">
-          <div class="reader-page-content" id="reader-page-content">
-            <div class="reader-loading">
-              <div class="reader-loading-spinner"></div>
-              <div>Loading book...</div>
+      <div class="reader-content" id="reader-content" data-layout="single">
+        <div class="reader-pages-wrapper" id="reader-pages-wrapper">
+          <div class="reader-page reader-page-left" id="reader-page-left">
+            <div class="reader-page-content" id="reader-page-content-left">
+              <div class="reader-loading">
+                <div class="reader-loading-spinner"></div>
+                <div>Loading book...</div>
+              </div>
             </div>
+          </div>
+          <div class="reader-page reader-page-right" id="reader-page-right">
+            <div class="reader-page-content" id="reader-page-content-right"></div>
           </div>
         </div>
       </div>

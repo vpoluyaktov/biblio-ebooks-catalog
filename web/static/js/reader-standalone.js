@@ -10,6 +10,7 @@ class StandaloneReader {
         this.settings = this.loadSettings();
         this.bookId = this.getBookIdFromURL();
         this.resizeTimeout = null;
+        this.layout = this.settings.layout || 'single'; // 'single' or 'double'
         this.init();
     }
 
@@ -77,6 +78,11 @@ class StandaloneReader {
             this.saveSettings();
             this.applySettings();
             this.repaginate();
+        });
+
+        // Layout toggle (1 page / 2 pages)
+        document.getElementById('reader-layout-toggle').addEventListener('click', () => {
+            this.toggleLayout();
         });
 
         // Chapters dropdown
@@ -238,15 +244,20 @@ class StandaloneReader {
         }
 
         const chapter = this.currentBook.chapters[this.currentChapterIndex];
-        const pageContent = document.getElementById('reader-page-content');
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
 
-        // Apply settings
-        pageContent.setAttribute('data-font-size', this.settings.fontSize);
-        pageContent.setAttribute('data-font-family', this.settings.fontFamily);
-        pageContent.style.lineHeight = this.settings.lineHeight;
+        // Apply settings to both pages
+        [pageContentLeft, pageContentRight].forEach(pageContent => {
+            if (pageContent) {
+                pageContent.setAttribute('data-font-size', this.settings.fontSize);
+                pageContent.setAttribute('data-font-family', this.settings.fontFamily);
+                pageContent.style.lineHeight = this.settings.lineHeight;
+            }
+        });
 
-        // Set chapter content
-        pageContent.innerHTML = chapter.content;
+        // Set chapter content to left page (will be paginated)
+        pageContentLeft.innerHTML = chapter.content;
 
         // Paginate the content
         this.paginateContent();
@@ -257,20 +268,20 @@ class StandaloneReader {
     }
 
     paginateContent() {
-        const pageContent = document.getElementById('reader-page-content');
-        const container = document.getElementById('reader-page');
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const containerLeft = document.getElementById('reader-page-left');
         
-        // Get available dimensions
-        const containerHeight = container.clientHeight;
-        const paddingTop = parseInt(getComputedStyle(pageContent).paddingTop) || 48;
-        const paddingBottom = parseInt(getComputedStyle(pageContent).paddingBottom) || 48;
-        const paddingLeft = parseInt(getComputedStyle(pageContent).paddingLeft) || 56;
-        const paddingRight = parseInt(getComputedStyle(pageContent).paddingRight) || 56;
+        // Get available dimensions from left page
+        const containerHeight = containerLeft.clientHeight;
+        const paddingTop = parseInt(getComputedStyle(pageContentLeft).paddingTop) || 48;
+        const paddingBottom = parseInt(getComputedStyle(pageContentLeft).paddingBottom) || 48;
+        const paddingLeft = parseInt(getComputedStyle(pageContentLeft).paddingLeft) || 56;
+        const paddingRight = parseInt(getComputedStyle(pageContentLeft).paddingRight) || 56;
         const availableHeight = containerHeight - paddingTop - paddingBottom;
-        const availableWidth = pageContent.clientWidth - paddingLeft - paddingRight;
+        const availableWidth = pageContentLeft.clientWidth - paddingLeft - paddingRight;
 
         // Store original content
-        const originalContent = pageContent.innerHTML;
+        const originalContent = pageContentLeft.innerHTML;
         
         // Create a temporary container with CSS columns to measure total width needed
         const tempDiv = document.createElement('div');
@@ -283,9 +294,9 @@ class StandaloneReader {
             column-width: ${availableWidth}px;
             column-gap: 0;
             column-fill: auto;
-            font-size: ${getComputedStyle(pageContent).fontSize};
-            font-family: ${getComputedStyle(pageContent).fontFamily};
-            line-height: ${getComputedStyle(pageContent).lineHeight};
+            font-size: ${getComputedStyle(pageContentLeft).fontSize};
+            font-family: ${getComputedStyle(pageContentLeft).fontFamily};
+            line-height: ${getComputedStyle(pageContentLeft).lineHeight};
         `;
         document.body.appendChild(tempDiv);
 
@@ -314,14 +325,24 @@ class StandaloneReader {
     }
 
     showCurrentPage() {
-        const pageContent = document.getElementById('reader-page-content');
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
         
         if (!this.chapterContent) return;
 
-        // Use CSS columns with transform to show the correct "page"
-        const offset = this.currentPage * this.columnWidth;
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
         
-        pageContent.innerHTML = `
+        // In double layout, we show 2 pages at a time (left and right)
+        // currentPage represents the left page index
+        const leftPageIndex = isDoubleLayout ? this.currentPage * 2 : this.currentPage;
+        const rightPageIndex = leftPageIndex + 1;
+
+        // Use CSS columns with transform to show the correct "page"
+        const leftOffset = leftPageIndex * this.columnWidth;
+        const rightOffset = rightPageIndex * this.columnWidth;
+        
+        // Render left page
+        pageContentLeft.innerHTML = `
             <div class="reader-columns-wrapper" style="
                 height: ${this.columnHeight}px;
                 overflow: hidden;
@@ -331,12 +352,34 @@ class StandaloneReader {
                     column-gap: 0;
                     column-fill: auto;
                     height: ${this.columnHeight}px;
-                    transform: translateX(-${offset}px);
+                    transform: translateX(-${leftOffset}px);
                 ">
                     ${this.chapterContent}
                 </div>
             </div>
         `;
+
+        // Render right page (only in double layout and if there's content)
+        if (isDoubleLayout && rightPageIndex < this.totalPages) {
+            pageContentRight.innerHTML = `
+                <div class="reader-columns-wrapper" style="
+                    height: ${this.columnHeight}px;
+                    overflow: hidden;
+                ">
+                    <div class="reader-columns-content" style="
+                        column-width: ${this.columnWidth}px;
+                        column-gap: 0;
+                        column-fill: auto;
+                        height: ${this.columnHeight}px;
+                        transform: translateX(-${rightOffset}px);
+                    ">
+                        ${this.chapterContent}
+                    </div>
+                </div>
+            `;
+        } else {
+            pageContentRight.innerHTML = '';
+        }
 
         this.updatePageNavigation();
     }
@@ -354,21 +397,31 @@ class StandaloneReader {
     }
 
     previousPage() {
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        
         if (this.currentPage > 0) {
             this.currentPage--;
             this.showCurrentPage();
         } else if (this.currentChapterIndex > 0) {
-            // Go to previous chapter, last page
+            // Go to previous chapter, last page/spread
             this.currentChapterIndex--;
             this.currentPage = Infinity; // Will be clamped in paginateContent
             this.displayChapter();
-            this.currentPage = this.totalPages - 1;
+            // Set to last spread in double layout
+            if (isDoubleLayout) {
+                this.currentPage = Math.ceil(this.totalPages / 2) - 1;
+            } else {
+                this.currentPage = this.totalPages - 1;
+            }
             this.showCurrentPage();
         }
     }
 
     nextPage() {
-        if (this.currentPage < this.totalPages - 1) {
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        const maxPage = isDoubleLayout ? Math.ceil(this.totalPages / 2) - 1 : this.totalPages - 1;
+        
+        if (this.currentPage < maxPage) {
             this.currentPage++;
             this.showCurrentPage();
         } else if (this.currentChapterIndex < this.currentBook.chapters.length - 1) {
@@ -403,9 +456,25 @@ class StandaloneReader {
         const prevZone = document.getElementById('reader-nav-prev');
         const nextZone = document.getElementById('reader-nav-next');
 
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        
+        // Calculate effective page numbers for display
+        let displayPage, displayTotal;
+        if (isDoubleLayout) {
+            // In double layout, currentPage is the spread index (0, 1, 2...)
+            // Each spread shows 2 pages
+            displayPage = this.currentPage * 2 + 1; // Show left page number
+            displayTotal = this.totalPages;
+            const maxSpread = Math.ceil(this.totalPages / 2) - 1;
+            var isLastSpread = this.currentPage >= maxSpread;
+        } else {
+            displayPage = this.currentPage + 1;
+            displayTotal = this.totalPages;
+            var isLastSpread = this.currentPage === this.totalPages - 1;
+        }
+
         const isFirstPage = this.currentPage === 0 && this.currentChapterIndex === 0;
-        const isLastPage = this.currentPage === this.totalPages - 1 && 
-                          this.currentChapterIndex === this.currentBook.chapters.length - 1;
+        const isLastPage = isLastSpread && this.currentChapterIndex === this.currentBook.chapters.length - 1;
 
         prevBtn.disabled = isFirstPage;
         nextBtn.disabled = isLastPage;
@@ -413,7 +482,12 @@ class StandaloneReader {
         prevZone.classList.toggle('disabled', isFirstPage);
         nextZone.classList.toggle('disabled', isLastPage);
 
-        indicator.textContent = `Page ${this.currentPage + 1} of ${this.totalPages}`;
+        if (isDoubleLayout) {
+            const rightPage = Math.min(displayPage + 1, displayTotal);
+            indicator.textContent = `Pages ${displayPage}-${rightPage} of ${displayTotal}`;
+        } else {
+            indicator.textContent = `Page ${displayPage} of ${displayTotal}`;
+        }
 
         // Update chapter info (just the title, no "Chapter X:" prefix)
         const chapter = this.currentBook.chapters[this.currentChapterIndex];
@@ -458,27 +532,67 @@ class StandaloneReader {
         // Apply line height
         document.getElementById('reader-line-height').value = this.settings.lineHeight;
 
-        // Apply to page content if it exists
-        const pageContent = document.getElementById('reader-page-content');
-        if (pageContent) {
-            pageContent.setAttribute('data-font-size', this.settings.fontSize);
-            pageContent.setAttribute('data-font-family', this.settings.fontFamily);
-            pageContent.style.lineHeight = this.settings.lineHeight;
+        // Apply layout
+        const content = document.getElementById('reader-content');
+        content.setAttribute('data-layout', this.layout);
+        this.updateLayoutButton();
+
+        // Apply to both page content elements
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        
+        [pageContentLeft, pageContentRight].forEach(pageContent => {
+            if (pageContent) {
+                pageContent.setAttribute('data-font-size', this.settings.fontSize);
+                pageContent.setAttribute('data-font-family', this.settings.fontFamily);
+                pageContent.style.lineHeight = this.settings.lineHeight;
+            }
+        });
+    }
+
+    toggleLayout() {
+        this.layout = this.layout === 'single' ? 'double' : 'single';
+        this.settings.layout = this.layout;
+        this.saveSettings();
+        
+        // Apply layout change
+        const content = document.getElementById('reader-content');
+        content.setAttribute('data-layout', this.layout);
+        this.updateLayoutButton();
+        
+        // Reset to page 0 and repaginate
+        this.currentPage = 0;
+        this.repaginate();
+    }
+
+    updateLayoutButton() {
+        const icon = document.getElementById('reader-layout-icon');
+        const label = document.getElementById('reader-layout-label');
+        
+        if (this.layout === 'double') {
+            icon.textContent = '☐☐';
+            label.textContent = '2 Pages';
+        } else {
+            icon.textContent = '☐';
+            label.textContent = '1 Page';
         }
     }
 
     showLoading() {
-        const pageContent = document.getElementById('reader-page-content');
+        const pageContent = document.getElementById('reader-page-content-left');
         pageContent.innerHTML = `
             <div class="reader-loading">
                 <div class="reader-loading-spinner"></div>
                 <div>Loading book...</div>
             </div>
         `;
+        // Clear right page
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        if (pageContentRight) pageContentRight.innerHTML = '';
     }
 
     showError(message) {
-        const pageContent = document.getElementById('reader-page-content');
+        const pageContent = document.getElementById('reader-page-content-left');
         pageContent.innerHTML = `
             <div class="reader-loading">
                 <div style="color: #dc3545; font-size: 24px; margin-bottom: 16px;">⚠</div>
@@ -489,6 +603,9 @@ class StandaloneReader {
                 </button>
             </div>
         `;
+        // Clear right page
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        if (pageContentRight) pageContentRight.innerHTML = '';
     }
 
     escapeHtml(text) {
@@ -502,7 +619,8 @@ class StandaloneReader {
             fontSize: 'medium',
             fontFamily: 'serif',
             theme: 'light',
-            lineHeight: '1.6'
+            lineHeight: '1.6',
+            layout: 'single'
         };
 
         try {
