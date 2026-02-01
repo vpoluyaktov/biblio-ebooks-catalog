@@ -341,9 +341,10 @@ class StandaloneReader {
         const leftOffset = leftPageIndex * this.columnWidth;
         const rightOffset = rightPageIndex * this.columnWidth;
         
-        // Render left page
+        // Render left page - wrapper width must match columnWidth to show only 1 column
         pageContentLeft.innerHTML = `
             <div class="reader-columns-wrapper" style="
+                width: ${this.columnWidth}px;
                 height: ${this.columnHeight}px;
                 overflow: hidden;
             ">
@@ -363,6 +364,7 @@ class StandaloneReader {
         if (isDoubleLayout && rightPageIndex < this.totalPages) {
             pageContentRight.innerHTML = `
                 <div class="reader-columns-wrapper" style="
+                    width: ${this.columnWidth}px;
                     height: ${this.columnHeight}px;
                     overflow: hidden;
                 ">
