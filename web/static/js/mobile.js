@@ -65,6 +65,9 @@ const MobileUI = {
       case 'home':
         container.innerHTML = this.renderHome();
         break;
+      case 'reading-history':
+        container.innerHTML = this.renderReadingHistory();
+        break;
       case 'authors':
         container.innerHTML = this.renderAuthors();
         this.loadAuthors();
@@ -148,6 +151,24 @@ const MobileUI = {
           </div>
 
           <div class="mobile-menu">
+            <button class="mobile-menu-item" data-mobile-nav="reading-history">
+              <div class="mobile-menu-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  <line x1="12" y1="6" x2="12" y2="12"/>
+                  <line x1="12" y1="12" x2="16" y2="14"/>
+                </svg>
+              </div>
+              <div class="mobile-menu-text">
+                <div class="mobile-menu-title">Continue Reading</div>
+                <div class="mobile-menu-subtitle">Recent books with saved position</div>
+              </div>
+              <svg class="mobile-menu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+
             <button class="mobile-menu-item" data-mobile-nav="authors">
               <div class="mobile-menu-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -231,6 +252,75 @@ const MobileUI = {
         </div>
       </div>
     `;
+  },
+
+  renderReadingHistory() {
+    const history = ReadingHistoryHelper.getAll();
+    
+    let listContent = '';
+    if (history.length === 0) {
+      listContent = '<div class="mobile-empty">No reading history yet. Open a book in the reader to start tracking.</div>';
+    } else {
+      listContent = history.map(entry => {
+        const progress = `Chapter ${entry.chapterIndex + 1} of ${entry.totalChapters}`;
+        const timeAgo = ReadingHistoryHelper.formatRelativeTime(entry.lastRead);
+        return `
+          <div class="mobile-list-item mobile-reading-history-item" data-book-id="${entry.bookId}" data-library-id="${entry.libraryId}">
+            <div class="mobile-list-item-text">
+              <div class="mobile-list-item-title">${this.escapeHtml(entry.title)}</div>
+              <div class="mobile-list-item-subtitle">${this.escapeHtml(entry.author)}</div>
+              <div class="mobile-reading-history-meta">
+                <span class="mobile-reading-history-progress">${progress}</span>
+                <span class="mobile-reading-history-time">${timeAgo}</span>
+              </div>
+            </div>
+            <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </div>
+        `;
+      }).join('');
+    }
+
+    return `
+      <div class="mobile-screen">
+        <div class="mobile-header">
+          <button class="mobile-back-btn" data-mobile-back>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <div class="mobile-header-title">Continue Reading</div>
+          <button type="button" class="mobile-icon-btn" data-action="toggleTheme">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="mobile-content">
+          <div class="mobile-list" id="mobile-reading-history-list">
+            ${listContent}
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   },
 
   renderAuthors() {
@@ -669,6 +759,20 @@ const MobileUI = {
     const searchBtn = document.getElementById('mobile-search-btn');
     if (searchBtn) {
       searchBtn.addEventListener('click', () => this.performSearch());
+    }
+
+    // Reading history items
+    const historyList = document.getElementById('mobile-reading-history-list');
+    if (historyList) {
+      historyList.querySelectorAll('.mobile-reading-history-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const bookId = item.dataset.bookId;
+          if (bookId) {
+            // Open reader in new tab
+            window.open(`${window.APP_BASE_PATH || ''}/reader?id=${bookId}`, '_blank');
+          }
+        });
+      });
     }
 
     // Global search
