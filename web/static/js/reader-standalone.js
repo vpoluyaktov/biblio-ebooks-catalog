@@ -562,9 +562,14 @@ class StandaloneReader {
         content.setAttribute('data-layout', this.layout);
         this.updateLayoutButton();
         
-        // Reset to page 0 and repaginate
+        // Reset to page 0 and repaginate after DOM updates with new layout
         this.currentPage = 0;
-        this.repaginate();
+        // Use requestAnimationFrame to ensure layout has been applied
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                this.repaginate();
+            });
+        });
     }
 
     updateLayoutButton() {
