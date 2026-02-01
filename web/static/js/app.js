@@ -74,15 +74,34 @@ const App = {
     }
   },
 
+  getSystemTheme() {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  },
+
   loadTheme() {
-    const saved = localStorage.getItem('theme') || 'dark';
-    this.theme = saved;
-    document.documentElement.setAttribute('data-theme', saved);
+    const saved = localStorage.getItem('theme');
+    // If no saved preference, use system theme
+    if (!saved) {
+      this.theme = this.getSystemTheme();
+    } else {
+      this.theme = saved;
+    }
+    document.documentElement.setAttribute('data-theme', this.theme);
+    
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      // Only auto-switch if user hasn't set a manual preference
+      if (!localStorage.getItem('theme')) {
+        this.theme = e.matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', this.theme);
+      }
+    });
   },
 
   toggleTheme() {
     this.theme = this.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', this.theme);
+    // Save user's manual preference
     localStorage.setItem('theme', this.theme);
   },
 

@@ -111,6 +111,15 @@ class StandaloneReader {
         this.applySettings();
         this.attachEventListeners();
         
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            // Only auto-switch if user hasn't set a manual preference
+            if (!localStorage.getItem('theme')) {
+                this.applySettings();
+                this.displayChapter();
+            }
+        });
+        
         if (this.bookId) {
             this.loadBook(this.bookId);
         } else {
@@ -700,9 +709,16 @@ class StandaloneReader {
         this.displayChapter();
     }
 
+    getSystemTheme() {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
     applySettings() {
-        // Apply theme from shared localStorage 'theme' key
-        const theme = localStorage.getItem('theme') || 'dark';
+        // Apply theme from shared localStorage 'theme' key, or use system theme if not set
+        let theme = localStorage.getItem('theme');
+        if (!theme) {
+            theme = this.getSystemTheme();
+        }
         const container = document.getElementById('reader-container');
         container.setAttribute('data-reader-theme', theme);
         document.getElementById('reader-theme').value = theme;
