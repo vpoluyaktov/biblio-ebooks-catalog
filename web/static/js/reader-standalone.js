@@ -579,12 +579,13 @@ class StandaloneReader {
         content.setAttribute('data-layout', this.layout);
         this.updateLayoutButton();
         
-        // Reset to page 0 and repaginate after DOM updates with new layout
+        // Reset to page 0 and force full chapter re-display after DOM updates
         this.currentPage = 0;
         // Use requestAnimationFrame to ensure layout has been applied
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                this.repaginate();
+                // Force full re-display of chapter content
+                this.displayChapter();
             });
         });
     }
