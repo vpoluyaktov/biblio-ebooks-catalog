@@ -31,15 +31,9 @@ class StandaloneReader {
     }
 
     attachEventListeners() {
-        // Close button - navigate back to catalog
+        // Close button - close the tab
         document.getElementById('reader-close').addEventListener('click', () => {
-            // Try to go back in history, or redirect to catalog
-            if (window.history.length > 1) {
-                window.history.back();
-            } else {
-                // Fallback: redirect to catalog root
-                window.location.href = window.APP_BASE_PATH || '/catalog';
-            }
+            window.close();
         });
 
         // Chapter navigation buttons
@@ -65,10 +59,9 @@ class StandaloneReader {
         document.getElementById('reader-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
         document.getElementById('reader-font-increase').addEventListener('click', () => this.changeFontSize(1));
 
-        // Theme control
+        // Theme control - uses shared localStorage 'theme' key
         document.getElementById('reader-theme').addEventListener('change', (e) => {
-            this.settings.theme = e.target.value;
-            this.saveSettings();
+            localStorage.setItem('theme', e.target.value);
             this.applySettings();
             this.displayChapter();
         });
@@ -102,6 +95,61 @@ class StandaloneReader {
             }
         });
 
+        // Mobile settings panel
+        const mobileSettingsBtn = document.getElementById('reader-mobile-settings-btn');
+        if (mobileSettingsBtn) {
+            mobileSettingsBtn.addEventListener('click', () => this.openMobileSettings());
+        }
+
+        const mobileSettingsClose = document.getElementById('reader-mobile-settings-close');
+        if (mobileSettingsClose) {
+            mobileSettingsClose.addEventListener('click', () => this.closeMobileSettings());
+        }
+
+        // Mobile chapter selector
+        const mobileChapter = document.getElementById('reader-mobile-chapter');
+        if (mobileChapter) {
+            mobileChapter.addEventListener('change', (e) => {
+                this.currentChapterIndex = parseInt(e.target.value);
+                this.currentPage = 0;
+                this.displayChapter();
+                this.closeMobileSettings();
+            });
+        }
+
+        // Mobile font family
+        const mobileFontFamily = document.getElementById('reader-mobile-font-family');
+        if (mobileFontFamily) {
+            mobileFontFamily.addEventListener('change', (e) => {
+                this.settings.fontFamily = e.target.value;
+                this.saveSettings();
+                this.applySettings();
+                this.displayChapter();
+            });
+        }
+
+        // Mobile font size
+        const mobileFontDecrease = document.getElementById('reader-mobile-font-decrease');
+        if (mobileFontDecrease) {
+            mobileFontDecrease.addEventListener('click', () => this.changeFontSize(-1));
+        }
+
+        const mobileFontIncrease = document.getElementById('reader-mobile-font-increase');
+        if (mobileFontIncrease) {
+            mobileFontIncrease.addEventListener('click', () => this.changeFontSize(1));
+        }
+
+        // Mobile line height
+        const mobileLineHeight = document.getElementById('reader-mobile-line-height');
+        if (mobileLineHeight) {
+            mobileLineHeight.addEventListener('change', (e) => {
+                this.settings.lineHeight = e.target.value;
+                this.saveSettings();
+                this.applySettings();
+                this.displayChapter();
+            });
+        }
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Ignore if typing in an input
@@ -109,8 +157,7 @@ class StandaloneReader {
             
             switch(e.key) {
                 case 'Escape':
-                    if (window.opener) window.close();
-                    else history.back();
+                    window.close();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -541,10 +588,11 @@ class StandaloneReader {
     }
 
     applySettings() {
-        // Apply theme to container
+        // Apply theme from shared localStorage 'theme' key
+        const theme = localStorage.getItem('theme') || 'dark';
         const container = document.getElementById('reader-container');
-        container.setAttribute('data-reader-theme', this.settings.theme);
-        document.getElementById('reader-theme').value = this.settings.theme;
+        container.setAttribute('data-reader-theme', theme);
+        document.getElementById('reader-theme').value = theme;
 
         // Apply font family
         document.getElementById('reader-font-family').value = this.settings.fontFamily;
@@ -604,6 +652,35 @@ class StandaloneReader {
         }
     }
 
+    openMobileSettings() {
+        const panel = document.getElementById('reader-mobile-settings');
+        if (panel) {
+            panel.classList.add('active');
+            this.updateMobileChapterSelector();
+            // Sync mobile controls with current settings
+            const mobileFontFamily = document.getElementById('reader-mobile-font-family');
+            const mobileLineHeight = document.getElementById('reader-mobile-line-height');
+            if (mobileFontFamily) mobileFontFamily.value = this.settings.fontFamily;
+            if (mobileLineHeight) mobileLineHeight.value = this.settings.lineHeight;
+        }
+    }
+
+    closeMobileSettings() {
+        const panel = document.getElementById('reader-mobile-settings');
+        if (panel) {
+            panel.classList.remove('active');
+        }
+    }
+
+    updateMobileChapterSelector() {
+        const select = document.getElementById('reader-mobile-chapter');
+        if (!select || !this.currentBook || !this.currentBook.chapters) return;
+        
+        select.innerHTML = this.currentBook.chapters.map((chapter, index) => 
+            `<option value="${index}" ${index === this.currentChapterIndex ? 'selected' : ''}>${index + 1}. ${this.escapeHtml(chapter.title || 'Untitled')}</option>`
+        ).join('');
+    }
+
     showLoading() {
         const pageContent = document.getElementById('reader-page-content-left');
         pageContent.innerHTML = `
@@ -644,7 +721,6 @@ class StandaloneReader {
         const defaults = {
             fontSize: 'medium',
             fontFamily: 'serif',
-            theme: 'light',
             lineHeight: '1.6',
             layout: 'single'
         };
@@ -659,7 +735,10 @@ class StandaloneReader {
 
     saveSettings() {
         try {
-            localStorage.setItem('ebookReaderSettings', JSON.stringify(this.settings));
+            // Save reader-specific settings (theme is stored separately in root 'theme' key)
+            const settingsToSave = { ...this.settings };
+            delete settingsToSave.theme; // Don't save theme here, it's in root localStorage
+            localStorage.setItem('ebookReaderSettings', JSON.stringify(settingsToSave));
         } catch (e) {
             console.error('Failed to save reader settings:', e);
         }

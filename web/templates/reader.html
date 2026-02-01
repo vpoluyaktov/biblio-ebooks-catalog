@@ -70,6 +70,7 @@
             </button>
           </div>
         </div>
+        <button class="reader-mobile-settings-btn" id="reader-mobile-settings-btn" title="Settings">⚙</button>
       </div>
     </div>
 
@@ -140,6 +141,42 @@
             <span class="reader-btn-icon">⟩⟩</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Mobile Settings Panel -->
+    <div class="reader-mobile-settings" id="reader-mobile-settings">
+      <div class="reader-mobile-settings-header">
+        <span class="reader-mobile-settings-title">Settings</span>
+        <button class="reader-mobile-settings-close" id="reader-mobile-settings-close">✕</button>
+      </div>
+      <div class="reader-mobile-setting-row">
+        <span class="reader-mobile-setting-label">Chapter</span>
+        <select class="reader-mobile-select" id="reader-mobile-chapter"></select>
+      </div>
+      <div class="reader-mobile-setting-row">
+        <span class="reader-mobile-setting-label">Font</span>
+        <select class="reader-mobile-select" id="reader-mobile-font-family">
+          <option value="serif">Serif</option>
+          <option value="sans-serif">Sans-serif</option>
+          <option value="monospace">Monospace</option>
+        </select>
+      </div>
+      <div class="reader-mobile-setting-row">
+        <span class="reader-mobile-setting-label">Font Size</span>
+        <div class="reader-mobile-setting-control">
+          <button class="reader-icon-btn" id="reader-mobile-font-decrease">A−</button>
+          <button class="reader-icon-btn" id="reader-mobile-font-increase">A+</button>
+        </div>
+      </div>
+      <div class="reader-mobile-setting-row">
+        <span class="reader-mobile-setting-label">Line Height</span>
+        <select class="reader-mobile-select" id="reader-mobile-line-height">
+          <option value="1.4">Compact</option>
+          <option value="1.6">Normal</option>
+          <option value="1.8">Relaxed</option>
+          <option value="2.0">Loose</option>
+        </select>
       </div>
     </div>
   </div>

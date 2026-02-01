@@ -650,6 +650,7 @@ const MobileUI = {
     if (libSelect) {
       libSelect.addEventListener('change', (e) => {
         App.currentLibrary = parseInt(e.target.value);
+        App.saveCurrentLibrary();
         this.navigateTo('home');
       });
     }
@@ -659,6 +660,7 @@ const MobileUI = {
     if (homeLibSelect) {
       homeLibSelect.addEventListener('change', (e) => {
         App.currentLibrary = parseInt(e.target.value);
+        App.saveCurrentLibrary();
         this.render(); // Re-render home screen with new library
       });
     }

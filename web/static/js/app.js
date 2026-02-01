@@ -57,6 +57,28 @@ const App = {
     localStorage.setItem('theme', this.theme);
   },
 
+  saveCurrentLibrary() {
+    if (this.currentLibrary) {
+      localStorage.setItem('currentLibrary', this.currentLibrary.toString());
+    }
+  },
+
+  restoreCurrentLibrary() {
+    const saved = localStorage.getItem('currentLibrary');
+    if (saved) {
+      const savedId = parseInt(saved);
+      // Verify the saved library still exists
+      if (this.libraries.some(l => l.id === savedId)) {
+        this.currentLibrary = savedId;
+        return;
+      }
+    }
+    // Fallback to first library
+    if (this.libraries.length > 0) {
+      this.currentLibrary = this.libraries[0].id;
+    }
+  },
+
   renderHeader(title, extraContent = '') {
     return `
       <header class="header">
@@ -308,7 +330,7 @@ const App = {
   async renderHome() {
     // If user has libraries, go directly to browser view
     if (this.libraries.length > 0) {
-      this.currentLibrary = this.libraries[0].id;
+      this.restoreCurrentLibrary();
       window.location.hash = `#browser`;
       return;
     }
@@ -338,7 +360,7 @@ const App = {
   // ========== FreeLib-style Browser View ==========
   async renderBrowser() {
     if (!this.currentLibrary && this.libraries.length > 0) {
-      this.currentLibrary = this.libraries[0].id;
+      this.restoreCurrentLibrary();
     }
 
     if (!this.currentLibrary) {
@@ -502,6 +524,7 @@ const App = {
     // Library selector
     document.getElementById('library-select')?.addEventListener('change', (e) => {
       this.currentLibrary = parseInt(e.target.value);
+      this.saveCurrentLibrary();
       this.currentAuthor = null;
       this.currentSeries = null;
       this.currentBook = null;
