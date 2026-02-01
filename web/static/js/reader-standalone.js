@@ -59,7 +59,7 @@ class StandaloneReader {
             this.settings.fontFamily = e.target.value;
             this.saveSettings();
             this.applySettings();
-            this.repaginate();
+            this.displayChapter();
         });
 
         document.getElementById('reader-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
@@ -70,6 +70,7 @@ class StandaloneReader {
             this.settings.theme = e.target.value;
             this.saveSettings();
             this.applySettings();
+            this.displayChapter();
         });
 
         // Line height control
@@ -77,7 +78,7 @@ class StandaloneReader {
             this.settings.lineHeight = e.target.value;
             this.saveSettings();
             this.applySettings();
-            this.repaginate();
+            this.displayChapter();
         });
 
         // Layout toggle (1 page / 2 pages)
@@ -536,7 +537,7 @@ class StandaloneReader {
         this.settings.fontSize = sizes[newIndex];
         this.saveSettings();
         this.applySettings();
-        this.repaginate();
+        this.displayChapter();
     }
 
     applySettings() {
