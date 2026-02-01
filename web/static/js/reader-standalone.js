@@ -258,62 +258,46 @@ class StandaloneReader {
         const pageContent = document.getElementById('reader-page-content');
         const container = document.getElementById('reader-page');
         
-        // Get available height
+        // Get available dimensions
         const containerHeight = container.clientHeight;
         const paddingTop = parseInt(getComputedStyle(pageContent).paddingTop) || 48;
         const paddingBottom = parseInt(getComputedStyle(pageContent).paddingBottom) || 48;
+        const paddingLeft = parseInt(getComputedStyle(pageContent).paddingLeft) || 56;
+        const paddingRight = parseInt(getComputedStyle(pageContent).paddingRight) || 56;
         const availableHeight = containerHeight - paddingTop - paddingBottom;
+        const availableWidth = pageContent.clientWidth - paddingLeft - paddingRight;
 
         // Store original content
         const originalContent = pageContent.innerHTML;
         
-        // Create a temporary container to measure content
+        // Create a temporary container with CSS columns to measure total width needed
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = originalContent;
         tempDiv.style.cssText = `
             position: absolute;
             visibility: hidden;
-            width: ${pageContent.clientWidth - parseInt(getComputedStyle(pageContent).paddingLeft) - parseInt(getComputedStyle(pageContent).paddingRight)}px;
+            height: ${availableHeight}px;
+            width: ${availableWidth}px;
+            column-width: ${availableWidth}px;
+            column-gap: 0;
+            column-fill: auto;
             font-size: ${getComputedStyle(pageContent).fontSize};
             font-family: ${getComputedStyle(pageContent).fontFamily};
             line-height: ${getComputedStyle(pageContent).lineHeight};
         `;
         document.body.appendChild(tempDiv);
 
-        // Get all block-level elements
-        const elements = Array.from(tempDiv.children);
-        this.pages = [];
-        let currentPageContent = [];
-        let currentHeight = 0;
+        // Calculate number of pages based on scroll width
+        const totalWidth = tempDiv.scrollWidth;
+        this.totalPages = Math.max(1, Math.ceil(totalWidth / availableWidth));
 
-        elements.forEach((el, index) => {
-            const elHeight = el.offsetHeight + parseInt(getComputedStyle(el).marginTop) + parseInt(getComputedStyle(el).marginBottom);
-            
-            if (currentHeight + elHeight > availableHeight && currentPageContent.length > 0) {
-                // Start new page
-                this.pages.push(currentPageContent.map(e => e.outerHTML).join(''));
-                currentPageContent = [el.cloneNode(true)];
-                currentHeight = elHeight;
-            } else {
-                currentPageContent.push(el.cloneNode(true));
-                currentHeight += elHeight;
-            }
-        });
-
-        // Add remaining content as last page
-        if (currentPageContent.length > 0) {
-            this.pages.push(currentPageContent.map(e => e.outerHTML).join(''));
-        }
+        // Store the content and column settings for display
+        this.chapterContent = originalContent;
+        this.columnWidth = availableWidth;
+        this.columnHeight = availableHeight;
 
         // Cleanup
         document.body.removeChild(tempDiv);
-
-        // Ensure at least one page
-        if (this.pages.length === 0) {
-            this.pages = [originalContent];
-        }
-
-        this.totalPages = this.pages.length;
         
         // Ensure current page is valid
         if (this.currentPage >= this.totalPages) {
@@ -330,9 +314,27 @@ class StandaloneReader {
     showCurrentPage() {
         const pageContent = document.getElementById('reader-page-content');
         
-        if (this.pages[this.currentPage]) {
-            pageContent.innerHTML = this.pages[this.currentPage];
-        }
+        if (!this.chapterContent) return;
+
+        // Use CSS columns with transform to show the correct "page"
+        const offset = this.currentPage * this.columnWidth;
+        
+        pageContent.innerHTML = `
+            <div class="reader-columns-wrapper" style="
+                height: ${this.columnHeight}px;
+                overflow: hidden;
+            ">
+                <div class="reader-columns-content" style="
+                    column-width: ${this.columnWidth}px;
+                    column-gap: 0;
+                    column-fill: auto;
+                    height: ${this.columnHeight}px;
+                    transform: translateX(-${offset}px);
+                ">
+                    ${this.chapterContent}
+                </div>
+            </div>
+        `;
 
         this.updatePageNavigation();
     }
@@ -411,11 +413,9 @@ class StandaloneReader {
 
         indicator.textContent = `Page ${this.currentPage + 1} of ${this.totalPages}`;
 
-        // Update chapter info
+        // Update chapter info (just the title, no "Chapter X:" prefix)
         const chapter = this.currentBook.chapters[this.currentChapterIndex];
-        const chapterNum = this.currentChapterIndex + 1;
-        const chapterTitle = chapter.title || 'Untitled';
-        chapterInfo.textContent = `Chapter ${chapterNum}: ${chapterTitle}`;
+        chapterInfo.textContent = chapter.title || 'Untitled';
     }
 
     updateChapterNavigation() {

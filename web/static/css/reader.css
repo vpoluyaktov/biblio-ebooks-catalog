@@ -336,6 +336,25 @@
     text-indent: 0;
 }
 
+/* Columns-based pagination */
+.reader-columns-wrapper {
+    overflow: hidden;
+}
+
+.reader-columns-content {
+    column-fill: auto;
+}
+
+.reader-columns-content p {
+    margin: 0 0 1em 0;
+    text-indent: 1.5em;
+    break-inside: auto;
+}
+
+.reader-columns-content p:first-child {
+    text-indent: 0;
+}
+
 .reader-page-content img {
     max-width: 100%;
     height: auto;
