@@ -365,25 +365,36 @@ class StandaloneReader {
             </div>
         `;
 
-        // Render right page (only in double layout and if there's content)
-        if (isDoubleLayout && rightPageIndex < this.totalPages) {
-            pageContentRight.innerHTML = `
-                <div class="reader-columns-wrapper" style="
-                    width: ${this.columnWidth}px;
-                    height: ${this.columnHeight}px;
-                    overflow: hidden;
-                ">
-                    <div class="reader-columns-content" style="
-                        column-width: ${this.columnWidth}px;
-                        column-gap: 0;
-                        column-fill: auto;
+        // Render right page (in double layout)
+        if (isDoubleLayout) {
+            if (rightPageIndex < this.totalPages) {
+                // Right page has content
+                pageContentRight.innerHTML = `
+                    <div class="reader-columns-wrapper" style="
+                        width: ${this.columnWidth}px;
                         height: ${this.columnHeight}px;
-                        transform: translateX(-${rightOffset}px);
+                        overflow: hidden;
                     ">
-                        ${this.chapterContent}
+                        <div class="reader-columns-content" style="
+                            column-width: ${this.columnWidth}px;
+                            column-gap: 0;
+                            column-fill: auto;
+                            height: ${this.columnHeight}px;
+                            transform: translateX(-${rightOffset}px);
+                        ">
+                            ${this.chapterContent}
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Right page is empty but should maintain dimensions
+                pageContentRight.innerHTML = `
+                    <div class="reader-columns-wrapper" style="
+                        width: ${this.columnWidth}px;
+                        height: ${this.columnHeight}px;
+                    "></div>
+                `;
+            }
         } else {
             pageContentRight.innerHTML = '';
         }
