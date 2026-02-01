@@ -30,12 +30,14 @@ class StandaloneReader {
     }
 
     attachEventListeners() {
-        // Close button
+        // Close button - navigate back to catalog
         document.getElementById('reader-close').addEventListener('click', () => {
-            if (window.opener) {
-                window.close();
+            // Try to go back in history, or redirect to catalog
+            if (window.history.length > 1) {
+                window.history.back();
             } else {
-                history.back();
+                // Fallback: redirect to catalog root
+                window.location.href = window.APP_BASE_PATH || '/catalog';
             }
         });
 
