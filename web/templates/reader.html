@@ -2,27 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Ebook Reader</title>
   <link rel="stylesheet" href="{{.BasePath}}/static/css/reader.css?v={{.Version}}">
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
       overflow: hidden;
-    }
-    .reader-container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      background: #ffffff;
-    }
-    .reader-container[data-reader-theme="dark"] {
-      background: #1a1a1a;
-    }
-    .reader-container[data-reader-theme="sepia"] {
-      background: #f4ecd8;
     }
   </style>
   <script>
@@ -31,11 +20,12 @@
 </head>
 <body>
   <div class="reader-container" id="reader-container" data-reader-theme="light">
+    <!-- Top Toolbar -->
     <div class="reader-toolbar">
       <div class="reader-toolbar-left">
-        <button class="reader-btn" id="reader-close">
+        <button class="reader-btn" id="reader-close" title="Close reader (Esc)">
           <span class="reader-btn-icon">✕</span>
-          Close
+          <span>Close</span>
         </button>
       </div>
       <div class="reader-toolbar-center">
@@ -53,7 +43,7 @@
             </select>
           </div>
           <div class="reader-setting-group">
-            <button class="reader-icon-btn" id="reader-font-decrease" title="Decrease font size">A-</button>
+            <button class="reader-icon-btn" id="reader-font-decrease" title="Decrease font size">A−</button>
             <button class="reader-icon-btn" id="reader-font-increase" title="Increase font size">A+</button>
           </div>
           <div class="reader-setting-group">
@@ -65,7 +55,7 @@
             </select>
           </div>
           <div class="reader-setting-group">
-            <span class="reader-setting-label">Line Height:</span>
+            <span class="reader-setting-label">Spacing:</span>
             <select class="reader-select" id="reader-line-height">
               <option value="1.4">Compact</option>
               <option value="1.6">Normal</option>
@@ -74,32 +64,67 @@
             </select>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Main Reading Area -->
+    <div class="reader-main" id="reader-main">
+      <!-- Left Navigation Zone -->
+      <div class="reader-nav-zone reader-nav-prev" id="reader-nav-prev" title="Previous page (←)">
+        <span class="reader-nav-icon">‹</span>
+      </div>
+
+      <!-- Page Content -->
+      <div class="reader-content" id="reader-content">
+        <div class="reader-page" id="reader-page">
+          <div class="reader-page-content" id="reader-page-content">
+            <div class="reader-loading">
+              <div class="reader-loading-spinner"></div>
+              <div>Loading book...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Navigation Zone -->
+      <div class="reader-nav-zone reader-nav-next" id="reader-nav-next" title="Next page (→)">
+        <span class="reader-nav-icon">›</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="reader-footer">
+      <div class="reader-footer-left">
+        <div class="reader-chapter-nav">
+          <button class="reader-btn" id="reader-prev-chapter" disabled title="Previous chapter">
+            <span class="reader-btn-icon">⟨⟨</span>
+            <span>Prev Chapter</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="reader-footer-center">
+        <div class="reader-page-nav">
+          <button class="reader-page-btn" id="reader-page-prev" disabled title="Previous page (←)">‹</button>
+          <span class="reader-page-indicator" id="reader-page-indicator">Page 1 of 1</span>
+          <button class="reader-page-btn" id="reader-page-next" disabled title="Next page (→)">›</button>
+        </div>
+      </div>
+
+      <div class="reader-footer-right">
         <div class="reader-chapters-dropdown">
-          <button class="reader-btn" id="reader-chapters-btn">
+          <button class="reader-btn" id="reader-chapters-btn" title="Table of contents">
             <span class="reader-btn-icon">☰</span>
-            Chapters
+            <span>Chapters</span>
           </button>
           <div class="reader-chapters-menu" id="reader-chapters-menu"></div>
         </div>
-      </div>
-    </div>
-    <div class="reader-content" id="reader-content">
-      <div class="reader-loading">
-        <div class="reader-loading-spinner"></div>
-        <div>Loading book...</div>
-      </div>
-    </div>
-    <div class="reader-footer">
-      <div class="reader-progress" id="reader-progress"></div>
-      <div class="reader-navigation">
-        <button class="reader-btn" id="reader-prev-chapter" disabled>
-          <span class="reader-btn-icon">←</span>
-          Previous
-        </button>
-        <button class="reader-btn" id="reader-next-chapter" disabled>
-          Next
-          <span class="reader-btn-icon">→</span>
-        </button>
+        <div class="reader-chapter-nav">
+          <button class="reader-btn" id="reader-next-chapter" disabled title="Next chapter">
+            <span>Next Chapter</span>
+            <span class="reader-btn-icon">⟩⟩</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
