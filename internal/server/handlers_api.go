@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -687,13 +688,13 @@ func (s *Server) apiGetBookContent(w http.ResponseWriter, r *http.Request, bookI
 	}
 	defer bookReader.Close()
 
-	// Read the entire file into memory (needed for ReaderAt interface)
-	data := make([]byte, size)
-	_, err = bookReader.Read(data)
+	// Read the entire file into memory using io.ReadAll (single Read may not get all data)
+	data, err := io.ReadAll(bookReader)
 	if err != nil {
 		s.jsonError(w, "Failed to read book file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	size = int64(len(data))
 
 	// Create a ReaderAt from the data
 	readerAt := &bytesReaderAt{data: data}
