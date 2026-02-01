@@ -271,19 +271,20 @@ class StandaloneReader {
         const pageContentLeft = document.getElementById('reader-page-content-left');
         const containerLeft = document.getElementById('reader-page-left');
         
-        // Use FIXED page dimensions for consistency
-        // Single page: max-width 720px, padding 56px each side = 608px content
-        // Double page: max-width 600px each, padding 56px each side = 488px content
-        const SINGLE_PAGE_WIDTH = 608;
-        const DOUBLE_PAGE_WIDTH = 488;
-        const PADDING_VERTICAL = 96; // 48px top + 48px bottom
-        
-        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
-        const fixedColumnWidth = isDoubleLayout ? DOUBLE_PAGE_WIDTH : SINGLE_PAGE_WIDTH;
-        
-        // Get height from container (this is more stable)
+        // Get actual dimensions from the rendered page element
+        // The CSS now controls the page width (90% of screen)
         const containerHeight = containerLeft.clientHeight;
-        const availableHeight = Math.max(400, containerHeight - PADDING_VERTICAL);
+        const containerWidth = containerLeft.clientWidth;
+        
+        // Get padding from computed styles
+        const styles = getComputedStyle(pageContentLeft);
+        const paddingTop = parseInt(styles.paddingTop) || 48;
+        const paddingBottom = parseInt(styles.paddingBottom) || 48;
+        const paddingLeft = parseInt(styles.paddingLeft) || 56;
+        const paddingRight = parseInt(styles.paddingRight) || 56;
+        
+        const availableHeight = Math.max(400, containerHeight - paddingTop - paddingBottom);
+        const availableWidth = Math.max(200, containerWidth - paddingLeft - paddingRight);
 
         // Store original content
         const originalContent = pageContentLeft.innerHTML;
@@ -295,23 +296,23 @@ class StandaloneReader {
             position: absolute;
             visibility: hidden;
             height: ${availableHeight}px;
-            width: ${fixedColumnWidth}px;
-            column-width: ${fixedColumnWidth}px;
+            width: ${availableWidth}px;
+            column-width: ${availableWidth}px;
             column-gap: 0;
             column-fill: auto;
-            font-size: ${getComputedStyle(pageContentLeft).fontSize};
-            font-family: ${getComputedStyle(pageContentLeft).fontFamily};
-            line-height: ${getComputedStyle(pageContentLeft).lineHeight};
+            font-size: ${styles.fontSize};
+            font-family: ${styles.fontFamily};
+            line-height: ${styles.lineHeight};
         `;
         document.body.appendChild(tempDiv);
 
         // Calculate number of pages based on scroll width
         const totalWidth = tempDiv.scrollWidth;
-        this.totalPages = Math.max(1, Math.ceil(totalWidth / fixedColumnWidth));
+        this.totalPages = Math.max(1, Math.ceil(totalWidth / availableWidth));
 
         // Store the content and column settings for display
         this.chapterContent = originalContent;
-        this.columnWidth = fixedColumnWidth;
+        this.columnWidth = availableWidth;
         this.columnHeight = availableHeight;
 
         // Cleanup

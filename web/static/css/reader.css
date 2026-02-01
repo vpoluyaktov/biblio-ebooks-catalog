@@ -285,14 +285,15 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 40px 80px;
+    padding: 40px 5%;
     overflow: hidden;
 }
 
-/* Pages Wrapper */
+/* Pages Wrapper - 90% of available width */
 .reader-pages-wrapper {
     display: flex;
     gap: 0;
+    width: 90%;
     height: 100%;
     justify-content: center;
 }
@@ -300,7 +301,6 @@
 /* The Page (book-like appearance) */
 .reader-page {
     width: 100%;
-    max-width: 720px;
     height: 100%;
     background: var(--reader-bg);
     box-shadow: 0 2px 20px var(--reader-page-shadow);
@@ -310,9 +310,10 @@
     overflow: hidden;
 }
 
-/* Single page layout (default) */
+/* Single page layout (default) - single page takes full wrapper width */
 .reader-content[data-layout="single"] .reader-pages-wrapper {
-    max-width: 720px;
+    width: 90%;
+    max-width: 900px;
 }
 
 .reader-content[data-layout="single"] .reader-page-right {
@@ -321,15 +322,17 @@
 
 .reader-content[data-layout="single"] .reader-page-left {
     border-radius: 2px;
+    width: 100%;
 }
 
-/* Two page layout */
+/* Two page layout - both pages share the wrapper width */
 .reader-content[data-layout="double"] .reader-pages-wrapper {
-    max-width: 1200px;
+    width: 90%;
+    max-width: 1400px;
 }
 
 .reader-content[data-layout="double"] .reader-page {
-    max-width: 600px;
+    width: 50%;
 }
 
 .reader-content[data-layout="double"] .reader-page-left {
@@ -350,7 +353,8 @@
     }
     
     .reader-content[data-layout="double"] .reader-pages-wrapper {
-        max-width: 720px;
+        width: 90%;
+        max-width: 900px;
     }
     
     .reader-content[data-layout="double"] .reader-page-right {
@@ -358,6 +362,7 @@
     }
     
     .reader-content[data-layout="double"] .reader-page-left {
+        width: 100%;
         border-radius: 2px;
         box-shadow: 0 2px 20px var(--reader-page-shadow);
     }
