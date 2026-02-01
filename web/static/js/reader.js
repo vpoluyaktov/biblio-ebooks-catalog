@@ -1,4 +1,4 @@
-// Ebook Reader Module
+// Standalone Ebook Reader with Pagination
 
 // Reading History Manager - tracks last 10 books with reading position
 class ReadingHistory {
@@ -7,7 +7,6 @@ class ReadingHistory {
         this.storageKey = 'readingHistory';
     }
 
-    // Get all history entries
     getAll() {
         try {
             const data = localStorage.getItem(this.storageKey);
@@ -18,16 +17,15 @@ class ReadingHistory {
         }
     }
 
-    // Save history to localStorage
     save(history) {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(history));
+            console.log('[ReadingHistory] Saved to localStorage:', history.length, 'entries');
         } catch (e) {
             console.error('Failed to save reading history:', e);
         }
     }
 
-    // Add or update a book in history (moves to top)
     addOrUpdate(entry) {
         const history = this.getAll();
         const bookId = parseInt(entry.bookId, 10);
@@ -35,239 +33,138 @@ class ReadingHistory {
         
         console.log('[ReadingHistory] addOrUpdate called for bookId:', bookId);
         
-        // Remove existing entry for this book if present
         const existingIndex = history.findIndex(h => parseInt(h.bookId, 10) === bookId);
         if (existingIndex !== -1) {
-            console.log('[ReadingHistory] Removing existing entry at index:', existingIndex);
             history.splice(existingIndex, 1);
         }
         
-        // Add new entry at the beginning
         const newEntry = {
             bookId: bookId,
             libraryId: libraryId,
             title: entry.title,
             author: entry.author,
             chapterIndex: entry.chapterIndex || 0,
-            scrollPosition: entry.scrollPosition || 0,
+            pageIndex: entry.pageIndex || 0,
             totalChapters: entry.totalChapters || 1,
             lastRead: new Date().toISOString()
         };
         history.unshift(newEntry);
         console.log('[ReadingHistory] Added entry:', newEntry);
         
-        // Keep only maxEntries
         while (history.length > this.maxEntries) {
             history.pop();
         }
         
         this.save(history);
-        console.log('[ReadingHistory] Saved history, total entries:', history.length);
     }
 
-    // Update position for a book (without moving to top)
-    updatePosition(bookId, chapterIndex, scrollPosition) {
+    updatePosition(bookId, chapterIndex, pageIndex) {
         const history = this.getAll();
         const numBookId = parseInt(bookId, 10);
         const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
         if (entry) {
             entry.chapterIndex = chapterIndex;
-            entry.scrollPosition = scrollPosition;
+            entry.pageIndex = pageIndex;
             entry.lastRead = new Date().toISOString();
             this.save(history);
-            console.log('[ReadingHistory] Updated position for bookId:', numBookId, 'chapter:', chapterIndex, 'scroll:', scrollPosition.toFixed(3));
-        } else {
-            console.warn('[ReadingHistory] updatePosition: No entry found for bookId:', numBookId);
+            console.log('[ReadingHistory] Updated position for bookId:', numBookId, 'chapter:', chapterIndex, 'page:', pageIndex);
         }
     }
 
-    // Get saved position for a book
     getPosition(bookId) {
         const history = this.getAll();
         const numBookId = parseInt(bookId, 10);
         const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
         if (entry) {
-            console.log('[ReadingHistory] Found saved position for bookId:', numBookId, 'chapter:', entry.chapterIndex);
+            console.log('[ReadingHistory] Found saved position for bookId:', numBookId);
         }
         return entry ? {
             chapterIndex: entry.chapterIndex || 0,
-            scrollPosition: entry.scrollPosition || 0
+            pageIndex: entry.pageIndex || 0
         } : null;
-    }
-
-    // Format relative time (e.g., "2 hours ago")
-    formatRelativeTime(isoString) {
-        const date = new Date(isoString);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins} min ago`;
-        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-        return date.toLocaleDateString();
     }
 }
 
 // Global reading history instance
 const readingHistory = new ReadingHistory();
 
-class EbookReader {
+class StandaloneReader {
     constructor() {
         this.currentBook = null;
-        this.currentBookId = null;
-        this.currentLibraryId = null;
         this.currentChapterIndex = 0;
+        this.currentPage = 0;
+        this.totalPages = 1;
+        this.pages = [];
         this.settings = this.loadSettings();
-        this.overlay = null;
-        this.scrollSaveTimeout = null;
+        this.bookId = this.getBookIdFromURL();
+        this.resizeTimeout = null;
+        this.layout = this.settings.layout || 'single'; // 'single' or 'double'
         this.init();
     }
 
-    init() {
-        this.createReaderOverlay();
-        this.applySettings();
-        this.attachEventListeners();
+    getBookIdFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id');
     }
 
-    createReaderOverlay() {
-        const overlay = document.createElement('div');
-        overlay.className = 'reader-overlay';
-        const appTheme = localStorage.getItem('theme') || 'dark';
-        overlay.setAttribute('data-reader-theme', appTheme);
+    init() {
+        this.applySettings();
+        this.attachEventListeners();
         
-        overlay.innerHTML = `
-            <div class="reader-toolbar">
-                <div class="reader-toolbar-left">
-                    <button class="reader-btn" id="reader-close">
-                        <span class="reader-btn-icon">✕</span>
-                        Close
-                    </button>
-                </div>
-                <div class="reader-toolbar-center">
-                    <div class="reader-title" id="reader-book-title"></div>
-                    <div class="reader-author" id="reader-book-author"></div>
-                </div>
-                <div class="reader-toolbar-right">
-                    <div class="reader-settings">
-                        <div class="reader-setting-group">
-                            <span class="reader-setting-label">Font:</span>
-                            <select class="reader-select" id="reader-font-family">
-                                <option value="serif">Serif</option>
-                                <option value="sans-serif">Sans-serif</option>
-                                <option value="monospace">Monospace</option>
-                            </select>
-                        </div>
-                        <div class="reader-setting-group">
-                            <button class="reader-icon-btn" id="reader-font-decrease" title="Decrease font size">A-</button>
-                            <button class="reader-icon-btn" id="reader-font-increase" title="Increase font size">A+</button>
-                        </div>
-                        <div class="reader-setting-group">
-                            <span class="reader-setting-label">Line Height:</span>
-                            <select class="reader-select" id="reader-line-height">
-                                <option value="1.4">Compact</option>
-                                <option value="1.6">Normal</option>
-                                <option value="1.8">Relaxed</option>
-                                <option value="2.0">Loose</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="reader-chapters-dropdown">
-                        <button class="reader-btn" id="reader-chapters-btn">
-                            <span class="reader-btn-icon">☰</span>
-                            Chapters
-                        </button>
-                        <div class="reader-chapters-menu" id="reader-chapters-menu"></div>
-                    </div>
-                    <button class="reader-mobile-settings-btn" id="reader-mobile-settings-btn" title="Settings">⚙</button>
-                </div>
-            </div>
-            <div class="reader-content" id="reader-content">
-                <div class="reader-loading">
-                    <div class="reader-loading-spinner"></div>
-                    <div>Loading book...</div>
-                </div>
-            </div>
-            <div class="reader-footer">
-                <div class="reader-progress" id="reader-progress"></div>
-                <div class="reader-navigation">
-                    <button class="reader-btn" id="reader-prev-chapter" disabled>
-                        <span class="reader-btn-icon">←</span>
-                        Previous
-                    </button>
-                    <button class="reader-btn" id="reader-next-chapter" disabled>
-                        Next
-                        <span class="reader-btn-icon">→</span>
-                    </button>
-                </div>
-            </div>
-            <div class="reader-mobile-settings" id="reader-mobile-settings">
-                <div class="reader-mobile-settings-header">
-                    <span class="reader-mobile-settings-title">Settings</span>
-                    <button class="reader-mobile-settings-close" id="reader-mobile-settings-close">✕</button>
-                </div>
-                <div class="reader-mobile-setting-row">
-                    <span class="reader-mobile-setting-label">Chapter</span>
-                    <select class="reader-mobile-select" id="reader-mobile-chapter"></select>
-                </div>
-                <div class="reader-mobile-setting-row">
-                    <span class="reader-mobile-setting-label">Font</span>
-                    <select class="reader-mobile-select" id="reader-mobile-font-family">
-                        <option value="serif">Serif</option>
-                        <option value="sans-serif">Sans-serif</option>
-                        <option value="monospace">Monospace</option>
-                    </select>
-                </div>
-                <div class="reader-mobile-setting-row">
-                    <span class="reader-mobile-setting-label">Font Size</span>
-                    <div class="reader-mobile-setting-control">
-                        <button class="reader-icon-btn" id="reader-mobile-font-decrease">A-</button>
-                        <button class="reader-icon-btn" id="reader-mobile-font-increase">A+</button>
-                    </div>
-                </div>
-                <div class="reader-mobile-setting-row">
-                    <span class="reader-mobile-setting-label">Line Height</span>
-                    <select class="reader-mobile-select" id="reader-mobile-line-height">
-                        <option value="1.4">Compact</option>
-                        <option value="1.6">Normal</option>
-                        <option value="1.8">Relaxed</option>
-                        <option value="2.0">Loose</option>
-                    </select>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-        this.overlay = overlay;
+        if (this.bookId) {
+            this.loadBook(this.bookId);
+        } else {
+            this.showError('No book ID provided');
+        }
     }
 
     attachEventListeners() {
-        // Close button
-        document.getElementById('reader-close').addEventListener('click', () => this.close());
+        // Close button - close the tab
+        document.getElementById('reader-close').addEventListener('click', () => {
+            window.close();
+        });
 
-        // Navigation buttons
+        // Chapter navigation buttons
         document.getElementById('reader-prev-chapter').addEventListener('click', () => this.previousChapter());
         document.getElementById('reader-next-chapter').addEventListener('click', () => this.nextChapter());
+
+        // Page navigation buttons
+        document.getElementById('reader-page-prev').addEventListener('click', () => this.previousPage());
+        document.getElementById('reader-page-next').addEventListener('click', () => this.nextPage());
+
+        // Click zones for page navigation
+        document.getElementById('reader-nav-prev').addEventListener('click', () => this.previousPage());
+        document.getElementById('reader-nav-next').addEventListener('click', () => this.nextPage());
 
         // Font controls
         document.getElementById('reader-font-family').addEventListener('change', (e) => {
             this.settings.fontFamily = e.target.value;
             this.saveSettings();
             this.applySettings();
+            this.displayChapter();
         });
 
         document.getElementById('reader-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
         document.getElementById('reader-font-increase').addEventListener('click', () => this.changeFontSize(1));
 
+        // Theme control - uses shared localStorage 'theme' key
+        document.getElementById('reader-theme').addEventListener('change', (e) => {
+            localStorage.setItem('theme', e.target.value);
+            this.applySettings();
+            this.displayChapter();
+        });
 
         // Line height control
         document.getElementById('reader-line-height').addEventListener('change', (e) => {
             this.settings.lineHeight = e.target.value;
             this.saveSettings();
             this.applySettings();
+            this.displayChapter();
+        });
+
+        // Layout toggle (1 page / 2 pages)
+        document.getElementById('reader-layout-toggle').addEventListener('click', () => {
+            this.toggleLayout();
         });
 
         // Chapters dropdown
@@ -287,102 +184,146 @@ class EbookReader {
         });
 
         // Mobile settings panel
-        document.getElementById('reader-mobile-settings-btn').addEventListener('click', () => {
-            this.openMobileSettings();
-        });
+        const mobileSettingsBtn = document.getElementById('reader-mobile-settings-btn');
+        if (mobileSettingsBtn) {
+            mobileSettingsBtn.addEventListener('click', () => this.openMobileSettings());
+        }
 
-        document.getElementById('reader-mobile-settings-close').addEventListener('click', () => {
-            this.closeMobileSettings();
-        });
+        const mobileSettingsClose = document.getElementById('reader-mobile-settings-close');
+        if (mobileSettingsClose) {
+            mobileSettingsClose.addEventListener('click', () => this.closeMobileSettings());
+        }
 
         // Mobile chapter selector
-        document.getElementById('reader-mobile-chapter').addEventListener('change', (e) => {
-            this.currentChapterIndex = parseInt(e.target.value);
-            this.displayChapter();
-            this.closeMobileSettings();
-        });
+        const mobileChapter = document.getElementById('reader-mobile-chapter');
+        if (mobileChapter) {
+            mobileChapter.addEventListener('change', (e) => {
+                this.currentChapterIndex = parseInt(e.target.value);
+                this.currentPage = 0;
+                this.displayChapter();
+                this.closeMobileSettings();
+            });
+        }
 
         // Mobile font family
-        document.getElementById('reader-mobile-font-family').addEventListener('change', (e) => {
-            this.settings.fontFamily = e.target.value;
-            this.saveSettings();
-            this.applySettings();
-        });
+        const mobileFontFamily = document.getElementById('reader-mobile-font-family');
+        if (mobileFontFamily) {
+            mobileFontFamily.addEventListener('change', (e) => {
+                this.settings.fontFamily = e.target.value;
+                this.saveSettings();
+                this.applySettings();
+                this.displayChapter();
+            });
+        }
 
         // Mobile font size
-        document.getElementById('reader-mobile-font-decrease').addEventListener('click', () => this.changeFontSize(-1));
-        document.getElementById('reader-mobile-font-increase').addEventListener('click', () => this.changeFontSize(1));
+        const mobileFontDecrease = document.getElementById('reader-mobile-font-decrease');
+        if (mobileFontDecrease) {
+            mobileFontDecrease.addEventListener('click', () => this.changeFontSize(-1));
+        }
+
+        const mobileFontIncrease = document.getElementById('reader-mobile-font-increase');
+        if (mobileFontIncrease) {
+            mobileFontIncrease.addEventListener('click', () => this.changeFontSize(1));
+        }
 
         // Mobile line height
-        document.getElementById('reader-mobile-line-height').addEventListener('change', (e) => {
-            this.settings.lineHeight = e.target.value;
-            this.saveSettings();
-            this.applySettings();
-        });
+        const mobileLineHeight = document.getElementById('reader-mobile-line-height');
+        if (mobileLineHeight) {
+            mobileLineHeight.addEventListener('change', (e) => {
+                this.settings.lineHeight = e.target.value;
+                this.saveSettings();
+                this.applySettings();
+                this.displayChapter();
+            });
+        }
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (!this.overlay.classList.contains('active')) return;
-
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+            
             switch(e.key) {
                 case 'Escape':
-                    this.close();
+                    window.close();
                     break;
                 case 'ArrowLeft':
-                    this.previousChapter();
+                    e.preventDefault();
+                    this.previousPage();
                     break;
                 case 'ArrowRight':
+                    e.preventDefault();
+                    this.nextPage();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.previousChapter();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
                     this.nextChapter();
+                    break;
+                case 'Home':
+                    e.preventDefault();
+                    this.goToPage(0);
+                    break;
+                case 'End':
+                    e.preventDefault();
+                    this.goToPage(this.totalPages - 1);
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    if (e.shiftKey) this.previousPage();
+                    else this.nextPage();
                     break;
             }
         });
 
         // Touch gestures for mobile
         let touchStartX = 0;
-        let touchEndX = 0;
+        let touchStartY = 0;
 
-        this.overlay.addEventListener('touchstart', (e) => {
+        const mainArea = document.getElementById('reader-main');
+        mainArea.addEventListener('touchstart', (e) => {
             touchStartX = e.changedTouches[0].screenX;
-        });
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
 
-        this.overlay.addEventListener('touchend', (e) => {
-            touchEndX = e.changedTouches[0].screenX;
-            this.handleSwipe();
-        });
-
-        const handleSwipe = () => {
+        mainArea.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const touchEndY = e.changedTouches[0].screenY;
+            const diffX = touchStartX - touchEndX;
+            const diffY = touchStartY - touchEndY;
             const swipeThreshold = 50;
-            const diff = touchStartX - touchEndX;
 
-            if (Math.abs(diff) > swipeThreshold) {
-                if (diff > 0) {
-                    // Swipe left - next chapter
-                    this.nextChapter();
+            // Only handle horizontal swipes (ignore vertical scrolling attempts)
+            if (Math.abs(diffX) > swipeThreshold && Math.abs(diffX) > Math.abs(diffY)) {
+                if (diffX > 0) {
+                    this.nextPage();
                 } else {
-                    // Swipe right - previous chapter
-                    this.previousChapter();
+                    this.previousPage();
                 }
             }
-        };
+        }, { passive: true });
 
-        this.handleSwipe = handleSwipe;
+        // Handle window resize - repaginate
+        window.addEventListener('resize', () => {
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(() => {
+                this.repaginate();
+            }, 250);
+        });
     }
 
-    async openBook(bookId, libraryId = null) {
+    async loadBook(bookId) {
         try {
-            this.overlay.classList.add('active');
             this.showLoading();
 
-            // Store book ID and library ID (ensure they are numbers)
-            this.currentBookId = parseInt(bookId, 10);
-            this.currentLibraryId = libraryId ? parseInt(libraryId, 10) : (typeof App !== 'undefined' ? App.currentLibrary : null);
-            
-            console.log('[EbookReader] Opening book:', this.currentBookId, 'library:', this.currentLibraryId);
-
-            // Fetch book content from API
-            const response = await fetch(`${APP_BASE_PATH}/api/books/${bookId}/content`);
+            const basePath = window.APP_BASE_PATH || '';
+            const response = await fetch(`${basePath}/api/books/${bookId}/content`);
             if (!response.ok) {
-                throw new Error('Failed to load book content');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to load book content');
             }
 
             this.currentBook = await response.json();
@@ -391,79 +332,39 @@ class EbookReader {
             const savedPosition = readingHistory.getPosition(bookId);
             if (savedPosition) {
                 this.currentChapterIndex = savedPosition.chapterIndex;
+                this.currentPage = savedPosition.pageIndex;
+                console.log('[StandaloneReader] Restoring position - chapter:', this.currentChapterIndex, 'page:', this.currentPage);
             } else {
                 this.currentChapterIndex = 0;
+                this.currentPage = 0;
             }
 
-            // Update UI
+            // Update page title and UI
+            document.title = this.currentBook.title || 'Ebook Reader';
             document.getElementById('reader-book-title').textContent = this.currentBook.title || 'Unknown Title';
-            document.getElementById('reader-book-author').textContent = this.currentBook.author || 'Unknown Author';
+            document.getElementById('reader-book-author').textContent = this.currentBook.author || '';
 
             // Build chapters menu
             this.buildChaptersMenu();
 
-            // Display chapter (will restore scroll position after render)
-            this.displayChapter(savedPosition?.scrollPosition);
+            // Display chapter (will restore page position after pagination)
+            this.displayChapter();
 
             // Add to reading history
             readingHistory.addOrUpdate({
-                bookId: this.currentBookId,
-                libraryId: this.currentLibraryId,
+                bookId: parseInt(bookId, 10),
+                libraryId: null,
                 title: this.currentBook.title || 'Unknown Title',
                 author: this.currentBook.author || 'Unknown Author',
                 chapterIndex: this.currentChapterIndex,
-                scrollPosition: savedPosition?.scrollPosition || 0,
+                pageIndex: this.currentPage,
                 totalChapters: this.currentBook.chapters.length
             });
 
-            // Setup scroll tracking
-            this.setupScrollTracking();
-
         } catch (error) {
-            console.error('Error opening book:', error);
-            alert('Failed to open book: ' + error.message);
-            this.close();
+            console.error('Error loading book:', error);
+            this.showError(error.message);
         }
-    }
-
-    setupScrollTracking() {
-        const content = document.getElementById('reader-content');
-        if (!content) return;
-
-        // Remove existing listener if any
-        if (this.scrollHandler) {
-            content.removeEventListener('scroll', this.scrollHandler);
-        }
-
-        // Create scroll handler with debounce
-        this.scrollHandler = () => {
-            if (this.scrollSaveTimeout) {
-                clearTimeout(this.scrollSaveTimeout);
-            }
-            this.scrollSaveTimeout = setTimeout(() => {
-                this.saveCurrentPosition();
-            }, 500); // Save after 500ms of no scrolling
-        };
-
-        content.addEventListener('scroll', this.scrollHandler);
-    }
-
-    saveCurrentPosition() {
-        if (!this.currentBookId || !this.currentBook) return;
-
-        const content = document.getElementById('reader-content');
-        if (!content) return;
-
-        // Calculate scroll position as percentage (0-1)
-        const scrollPosition = content.scrollHeight > content.clientHeight
-            ? content.scrollTop / (content.scrollHeight - content.clientHeight)
-            : 0;
-
-        readingHistory.updatePosition(
-            this.currentBookId,
-            this.currentChapterIndex,
-            scrollPosition
-        );
     }
 
     buildChaptersMenu() {
@@ -479,11 +380,12 @@ class EbookReader {
 
             item.innerHTML = `
                 <span class="reader-chapter-number">${index + 1}.</span>
-                ${chapter.title}
+                ${this.escapeHtml(chapter.title || 'Untitled')}
             `;
 
             item.addEventListener('click', () => {
                 this.currentChapterIndex = index;
+                this.currentPage = 0;
                 this.displayChapter();
                 menu.classList.remove('active');
             });
@@ -492,53 +394,287 @@ class EbookReader {
         });
     }
 
-    displayChapter(scrollPosition = null) {
+    displayChapter() {
         if (!this.currentBook || !this.currentBook.chapters[this.currentChapterIndex]) {
             return;
         }
 
         const chapter = this.currentBook.chapters[this.currentChapterIndex];
-        const content = document.getElementById('reader-content');
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
 
-        // Create chapter container
-        const chapterDiv = document.createElement('div');
-        chapterDiv.className = 'reader-chapter';
-        chapterDiv.setAttribute('data-font-size', this.settings.fontSize);
-        chapterDiv.setAttribute('data-font-family', this.settings.fontFamily);
-        chapterDiv.style.lineHeight = this.settings.lineHeight;
+        // Apply settings to both pages
+        [pageContentLeft, pageContentRight].forEach(pageContent => {
+            if (pageContent) {
+                pageContent.setAttribute('data-font-size', this.settings.fontSize);
+                pageContent.setAttribute('data-font-family', this.settings.fontFamily);
+                pageContent.style.lineHeight = this.settings.lineHeight;
+            }
+        });
 
-        // Set chapter content
-        chapterDiv.innerHTML = chapter.content;
+        // Set chapter content to left page (will be paginated)
+        pageContentLeft.innerHTML = chapter.content;
 
-        // Replace content
-        content.innerHTML = '';
-        content.appendChild(chapterDiv);
+        // Paginate the content
+        this.paginateContent();
 
-        // Restore scroll position or scroll to top
-        if (scrollPosition !== null && scrollPosition > 0) {
-            // Use requestAnimationFrame to ensure content is rendered
-            requestAnimationFrame(() => {
-                const maxScroll = content.scrollHeight - content.clientHeight;
-                content.scrollTop = scrollPosition * maxScroll;
-            });
-        } else {
-            content.scrollTop = 0;
-        }
-
-        // Update navigation buttons
-        this.updateNavigation();
-
-        // Update progress
-        this.updateProgress();
-
-        // Update chapters menu active state
+        // Update navigation
+        this.updateChapterNavigation();
         this.updateChaptersMenuActive();
-
-        // Save position after chapter change
-        this.saveCurrentPosition();
     }
 
-    updateNavigation() {
+    paginateContent() {
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const containerLeft = document.getElementById('reader-page-left');
+        
+        // Get actual dimensions from the rendered page element
+        // The CSS now controls the page width (90% of screen)
+        const containerHeight = containerLeft.clientHeight;
+        const containerWidth = containerLeft.clientWidth;
+        
+        // Get padding from computed styles
+        const styles = getComputedStyle(pageContentLeft);
+        const paddingTop = parseInt(styles.paddingTop) || 48;
+        const paddingBottom = parseInt(styles.paddingBottom) || 48;
+        const paddingLeft = parseInt(styles.paddingLeft) || 56;
+        const paddingRight = parseInt(styles.paddingRight) || 56;
+        
+        const availableHeight = Math.max(400, containerHeight - paddingTop - paddingBottom);
+        const availableWidth = Math.max(200, containerWidth - paddingLeft - paddingRight);
+
+        // Store original content
+        const originalContent = pageContentLeft.innerHTML;
+        
+        // Create a temporary container with CSS columns to measure total width needed
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = originalContent;
+        tempDiv.style.cssText = `
+            position: absolute;
+            visibility: hidden;
+            height: ${availableHeight}px;
+            width: ${availableWidth}px;
+            column-width: ${availableWidth}px;
+            column-gap: 0;
+            column-fill: auto;
+            font-size: ${styles.fontSize};
+            font-family: ${styles.fontFamily};
+            line-height: ${styles.lineHeight};
+        `;
+        document.body.appendChild(tempDiv);
+
+        // Calculate number of pages based on scroll width
+        const totalWidth = tempDiv.scrollWidth;
+        this.totalPages = Math.max(1, Math.ceil(totalWidth / availableWidth));
+
+        // Store the content and column settings for display
+        this.chapterContent = originalContent;
+        this.columnWidth = availableWidth;
+        this.columnHeight = availableHeight;
+
+        // Cleanup
+        document.body.removeChild(tempDiv);
+        
+        // Ensure current page is valid
+        if (this.currentPage >= this.totalPages) {
+            this.currentPage = this.totalPages - 1;
+        }
+        if (this.currentPage < 0) {
+            this.currentPage = 0;
+        }
+
+        // Display current page
+        this.showCurrentPage();
+    }
+
+    showCurrentPage() {
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        
+        if (!this.chapterContent) return;
+
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        
+        // In double layout, we show 2 pages at a time (left and right)
+        // currentPage represents the left page index
+        const leftPageIndex = isDoubleLayout ? this.currentPage * 2 : this.currentPage;
+        const rightPageIndex = leftPageIndex + 1;
+
+        // Use CSS columns with transform to show the correct "page"
+        const leftOffset = leftPageIndex * this.columnWidth;
+        const rightOffset = rightPageIndex * this.columnWidth;
+        
+        // Render left page - wrapper width must match columnWidth to show only 1 column
+        pageContentLeft.innerHTML = `
+            <div class="reader-columns-wrapper" style="
+                width: ${this.columnWidth}px;
+                height: ${this.columnHeight}px;
+                overflow: hidden;
+            ">
+                <div class="reader-columns-content" style="
+                    column-width: ${this.columnWidth}px;
+                    column-gap: 0;
+                    column-fill: auto;
+                    height: ${this.columnHeight}px;
+                    transform: translateX(-${leftOffset}px);
+                ">
+                    ${this.chapterContent}
+                </div>
+            </div>
+        `;
+
+        // Render right page (in double layout)
+        if (isDoubleLayout) {
+            if (rightPageIndex < this.totalPages) {
+                // Right page has content
+                pageContentRight.innerHTML = `
+                    <div class="reader-columns-wrapper" style="
+                        width: ${this.columnWidth}px;
+                        height: ${this.columnHeight}px;
+                        overflow: hidden;
+                    ">
+                        <div class="reader-columns-content" style="
+                            column-width: ${this.columnWidth}px;
+                            column-gap: 0;
+                            column-fill: auto;
+                            height: ${this.columnHeight}px;
+                            transform: translateX(-${rightOffset}px);
+                        ">
+                            ${this.chapterContent}
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Right page is empty but should maintain dimensions
+                pageContentRight.innerHTML = `
+                    <div class="reader-columns-wrapper" style="
+                        width: ${this.columnWidth}px;
+                        height: ${this.columnHeight}px;
+                    "></div>
+                `;
+            }
+        } else {
+            pageContentRight.innerHTML = '';
+        }
+
+        this.updatePageNavigation();
+        
+        // Save position to reading history
+        if (this.bookId) {
+            readingHistory.updatePosition(this.bookId, this.currentChapterIndex, this.currentPage);
+        }
+    }
+
+    repaginate() {
+        if (!this.currentBook) return;
+        this.paginateContent();
+    }
+
+    goToPage(pageIndex) {
+        if (pageIndex >= 0 && pageIndex < this.totalPages) {
+            this.currentPage = pageIndex;
+            this.showCurrentPage();
+        }
+    }
+
+    previousPage() {
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        
+        if (this.currentPage > 0) {
+            this.currentPage--;
+            this.showCurrentPage();
+        } else if (this.currentChapterIndex > 0) {
+            // Go to previous chapter, last page/spread
+            this.currentChapterIndex--;
+            this.currentPage = Infinity; // Will be clamped in paginateContent
+            this.displayChapter();
+            // Set to last spread in double layout
+            if (isDoubleLayout) {
+                this.currentPage = Math.ceil(this.totalPages / 2) - 1;
+            } else {
+                this.currentPage = this.totalPages - 1;
+            }
+            this.showCurrentPage();
+        }
+    }
+
+    nextPage() {
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        const maxPage = isDoubleLayout ? Math.ceil(this.totalPages / 2) - 1 : this.totalPages - 1;
+        
+        if (this.currentPage < maxPage) {
+            this.currentPage++;
+            this.showCurrentPage();
+        } else if (this.currentChapterIndex < this.currentBook.chapters.length - 1) {
+            // Go to next chapter, first page
+            this.currentChapterIndex++;
+            this.currentPage = 0;
+            this.displayChapter();
+        }
+    }
+
+    previousChapter() {
+        if (this.currentChapterIndex > 0) {
+            this.currentChapterIndex--;
+            this.currentPage = 0;
+            this.displayChapter();
+        }
+    }
+
+    nextChapter() {
+        if (this.currentChapterIndex < this.currentBook.chapters.length - 1) {
+            this.currentChapterIndex++;
+            this.currentPage = 0;
+            this.displayChapter();
+        }
+    }
+
+    updatePageNavigation() {
+        const prevBtn = document.getElementById('reader-page-prev');
+        const nextBtn = document.getElementById('reader-page-next');
+        const indicator = document.getElementById('reader-page-indicator');
+        const chapterInfo = document.getElementById('reader-chapter-info');
+        const prevZone = document.getElementById('reader-nav-prev');
+        const nextZone = document.getElementById('reader-nav-next');
+
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        
+        // Calculate effective page numbers for display
+        let displayPage, displayTotal;
+        if (isDoubleLayout) {
+            // In double layout, currentPage is the spread index (0, 1, 2...)
+            // Each spread shows 2 pages
+            displayPage = this.currentPage * 2 + 1; // Show left page number
+            displayTotal = this.totalPages;
+            const maxSpread = Math.ceil(this.totalPages / 2) - 1;
+            var isLastSpread = this.currentPage >= maxSpread;
+        } else {
+            displayPage = this.currentPage + 1;
+            displayTotal = this.totalPages;
+            var isLastSpread = this.currentPage === this.totalPages - 1;
+        }
+
+        const isFirstPage = this.currentPage === 0 && this.currentChapterIndex === 0;
+        const isLastPage = isLastSpread && this.currentChapterIndex === this.currentBook.chapters.length - 1;
+
+        prevBtn.disabled = isFirstPage;
+        nextBtn.disabled = isLastPage;
+
+        prevZone.classList.toggle('disabled', isFirstPage);
+        nextZone.classList.toggle('disabled', isLastPage);
+
+        if (isDoubleLayout) {
+            const rightPage = Math.min(displayPage + 1, displayTotal);
+            indicator.textContent = `Pages ${displayPage}-${rightPage} of ${displayTotal}`;
+        } else {
+            indicator.textContent = `Page ${displayPage} of ${displayTotal}`;
+        }
+
+        // Update chapter info (just the title, no "Chapter X:" prefix)
+        const chapter = this.currentBook.chapters[this.currentChapterIndex];
+        chapterInfo.textContent = chapter.title || 'Untitled';
+    }
+
+    updateChapterNavigation() {
         const prevBtn = document.getElementById('reader-prev-chapter');
         const nextBtn = document.getElementById('reader-next-chapter');
 
@@ -546,36 +682,11 @@ class EbookReader {
         nextBtn.disabled = this.currentChapterIndex === this.currentBook.chapters.length - 1;
     }
 
-    updateProgress() {
-        const progress = document.getElementById('reader-progress');
-        const current = this.currentChapterIndex + 1;
-        const total = this.currentBook.chapters.length;
-        progress.textContent = `Chapter ${current} of ${total}`;
-    }
-
     updateChaptersMenuActive() {
         const items = document.querySelectorAll('.reader-chapter-item');
         items.forEach((item, index) => {
-            if (index === this.currentChapterIndex) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
+            item.classList.toggle('active', index === this.currentChapterIndex);
         });
-    }
-
-    previousChapter() {
-        if (this.currentChapterIndex > 0) {
-            this.currentChapterIndex--;
-            this.displayChapter(0); // Start at top of new chapter
-        }
-    }
-
-    nextChapter() {
-        if (this.currentChapterIndex < this.currentBook.chapters.length - 1) {
-            this.currentChapterIndex++;
-            this.displayChapter(0); // Start at top of new chapter
-        }
     }
 
     changeFontSize(delta) {
@@ -586,89 +697,145 @@ class EbookReader {
         this.settings.fontSize = sizes[newIndex];
         this.saveSettings();
         this.applySettings();
-
-        // Update current chapter display
-        const chapterDiv = document.querySelector('.reader-chapter');
-        if (chapterDiv) {
-            chapterDiv.setAttribute('data-font-size', this.settings.fontSize);
-        }
+        this.displayChapter();
     }
 
     applySettings() {
-        // Apply theme from app's global theme setting
-        const appTheme = localStorage.getItem('theme') || 'dark';
-        this.overlay.setAttribute('data-reader-theme', appTheme);
+        // Apply theme from shared localStorage 'theme' key
+        const theme = localStorage.getItem('theme') || 'dark';
+        const container = document.getElementById('reader-container');
+        container.setAttribute('data-reader-theme', theme);
+        document.getElementById('reader-theme').value = theme;
 
-        // Apply font family (desktop)
+        // Apply font family
         document.getElementById('reader-font-family').value = this.settings.fontFamily;
 
-        // Apply line height (desktop)
+        // Apply line height
         document.getElementById('reader-line-height').value = this.settings.lineHeight;
 
-        // Apply to mobile controls as well
-        document.getElementById('reader-mobile-font-family').value = this.settings.fontFamily;
-        document.getElementById('reader-mobile-line-height').value = this.settings.lineHeight;
+        // Apply layout
+        const content = document.getElementById('reader-content');
+        content.setAttribute('data-layout', this.layout);
+        this.updateLayoutButton();
 
-        // Font size is applied per chapter
+        // Apply to both page content elements
+        const pageContentLeft = document.getElementById('reader-page-content-left');
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        
+        [pageContentLeft, pageContentRight].forEach(pageContent => {
+            if (pageContent) {
+                pageContent.setAttribute('data-font-size', this.settings.fontSize);
+                pageContent.setAttribute('data-font-family', this.settings.fontFamily);
+                pageContent.style.lineHeight = this.settings.lineHeight;
+            }
+        });
+    }
+
+    toggleLayout() {
+        this.layout = this.layout === 'single' ? 'double' : 'single';
+        this.settings.layout = this.layout;
+        this.saveSettings();
+        
+        // Apply layout change
+        const content = document.getElementById('reader-content');
+        content.setAttribute('data-layout', this.layout);
+        this.updateLayoutButton();
+        
+        // Reset to page 0 and force full chapter re-display after DOM updates
+        this.currentPage = 0;
+        // Use requestAnimationFrame to ensure layout has been applied
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                // Force full re-display of chapter content
+                this.displayChapter();
+            });
+        });
+    }
+
+    updateLayoutButton() {
+        const icon = document.getElementById('reader-layout-icon');
+        const label = document.getElementById('reader-layout-label');
+        
+        if (this.layout === 'double') {
+            icon.textContent = '☐☐';
+            label.textContent = '2 Pages';
+        } else {
+            icon.textContent = '☐';
+            label.textContent = '1 Page';
+        }
     }
 
     openMobileSettings() {
         const panel = document.getElementById('reader-mobile-settings');
-        panel.classList.add('active');
-        
-        // Update chapter selector
-        this.updateMobileChapterSelector();
+        if (panel) {
+            panel.classList.add('active');
+            this.updateMobileChapterSelector();
+            // Sync mobile controls with current settings
+            const mobileFontFamily = document.getElementById('reader-mobile-font-family');
+            const mobileLineHeight = document.getElementById('reader-mobile-line-height');
+            if (mobileFontFamily) mobileFontFamily.value = this.settings.fontFamily;
+            if (mobileLineHeight) mobileLineHeight.value = this.settings.lineHeight;
+        }
     }
 
     closeMobileSettings() {
         const panel = document.getElementById('reader-mobile-settings');
-        panel.classList.remove('active');
+        if (panel) {
+            panel.classList.remove('active');
+        }
     }
 
     updateMobileChapterSelector() {
         const select = document.getElementById('reader-mobile-chapter');
-        if (!this.currentBook || !this.currentBook.chapters) return;
+        if (!select || !this.currentBook || !this.currentBook.chapters) return;
         
         select.innerHTML = this.currentBook.chapters.map((chapter, index) => 
-            `<option value="${index}" ${index === this.currentChapterIndex ? 'selected' : ''}>${index + 1}. ${chapter.title}</option>`
+            `<option value="${index}" ${index === this.currentChapterIndex ? 'selected' : ''}>${index + 1}. ${this.escapeHtml(chapter.title || 'Untitled')}</option>`
         ).join('');
     }
 
     showLoading() {
-        const content = document.getElementById('reader-content');
-        content.innerHTML = `
+        const pageContent = document.getElementById('reader-page-content-left');
+        pageContent.innerHTML = `
             <div class="reader-loading">
                 <div class="reader-loading-spinner"></div>
                 <div>Loading book...</div>
             </div>
         `;
+        // Clear right page
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        if (pageContentRight) pageContentRight.innerHTML = '';
     }
 
-    close() {
-        // Save final position before closing
-        this.saveCurrentPosition();
+    showError(message) {
+        const pageContent = document.getElementById('reader-page-content-left');
+        pageContent.innerHTML = `
+            <div class="reader-loading">
+                <div style="color: #dc3545; font-size: 24px; margin-bottom: 16px;">⚠</div>
+                <div style="font-weight: 600; margin-bottom: 8px;">Failed to load book</div>
+                <div style="font-size: 14px; opacity: 0.8; max-width: 400px; text-align: center;">${this.escapeHtml(message)}</div>
+                <button class="reader-btn" onclick="history.back()" style="margin-top: 24px;">
+                    ← Go Back
+                </button>
+            </div>
+        `;
+        // Clear right page
+        const pageContentRight = document.getElementById('reader-page-content-right');
+        if (pageContentRight) pageContentRight.innerHTML = '';
+    }
 
-        // Clean up scroll handler
-        const content = document.getElementById('reader-content');
-        if (content && this.scrollHandler) {
-            content.removeEventListener('scroll', this.scrollHandler);
-        }
-        if (this.scrollSaveTimeout) {
-            clearTimeout(this.scrollSaveTimeout);
-        }
-
-        this.overlay.classList.remove('active');
-        this.currentBook = null;
-        this.currentBookId = null;
-        this.currentLibraryId = null;
-        this.currentChapterIndex = 0;
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     loadSettings() {
         const defaults = {
             fontSize: 'medium',
             fontFamily: 'serif',
-            lineHeight: '1.6'
+            lineHeight: '1.6',
+            layout: 'single'
         };
 
         try {
@@ -681,7 +848,10 @@ class EbookReader {
 
     saveSettings() {
         try {
-            localStorage.setItem('ebookReaderSettings', JSON.stringify(this.settings));
+            // Save reader-specific settings (theme is stored separately in root 'theme' key)
+            const settingsToSave = { ...this.settings };
+            delete settingsToSave.theme; // Don't save theme here, it's in root localStorage
+            localStorage.setItem('ebookReaderSettings', JSON.stringify(settingsToSave));
         } catch (e) {
             console.error('Failed to save reader settings:', e);
         }
@@ -689,25 +859,10 @@ class EbookReader {
 }
 
 // Initialize reader when DOM is ready
-let ebookReader;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        ebookReader = new EbookReader();
+        new StandaloneReader();
     });
 } else {
-    ebookReader = new EbookReader();
+    new StandaloneReader();
 }
-
-// Export for use in other modules
-window.openEbookReader = function(bookId, libraryId) {
-    if (ebookReader) {
-        ebookReader.openBook(bookId, libraryId);
-    }
-};
-
-// Export reading history for use in app.js
-window.getReadingHistory = function() {
-    return readingHistory.getAll();
-};
-
-window.readingHistory = readingHistory;

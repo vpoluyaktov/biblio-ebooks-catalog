@@ -1,5 +1,34 @@
 // EBooks Catalog Web UI
 
+// Reading History Helper - for accessing history from main app
+const ReadingHistoryHelper = {
+  storageKey: 'readingHistory',
+  
+  getAll() {
+    try {
+      const data = localStorage.getItem(this.storageKey);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  
+  formatRelativeTime(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  }
+};
+
 const App = {
   user: null,
   currentLibrary: null,
@@ -641,7 +670,7 @@ const App = {
     const list = document.getElementById('reading-history-list');
     if (!list) return;
 
-    const history = window.getReadingHistory ? window.getReadingHistory() : [];
+    const history = ReadingHistoryHelper.getAll();
     
     if (history.length === 0) {
       list.innerHTML = '<div class="reading-history-empty">No reading history yet</div>';
@@ -650,7 +679,7 @@ const App = {
 
     list.innerHTML = history.map(entry => {
       const progress = `Ch ${entry.chapterIndex + 1}/${entry.totalChapters}`;
-      const timeAgo = window.readingHistory ? window.readingHistory.formatRelativeTime(entry.lastRead) : '';
+      const timeAgo = ReadingHistoryHelper.formatRelativeTime(entry.lastRead);
       
       return `
         <div class="reading-history-item" data-book-id="${entry.bookId}" data-library-id="${entry.libraryId}">
@@ -668,9 +697,9 @@ const App = {
     list.querySelectorAll('.reading-history-item').forEach(item => {
       item.addEventListener('click', () => {
         const bookId = item.dataset.bookId;
-        const libraryId = item.dataset.libraryId;
-        if (bookId && window.openEbookReader) {
-          window.openEbookReader(parseInt(bookId), parseInt(libraryId));
+        if (bookId) {
+          // Open reader in new tab
+          window.open(`${window.APP_BASE_PATH || ''}/reader?id=${bookId}`, '_blank');
           document.getElementById('reading-history-menu')?.classList.remove('active');
         }
       });

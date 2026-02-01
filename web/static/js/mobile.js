@@ -255,7 +255,7 @@ const MobileUI = {
   },
 
   renderReadingHistory() {
-    const history = window.getReadingHistory ? window.getReadingHistory() : [];
+    const history = ReadingHistoryHelper.getAll();
     
     let listContent = '';
     if (history.length === 0) {
@@ -263,7 +263,7 @@ const MobileUI = {
     } else {
       listContent = history.map(entry => {
         const progress = `Chapter ${entry.chapterIndex + 1} of ${entry.totalChapters}`;
-        const timeAgo = window.readingHistory ? window.readingHistory.formatRelativeTime(entry.lastRead) : '';
+        const timeAgo = ReadingHistoryHelper.formatRelativeTime(entry.lastRead);
         return `
           <div class="mobile-list-item mobile-reading-history-item" data-book-id="${entry.bookId}" data-library-id="${entry.libraryId}">
             <div class="mobile-list-item-text">
@@ -767,9 +767,9 @@ const MobileUI = {
       historyList.querySelectorAll('.mobile-reading-history-item').forEach(item => {
         item.addEventListener('click', () => {
           const bookId = item.dataset.bookId;
-          const libraryId = item.dataset.libraryId;
-          if (bookId && window.openEbookReader) {
-            window.openEbookReader(parseInt(bookId), parseInt(libraryId));
+          if (bookId) {
+            // Open reader in new tab
+            window.open(`${window.APP_BASE_PATH || ''}/reader?id=${bookId}`, '_blank');
           }
         });
       });
