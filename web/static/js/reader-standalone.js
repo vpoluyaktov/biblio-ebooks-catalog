@@ -271,14 +271,19 @@ class StandaloneReader {
         const pageContentLeft = document.getElementById('reader-page-content-left');
         const containerLeft = document.getElementById('reader-page-left');
         
-        // Get available dimensions from left page
+        // Use FIXED page dimensions for consistency
+        // Single page: max-width 720px, padding 56px each side = 608px content
+        // Double page: max-width 600px each, padding 56px each side = 488px content
+        const SINGLE_PAGE_WIDTH = 608;
+        const DOUBLE_PAGE_WIDTH = 488;
+        const PADDING_VERTICAL = 96; // 48px top + 48px bottom
+        
+        const isDoubleLayout = this.layout === 'double' && window.innerWidth > 1000;
+        const fixedColumnWidth = isDoubleLayout ? DOUBLE_PAGE_WIDTH : SINGLE_PAGE_WIDTH;
+        
+        // Get height from container (this is more stable)
         const containerHeight = containerLeft.clientHeight;
-        const paddingTop = parseInt(getComputedStyle(pageContentLeft).paddingTop) || 48;
-        const paddingBottom = parseInt(getComputedStyle(pageContentLeft).paddingBottom) || 48;
-        const paddingLeft = parseInt(getComputedStyle(pageContentLeft).paddingLeft) || 56;
-        const paddingRight = parseInt(getComputedStyle(pageContentLeft).paddingRight) || 56;
-        const availableHeight = containerHeight - paddingTop - paddingBottom;
-        const availableWidth = pageContentLeft.clientWidth - paddingLeft - paddingRight;
+        const availableHeight = Math.max(400, containerHeight - PADDING_VERTICAL);
 
         // Store original content
         const originalContent = pageContentLeft.innerHTML;
@@ -290,8 +295,8 @@ class StandaloneReader {
             position: absolute;
             visibility: hidden;
             height: ${availableHeight}px;
-            width: ${availableWidth}px;
-            column-width: ${availableWidth}px;
+            width: ${fixedColumnWidth}px;
+            column-width: ${fixedColumnWidth}px;
             column-gap: 0;
             column-fill: auto;
             font-size: ${getComputedStyle(pageContentLeft).fontSize};
@@ -302,11 +307,11 @@ class StandaloneReader {
 
         // Calculate number of pages based on scroll width
         const totalWidth = tempDiv.scrollWidth;
-        this.totalPages = Math.max(1, Math.ceil(totalWidth / availableWidth));
+        this.totalPages = Math.max(1, Math.ceil(totalWidth / fixedColumnWidth));
 
         // Store the content and column settings for display
         this.chapterContent = originalContent;
-        this.columnWidth = availableWidth;
+        this.columnWidth = fixedColumnWidth;
         this.columnHeight = availableHeight;
 
         // Cleanup
