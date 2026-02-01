@@ -1,5 +1,93 @@
 // Standalone Ebook Reader with Pagination
 
+// Reading History Manager - tracks last 10 books with reading position
+class ReadingHistory {
+    constructor() {
+        this.maxEntries = 10;
+        this.storageKey = 'readingHistory';
+    }
+
+    getAll() {
+        try {
+            const data = localStorage.getItem(this.storageKey);
+            return data ? JSON.parse(data) : [];
+        } catch (e) {
+            console.error('Failed to load reading history:', e);
+            return [];
+        }
+    }
+
+    save(history) {
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify(history));
+            console.log('[ReadingHistory] Saved to localStorage:', history.length, 'entries');
+        } catch (e) {
+            console.error('Failed to save reading history:', e);
+        }
+    }
+
+    addOrUpdate(entry) {
+        const history = this.getAll();
+        const bookId = parseInt(entry.bookId, 10);
+        const libraryId = entry.libraryId ? parseInt(entry.libraryId, 10) : null;
+        
+        console.log('[ReadingHistory] addOrUpdate called for bookId:', bookId);
+        
+        const existingIndex = history.findIndex(h => parseInt(h.bookId, 10) === bookId);
+        if (existingIndex !== -1) {
+            history.splice(existingIndex, 1);
+        }
+        
+        const newEntry = {
+            bookId: bookId,
+            libraryId: libraryId,
+            title: entry.title,
+            author: entry.author,
+            chapterIndex: entry.chapterIndex || 0,
+            pageIndex: entry.pageIndex || 0,
+            totalChapters: entry.totalChapters || 1,
+            lastRead: new Date().toISOString()
+        };
+        history.unshift(newEntry);
+        console.log('[ReadingHistory] Added entry:', newEntry);
+        
+        while (history.length > this.maxEntries) {
+            history.pop();
+        }
+        
+        this.save(history);
+    }
+
+    updatePosition(bookId, chapterIndex, pageIndex) {
+        const history = this.getAll();
+        const numBookId = parseInt(bookId, 10);
+        const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
+        if (entry) {
+            entry.chapterIndex = chapterIndex;
+            entry.pageIndex = pageIndex;
+            entry.lastRead = new Date().toISOString();
+            this.save(history);
+            console.log('[ReadingHistory] Updated position for bookId:', numBookId, 'chapter:', chapterIndex, 'page:', pageIndex);
+        }
+    }
+
+    getPosition(bookId) {
+        const history = this.getAll();
+        const numBookId = parseInt(bookId, 10);
+        const entry = history.find(h => parseInt(h.bookId, 10) === numBookId);
+        if (entry) {
+            console.log('[ReadingHistory] Found saved position for bookId:', numBookId);
+        }
+        return entry ? {
+            chapterIndex: entry.chapterIndex || 0,
+            pageIndex: entry.pageIndex || 0
+        } : null;
+    }
+}
+
+// Global reading history instance
+const readingHistory = new ReadingHistory();
+
 class StandaloneReader {
     constructor() {
         this.currentBook = null;
@@ -239,8 +327,17 @@ class StandaloneReader {
             }
 
             this.currentBook = await response.json();
-            this.currentChapterIndex = 0;
-            this.currentPage = 0;
+            
+            // Check for saved position
+            const savedPosition = readingHistory.getPosition(bookId);
+            if (savedPosition) {
+                this.currentChapterIndex = savedPosition.chapterIndex;
+                this.currentPage = savedPosition.pageIndex;
+                console.log('[StandaloneReader] Restoring position - chapter:', this.currentChapterIndex, 'page:', this.currentPage);
+            } else {
+                this.currentChapterIndex = 0;
+                this.currentPage = 0;
+            }
 
             // Update page title and UI
             document.title = this.currentBook.title || 'Ebook Reader';
@@ -250,8 +347,19 @@ class StandaloneReader {
             // Build chapters menu
             this.buildChaptersMenu();
 
-            // Display first chapter
+            // Display chapter (will restore page position after pagination)
             this.displayChapter();
+
+            // Add to reading history
+            readingHistory.addOrUpdate({
+                bookId: parseInt(bookId, 10),
+                libraryId: null,
+                title: this.currentBook.title || 'Unknown Title',
+                author: this.currentBook.author || 'Unknown Author',
+                chapterIndex: this.currentChapterIndex,
+                pageIndex: this.currentPage,
+                totalChapters: this.currentBook.chapters.length
+            });
 
         } catch (error) {
             console.error('Error loading book:', error);
@@ -449,6 +557,11 @@ class StandaloneReader {
         }
 
         this.updatePageNavigation();
+        
+        // Save position to reading history
+        if (this.bookId) {
+            readingHistory.updatePosition(this.bookId, this.currentChapterIndex, this.currentPage);
+        }
     }
 
     repaginate() {
