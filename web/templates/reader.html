@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Ebook Reader</title>
+  <link rel="stylesheet" href="{{.BasePath}}/static/css/reader.css?v={{.Version}}">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      overflow: hidden;
+    }
+  </style>
+  <script>
+    window.APP_BASE_PATH = "{{.BasePath}}";
+  </script>
+</head>
+<body>
+  <div class="reader-container" id="reader-container" data-reader-theme="light">
+    <!-- Top Toolbar -->
+    <div class="reader-toolbar">
+      <div class="reader-toolbar-left">
+        <button class="reader-btn" id="reader-close" title="Close reader (Esc)">
+          <span class="reader-btn-icon">✕</span>
+          <span>Close</span>
+        </button>
+      </div>
+      <div class="reader-toolbar-center">
+        <div class="reader-title" id="reader-book-title">Loading...</div>
+        <div class="reader-author" id="reader-book-author"></div>
+      </div>
+      <div class="reader-toolbar-right">
+        <div class="reader-settings">
+          <div class="reader-setting-group">
+            <span class="reader-setting-label">Font:</span>
+            <select class="reader-select" id="reader-font-family">
+              <option value="serif">Serif</option>
+              <option value="sans-serif">Sans-serif</option>
+              <option value="monospace">Monospace</option>
+            </select>
+          </div>
+          <div class="reader-setting-group">
+            <button class="reader-icon-btn" id="reader-font-decrease" title="Decrease font size">A−</button>
+            <button class="reader-icon-btn" id="reader-font-increase" title="Increase font size">A+</button>
+          </div>
+          <div class="reader-setting-group">
+            <span class="reader-setting-label">Theme:</span>
+            <select class="reader-select" id="reader-theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="sepia">Sepia</option>
+            </select>
+          </div>
+          <div class="reader-setting-group">
+            <span class="reader-setting-label">Spacing:</span>
+            <select class="reader-select" id="reader-line-height">
+              <option value="1.4">Compact</option>
+              <option value="1.6">Normal</option>
+              <option value="1.8">Relaxed</option>
+              <option value="2.0">Loose</option>
+            </select>
+          </div>
+          <div class="reader-setting-group reader-layout-toggle" id="reader-layout-group">
+            <button class="reader-icon-btn reader-layout-btn" id="reader-layout-toggle" title="Toggle page layout">
+              <span class="reader-layout-icon" id="reader-layout-icon">☐</span>
+              <span class="reader-layout-label" id="reader-layout-label">1 Page</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Reading Area -->
+    <div class="reader-main" id="reader-main">
+      <!-- Left Navigation Zone -->
+      <div class="reader-nav-zone reader-nav-prev" id="reader-nav-prev" title="Previous page (←)">
+        <span class="reader-nav-icon">‹</span>
+      </div>
+
+      <!-- Page Content -->
+      <div class="reader-content" id="reader-content" data-layout="single">
+        <div class="reader-pages-wrapper" id="reader-pages-wrapper">
+          <div class="reader-page reader-page-left" id="reader-page-left">
+            <div class="reader-page-content" id="reader-page-content-left">
+              <div class="reader-loading">
+                <div class="reader-loading-spinner"></div>
+                <div>Loading book...</div>
+              </div>
+            </div>
+          </div>
+          <div class="reader-page reader-page-right" id="reader-page-right">
+            <div class="reader-page-content" id="reader-page-content-right"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Navigation Zone -->
+      <div class="reader-nav-zone reader-nav-next" id="reader-nav-next" title="Next page (→)">
+        <span class="reader-nav-icon">›</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="reader-footer">
+      <div class="reader-footer-left">
+        <div class="reader-chapter-nav">
+          <button class="reader-btn" id="reader-prev-chapter" disabled title="Previous chapter">
+            <span class="reader-btn-icon">⟨⟨</span>
+            <span>Prev Chapter</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="reader-footer-center">
+        <div class="reader-status">
+          <span class="reader-chapter-info" id="reader-chapter-info">Chapter 1</span>
+          <span class="reader-status-separator">•</span>
+          <div class="reader-page-nav">
+            <button class="reader-page-btn" id="reader-page-prev" disabled title="Previous page (←)">‹</button>
+            <span class="reader-page-indicator" id="reader-page-indicator">Page 1 of 1</span>
+            <button class="reader-page-btn" id="reader-page-next" disabled title="Next page (→)">›</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="reader-footer-right">
+        <div class="reader-chapters-dropdown">
+          <button class="reader-btn" id="reader-chapters-btn" title="Table of contents">
+            <span class="reader-btn-icon">☰</span>
+            <span>Chapters</span>
+          </button>
+          <div class="reader-chapters-menu" id="reader-chapters-menu"></div>
+        </div>
+        <div class="reader-chapter-nav">
+          <button class="reader-btn" id="reader-next-chapter" disabled title="Next chapter">
+            <span>Next Chapter</span>
+            <span class="reader-btn-icon">⟩⟩</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="{{.BasePath}}/static/js/reader-standalone.js?v={{.Version}}"></script>
+</body>
+</html>

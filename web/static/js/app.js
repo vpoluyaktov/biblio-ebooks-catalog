@@ -1302,6 +1302,7 @@ const App = {
           date: updated ? new Date(updated).toLocaleDateString() : '',
           genre,
           lang,
+          format,
           downloadLink,
           content
         };
@@ -1471,6 +1472,9 @@ const App = {
           </div>
         ` : ''}
         <div class="book-actions">
+          ${(book.format === 'epub' || book.format === 'fb2' || book.format === 'epub.zip' || book.format === 'fb2.zip') ? `
+            <a href="${window.APP_BASE_PATH || ''}/reader?id=${book.id}" target="_blank" class="btn btn-primary btn-sm">📖 Read</a>
+          ` : ''}
           ${book.downloadLink ? `
             <a href="${book.downloadLink}" class="btn btn-primary btn-sm" download>Download</a>
           ` : ''}

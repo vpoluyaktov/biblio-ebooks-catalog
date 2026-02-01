@@ -524,6 +524,11 @@ const MobileUI = {
               ` : ''}
             </div>
             <div class="mobile-book-actions">
+              ${(book.format === 'epub' || book.format === 'fb2' || book.format === 'epub.zip' || book.format === 'fb2.zip') ? `
+                <a href="${window.APP_BASE_PATH || ''}/reader?id=${book.id}" target="_blank" class="mobile-btn-primary" style="margin-bottom: 10px; text-decoration: none;">
+                  📖 Read
+                </a>
+              ` : ''}
               <a href="${book.download_url || '#'}" class="mobile-btn-primary mobile-btn-download" ${!book.download_url ? 'style="opacity:0.5;pointer-events:none"' : ''}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1004,6 +1009,9 @@ const MobileUI = {
         // Extract language from dcterms:language
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
         
+        // Extract format from dc:format element
+        const format = entry.querySelector('format, [*|format]')?.textContent || '';
+        
         // Extract date
         const updated = entry.querySelector('updated')?.textContent || '';
         const date = updated ? new Date(updated).toLocaleDateString() : '';
@@ -1029,6 +1037,7 @@ const MobileUI = {
           genre,
           annotation,
           lang,
+          format,
           date,
           size,
           download_url: downloadUrl,
@@ -1153,6 +1162,9 @@ const MobileUI = {
         
         const lang = entry.querySelector('language, [*|language]')?.textContent || '';
         
+        // Extract format from dc:format element
+        const format = entry.querySelector('format, [*|format]')?.textContent || '';
+        
         const updated = entry.querySelector('updated')?.textContent || '';
         const date = updated ? new Date(updated).toLocaleDateString() : '';
         
@@ -1176,6 +1188,7 @@ const MobileUI = {
           genre,
           annotation,
           lang,
+          format,
           date,
           size,
           download_url: downloadUrl,

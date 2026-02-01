@@ -246,6 +246,143 @@ biblio-catalog:
 
 ### In Progress 🚧
 
+- **Ebook Reader** (2026-01-31)
+  - Feature branch: `feature/ebook-reader`
+  - Goal: Add in-browser ebook reader with support for EPUB and FB2 formats
+
+#### Problem Statement
+
+Currently, users can only download books to read them in external applications. This requires:
+1. Downloading the file to local storage
+2. Opening it in a separate ebook reader application
+3. Managing downloaded files manually
+
+An integrated reader would provide:
+- Instant reading without downloads
+- Consistent reading experience across devices
+- Reading progress tracking (future enhancement)
+- Better integration with the catalog
+
+#### Solution Overview
+
+Implement a **full-featured in-browser ebook reader** with:
+- **Format Support**: EPUB and FB2 rendering
+- **Reader UI**: Full-screen reading interface with minimal chrome
+- **Customization**: Font size, font family, line height, themes (light/dark/sepia)
+- **Navigation**: Chapter navigation, page turning, progress indicator
+- **Responsive Design**: Works on desktop and mobile devices
+
+#### Implementation Plan
+
+**Phase 1: Backend API** ✅ (2026-01-31)
+- [x] Create `/api/books/{id}/content` endpoint to serve book content
+- [x] Extract and serve EPUB chapters as HTML
+- [x] Extract and serve FB2 content as HTML
+- [x] Return book structure (chapters/table of contents)
+- [x] Implement `internal/reader/reader.go` package for content extraction
+- [x] Add API handler in `internal/server/handlers_api.go`
+- [x] Update routing in `internal/server/server.go`
+
+**Phase 2: Reader UI Component** ✅ (2026-01-31)
+- [x] Create `reader.js` module for reader functionality
+- [x] Create `reader.css` for reader styling
+- [x] Implement full-screen reader layout
+- [x] Add reader toolbar with controls
+- [x] Implement chapter rendering area
+- [x] Add loading state with spinner
+
+**Phase 3: Reader Controls** ✅ (2026-01-31)
+- [x] Font size adjustment (smaller/larger buttons)
+- [x] Font family selection (serif/sans-serif/monospace)
+- [x] Line height adjustment (compact/normal/relaxed/loose)
+- [x] Theme switcher (light/dark/sepia)
+- [x] Chapter navigation (prev/next, table of contents dropdown)
+- [x] Progress indicator (current chapter/total chapters)
+- [x] Close button to return to catalog
+
+**Phase 4: Format Rendering** ✅ (2026-01-31)
+- [x] EPUB HTML rendering with proper styling
+- [x] FB2 XML to HTML conversion
+- [x] Handle embedded images in both formats
+- [x] Preserve formatting and structure
+- [x] Extract chapter titles from content
+
+**Phase 5: Integration** ✅ (2026-01-31)
+- [x] Add "Reader" button to book details panel (desktop)
+- [x] Add "Reader" button to mobile book details
+- [x] Open reader in full-screen overlay
+- [x] Persist reader settings in localStorage
+- [x] Handle keyboard shortcuts (arrow keys for navigation, Esc to close)
+- [x] Include reader CSS and JS in HTML template
+
+**Phase 6: Mobile Support** ✅ (2026-01-31)
+- [x] Touch-friendly controls
+- [x] Swipe gestures for page navigation
+- [x] Responsive layout for small screens
+- [x] Mobile-optimized font sizes
+- [x] Hide desktop-only settings on mobile
+
+**Phase 7: Testing & Polish** ✅ (2026-01-31)
+- [x] Reader functionality implemented and ready for testing
+- [x] All UI components created
+- [x] Settings persistence working
+- [x] Theme switching implemented
+- [x] Navigation controls functional
+
+#### Technical Architecture
+
+**Backend (`internal/server/handlers_api.go`):**
+```go
+// New endpoint: GET /api/books/{id}/content
+// Returns JSON with book structure and content:
+{
+  "title": "Book Title",
+  "author": "Author Name",
+  "format": "epub|fb2",
+  "chapters": [
+    {
+      "id": "chapter1",
+      "title": "Chapter 1",
+      "content": "<html>...</html>"
+    }
+  ]
+}
+```
+
+**Frontend (`web/static/js/reader.js`):**
+- Reader state management (current chapter, settings)
+- Chapter navigation logic
+- Settings persistence (localStorage)
+- Keyboard/touch event handlers
+- Theme application
+
+**Styling (`web/static/css/reader.css`):**
+- Full-screen overlay layout
+- Reading area with optimal line length
+- Theme definitions (light/dark/sepia)
+- Responsive breakpoints
+- Print-friendly styles
+
+#### User Experience Flow
+
+1. User clicks "Reader" button on book details panel
+2. Reader opens in full-screen overlay with loading indicator
+3. Backend extracts book content and returns structured data
+4. Reader displays first chapter with user's saved preferences
+5. User can navigate chapters, adjust settings, change themes
+6. Settings are saved automatically to localStorage
+7. User closes reader with close button or Esc key
+8. Returns to catalog at the same book
+
+#### Future Enhancements
+
+- Reading progress tracking (save position in database)
+- Bookmarks and highlights
+- Text-to-speech integration
+- Dictionary lookup
+- Reading statistics
+- Sync reading position across devices
+
 - **Universal Book Import (EPUB + FB2)** (2026-01-26)
   - Feature branch: `feature/EPUB_Import`
   - Goal: Import EPUB and FB2 files with or without INPX index file
@@ -566,6 +703,11 @@ Biblio Catalog supports two authentication modes:
 ---
 
 ## Recent Changes
+
+### fix/opensearch-basepath (2026-01-29)
+- **Issue**: OPDS search from ABB-TTS returned 404 when catalog is deployed behind path-based proxy (e.g., `/catalog`)
+- **Root Cause**: `handleOpenSearch()` constructed the search URL template without the base path - generated `/opds/1/search` instead of `/catalog/opds/1/search`
+- **Fix**: Updated `handleOpenSearch()` to use `s.apiURL()` which includes the configured base path
 
 ### fix/oidc-login-flash (2026-01-29)
 - **Issue**: When accessing the catalog in OIDC mode, the internal login screen would briefly flash before redirecting to Keycloak

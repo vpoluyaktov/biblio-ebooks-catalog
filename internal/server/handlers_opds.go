@@ -569,7 +569,7 @@ func (s *Server) handleOpenSearch(w http.ResponseWriter, r *http.Request) {
 		scheme = fwdProto
 	}
 	host := r.Host
-	baseURL := fmt.Sprintf("%s://%s/opds/%d", scheme, host, libID)
+	baseURL := fmt.Sprintf("%s://%s%s", scheme, host, s.apiURL(fmt.Sprintf("/opds/%d", libID)))
 
 	w.Header().Set("Content-Type", "application/opensearchdescription+xml; charset=utf-8")
 	w.Write([]byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>

@@ -62,10 +62,12 @@ func (s *Server) setupRoutes() *http.ServeMux {
 	if basePath == "" {
 		mux.HandleFunc("/", s.handleIndex)
 		mux.HandleFunc("/library/", s.handleLibrary)
+		mux.HandleFunc("/reader", s.handleReader)
 	} else {
 		mux.HandleFunc(basePath+"/", s.handleIndex)
 		mux.HandleFunc(basePath, s.handleIndex)
 		mux.HandleFunc(basePath+"/library/", s.handleLibrary)
+		mux.HandleFunc(basePath+"/reader", s.handleReader)
 	}
 
 	// OPDS routes - /opds/opds/{libID}/...
@@ -389,13 +391,24 @@ func (s *Server) handleLibraryRoutes(w http.ResponseWriter, r *http.Request, rem
 
 // handleBookRoutes handles /api/books/{id}/... routes
 func (s *Server) handleBookRoutes(w http.ResponseWriter, r *http.Request, remaining string) {
-	bookID, err := parseInt64(remaining)
+	var idStr string
+	var action string
+	if idx := indexOf(remaining, "/"); idx != -1 {
+		idStr = remaining[:idx]
+		action = remaining[idx+1:]
+	} else {
+		idStr = remaining
+	}
+
+	bookID, err := parseInt64(idStr)
 	if err != nil {
 		s.jsonError(w, "Invalid book ID", http.StatusBadRequest)
 		return
 	}
 
-	if r.Method == "GET" {
+	if action == "content" && r.Method == "GET" {
+		s.apiGetBookContentWithID(w, r, bookID)
+	} else if action == "" && r.Method == "GET" {
 		s.apiGetBookWithID(w, r, bookID)
 	} else {
 		http.NotFound(w, r)
