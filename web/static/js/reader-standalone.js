@@ -395,6 +395,7 @@ class StandaloneReader {
         const prevBtn = document.getElementById('reader-page-prev');
         const nextBtn = document.getElementById('reader-page-next');
         const indicator = document.getElementById('reader-page-indicator');
+        const chapterInfo = document.getElementById('reader-chapter-info');
         const prevZone = document.getElementById('reader-nav-prev');
         const nextZone = document.getElementById('reader-nav-next');
 
@@ -409,6 +410,12 @@ class StandaloneReader {
         nextZone.classList.toggle('disabled', isLastPage);
 
         indicator.textContent = `Page ${this.currentPage + 1} of ${this.totalPages}`;
+
+        // Update chapter info
+        const chapter = this.currentBook.chapters[this.currentChapterIndex];
+        const chapterNum = this.currentChapterIndex + 1;
+        const chapterTitle = chapter.title || 'Untitled';
+        chapterInfo.textContent = `Chapter ${chapterNum}: ${chapterTitle}`;
     }
 
     updateChapterNavigation() {
