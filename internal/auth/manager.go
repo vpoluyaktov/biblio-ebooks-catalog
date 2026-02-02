@@ -1,51 +1,41 @@
 package auth
 
 import (
+	"biblio-catalog/internal/db"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
-	"time"
-
-	"biblio-catalog/internal/db"
 )
 
 // AuthMode represents the authentication mode
 type AuthMode string
 
 const (
-	AuthModeInternal AuthMode = "internal"
-	AuthModeOIDC     AuthMode = "oidc"
+	AuthModeInternal   AuthMode = "internal"
+	AuthModeOIDC       AuthMode = "oidc"
+	AuthModeBiblioAuth AuthMode = "biblio-auth"
 )
 
-// Manager handles authentication for both internal and OIDC modes
+// Manager handles authentication for internal, oidc, and biblio-auth modes
 type Manager struct {
 	mode         AuthMode
-	internalAuth *Auth // Only used in internal mode
-	oidcAuth     *OIDCProvider
+	internalAuth *Auth             // Used in all modes for Basic Auth (OPDS)
+	biblioAuth   *BiblioAuthClient // Used in biblio-auth mode for web UI
 }
 
 // NewManager creates a new authentication manager
-func NewManager(mode string, database *db.DB, oidcCfg OIDCConfig) (*Manager, error) {
+func NewManager(mode string, database *db.DB, biblioAuthURL string) (*Manager, error) {
 	m := &Manager{
-		mode: AuthMode(mode),
+		mode:         AuthMode(mode),
+		internalAuth: New(database),
 	}
 
-	switch m.mode {
-	case AuthModeInternal:
-		// Initialize internal auth for local user database
-		m.internalAuth = New(database)
-	case AuthModeOIDC:
-		// Initialize OIDC provider for Keycloak authentication
-		// Basic Auth on OPDS feeds uses OIDC ROPC grant (same Keycloak users)
-		oidc, err := NewOIDCProvider(oidcCfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
-		}
-		m.oidcAuth = oidc
-	default:
-		return nil, fmt.Errorf("invalid auth mode: %s (must be 'internal' or 'oidc')", mode)
+	// Initialize biblio-auth client if in biblio-auth mode
+	if m.mode == AuthModeBiblioAuth {
+		m.biblioAuth = NewBiblioAuthClient(biblioAuthURL)
 	}
 
 	return m, nil
@@ -61,246 +51,176 @@ func (m *Manager) IsInternalMode() bool {
 	return m.mode == AuthModeInternal
 }
 
-// IsOIDCMode returns true if using OIDC authentication
-func (m *Manager) IsOIDCMode() bool {
-	return m.mode == AuthModeOIDC
+// IsBiblioAuthMode returns true if using Biblio Auth
+func (m *Manager) IsBiblioAuthMode() bool {
+	return m.mode == AuthModeBiblioAuth
 }
 
-// GetInternalAuth returns the internal auth provider (only in internal mode)
+// GetInternalAuth returns the internal auth provider for Basic Auth
 func (m *Manager) GetInternalAuth() *Auth {
 	return m.internalAuth
 }
 
-// GetOIDCAuth returns the OIDC auth provider (only in OIDC mode)
-func (m *Manager) GetOIDCAuth() *OIDCProvider {
-	return m.oidcAuth
+// GetBiblioAuth returns the Biblio Auth client
+func (m *Manager) GetBiblioAuth() *BiblioAuthClient {
+	return m.biblioAuth
 }
 
-// Authenticate authenticates a user with username/password (internal mode only)
+// Authenticate authenticates a user with username/password (for Basic Auth/OPDS)
 func (m *Manager) Authenticate(username, password string) (*db.User, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("authenticate not supported in %s mode", m.mode)
-	}
 	return m.internalAuth.Authenticate(username, password)
 }
 
-// CreateSession creates a session for a user (internal mode only)
+// CreateSession creates a session for a user (for Basic Auth/OPDS)
 func (m *Manager) CreateSession(userID int64) (*db.Session, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("create session not supported in %s mode", m.mode)
-	}
 	return m.internalAuth.CreateSession(userID)
 }
 
-// ValidateSession validates a session (internal mode only)
+// ValidateSession validates a session (for Basic Auth/OPDS)
 func (m *Manager) ValidateSession(sessionID string) (*db.User, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("validate session not supported in %s mode", m.mode)
-	}
 	return m.internalAuth.ValidateSession(sessionID)
+}
+
+// ValidateBiblioAuthSession validates a Biblio Auth session token
+func (m *Manager) ValidateBiblioAuthSession(token string) (*UserInfo, error) {
+	if m.biblioAuth == nil {
+		return nil, fmt.Errorf("biblio-auth not configured")
+	}
+	return m.biblioAuth.ValidateSession(token)
+}
+
+// GetLoginURL returns the Biblio Auth login URL
+func (m *Manager) GetLoginURL(returnURL string) string {
+	if m.biblioAuth == nil {
+		return ""
+	}
+	return m.biblioAuth.GetLoginURL(returnURL)
+}
+
+// GetLogoutURL returns the Biblio Auth logout URL
+func (m *Manager) GetLogoutURL() string {
+	if m.biblioAuth == nil {
+		return ""
+	}
+	return m.biblioAuth.GetLogoutURL()
 }
 
 // DeleteSession deletes a session (internal mode only)
 func (m *Manager) DeleteSession(sessionID string) error {
-	if m.mode != AuthModeInternal {
-		return fmt.Errorf("delete session not supported in %s mode", m.mode)
-	}
 	return m.internalAuth.DeleteSession(sessionID)
 }
 
-// HasUsers checks if there are any users (internal mode only)
-func (m *Manager) HasUsers() (bool, error) {
-	if m.mode != AuthModeInternal {
-		return true, nil // In OIDC mode, users are managed externally
-	}
-	return m.internalAuth.HasUsers()
+// GetUsers returns all users (internal mode only)
+func (m *Manager) GetUsers() ([]db.User, error) {
+	return m.internalAuth.GetUsers()
+}
+
+// GetUser returns a user by ID (internal mode only)
+func (m *Manager) GetUser(id int64) (*db.User, error) {
+	return m.internalAuth.GetUser(id)
 }
 
 // CreateUser creates a new user (internal mode only)
 func (m *Manager) CreateUser(username, password, role string) (*db.User, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("create user not supported in %s mode - manage users in OIDC provider", m.mode)
-	}
 	return m.internalAuth.CreateUser(username, password, role)
 }
 
-// GetUser gets a user by ID (internal mode only)
-func (m *Manager) GetUser(id int64) (*db.User, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("get user not supported in %s mode", m.mode)
-	}
-	return m.internalAuth.GetUser(id)
-}
-
-// GetUsers gets all users (internal mode only)
-func (m *Manager) GetUsers() ([]db.User, error) {
-	if m.mode != AuthModeInternal {
-		return nil, fmt.Errorf("get users not supported in %s mode - manage users in OIDC provider", m.mode)
-	}
-	return m.internalAuth.GetUsers()
-}
-
 // UpdateUserPassword updates a user's password (internal mode only)
-func (m *Manager) UpdateUserPassword(userID int64, newPassword string) error {
-	if m.mode != AuthModeInternal {
-		return fmt.Errorf("update password not supported in %s mode - manage users in OIDC provider", m.mode)
-	}
-	return m.internalAuth.UpdateUserPassword(userID, newPassword)
+func (m *Manager) UpdateUserPassword(id int64, newPassword string) error {
+	return m.internalAuth.UpdateUserPassword(id, newPassword)
 }
 
 // UpdateUserRole updates a user's role (internal mode only)
-func (m *Manager) UpdateUserRole(userID int64, role string) error {
-	if m.mode != AuthModeInternal {
-		return fmt.Errorf("update role not supported in %s mode - manage users in OIDC provider", m.mode)
-	}
-	return m.internalAuth.UpdateUserRole(userID, role)
+func (m *Manager) UpdateUserRole(id int64, role string) error {
+	return m.internalAuth.UpdateUserRole(id, role)
 }
 
 // DeleteUser deletes a user (internal mode only)
-func (m *Manager) DeleteUser(userID int64) error {
-	if m.mode != AuthModeInternal {
-		return fmt.Errorf("delete user not supported in %s mode - manage users in OIDC provider", m.mode)
-	}
-	return m.internalAuth.DeleteUser(userID)
+func (m *Manager) DeleteUser(id int64) error {
+	return m.internalAuth.DeleteUser(id)
 }
 
-// GetLoginURL returns the login URL (OIDC mode only)
-func (m *Manager) GetLoginURL() (string, string, error) {
-	if m.mode != AuthModeOIDC {
-		return "", "", fmt.Errorf("get login URL not supported in %s mode", m.mode)
-	}
-	return m.oidcAuth.GetLoginURL()
+// HasUsers checks if any users exist (internal mode only)
+func (m *Manager) HasUsers() (bool, error) {
+	return m.internalAuth.HasUsers()
 }
 
-// HandleCallback handles OAuth2 callback (OIDC mode only)
-func (m *Manager) HandleCallback(code, state string) (*db.User, string, string, string, error) {
-	if m.mode != AuthModeOIDC {
-		return nil, "", "", "", fmt.Errorf("handle callback not supported in %s mode", m.mode)
-	}
-	return m.oidcAuth.HandleCallback(code, state)
-}
-
-// ValidateToken validates an OIDC token (OIDC mode only)
-func (m *Manager) ValidateToken(token string) (*db.User, error) {
-	if m.mode != AuthModeOIDC {
-		return nil, fmt.Errorf("validate token not supported in %s mode", m.mode)
-	}
-	return m.oidcAuth.ValidateToken(token)
-}
-
-// GetLogoutURL returns the logout URL (OIDC mode only)
-func (m *Manager) GetLogoutURL(redirectURL string) string {
-	if m.mode != AuthModeOIDC {
-		return ""
-	}
-	return m.oidcAuth.GetLogoutURL(redirectURL)
-}
-
-// CheckSessionOrBasicAuth checks for session or basic auth (works in both modes)
-// In OIDC mode, this also supports Basic Auth for OPDS e-readers and service-to-service calls
+// CheckSessionOrBasicAuth checks for session or basic auth
+// In biblio-auth mode, validates against Biblio Auth service
+// In internal mode, validates against internal database
 func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request) bool {
-	if m.mode == AuthModeInternal {
-		return m.internalAuth.CheckSessionOrBasicAuth(w, r)
-	}
-
-	// In OIDC mode, check for OIDC session cookie first
-	cookie, err := r.Cookie("oidc_session")
-	if err == nil {
-		session, err := OIDCSessionFromJSON(cookie.Value)
-		if err == nil && session.ExpiresAt.After(time.Now()) {
-			// Create user from session data (tokens were validated at login time)
-			user := &db.User{
-				ID:       0,
-				Username: session.Username,
-				Role:     session.Role,
-			}
-			ctx := context.WithValue(r.Context(), UserContextKey, user)
-			*r = *r.WithContext(ctx)
-			return true
-		}
-	}
-
-	// For OPDS e-readers and service-to-service calls, support Basic Auth via OIDC ROPC
-	// This authenticates against Keycloak using Resource Owner Password Credentials grant
-	authHeader := r.Header.Get("Authorization")
-	fmt.Printf("[DEBUG] ROPC Basic Auth check - authHeader present: %v\n", authHeader != "")
-	if authHeader != "" && len(authHeader) > 6 && authHeader[:6] == "Basic " {
-		decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
+	// In biblio-auth mode, check auth_token cookie first, then Basic Auth via Biblio Auth
+	if m.mode == AuthModeBiblioAuth {
+		// Check for auth_token cookie (from Biblio Auth web login)
+		cookie, err := r.Cookie("auth_token")
 		if err == nil {
-			parts := strings.SplitN(string(decoded), ":", 2)
-			if len(parts) == 2 {
-				fmt.Printf("[DEBUG] ROPC attempting auth for user: %s\n", parts[0])
-				user, err := m.oidcAuth.AuthenticateWithPassword(parts[0], parts[1])
-				if err == nil {
-					fmt.Printf("[DEBUG] ROPC auth successful for user: %s\n", parts[0])
-					ctx := context.WithValue(r.Context(), UserContextKey, user)
-					*r = *r.WithContext(ctx)
-					return true
+			userInfo, err := m.biblioAuth.ValidateSession(cookie.Value)
+			if err == nil {
+				// Convert to db.User for context
+				user := &db.User{
+					ID:       int64(userInfo.ID),
+					Username: userInfo.Username,
+					Role:     "user",
 				}
-				fmt.Printf("[DEBUG] ROPC auth failed: %v\n", err)
+				for _, group := range userInfo.Groups {
+					if group == "admin" {
+						user.Role = db.RoleAdmin
+						break
+					}
+				}
+				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				*r = *r.WithContext(ctx)
+				return true
 			}
 		}
+
+		// Try Basic Auth via Biblio Auth
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" && strings.HasPrefix(authHeader, "Basic ") {
+			decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
+			if err == nil {
+				parts := strings.SplitN(string(decoded), ":", 2)
+				if len(parts) == 2 {
+					userInfo, err := m.biblioAuth.ValidateBasicAuth(parts[0], parts[1])
+					if err == nil {
+						log.Printf("Biblio Auth Basic Auth successful: user=%s", userInfo.Username)
+						// Convert to db.User for context
+						user := &db.User{
+							ID:       int64(userInfo.ID),
+							Username: userInfo.Username,
+							Role:     "user",
+						}
+						for _, group := range userInfo.Groups {
+							if group == "admin" {
+								user.Role = db.RoleAdmin
+								break
+							}
+						}
+						ctx := context.WithValue(r.Context(), UserContextKey, user)
+						*r = *r.WithContext(ctx)
+						return true
+					}
+					log.Printf("Biblio Auth Basic Auth failed: %v", err)
+				}
+			}
+		}
+
+		// Request Basic Auth
+		w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
 	}
 
-	// Return 401 to prompt for Basic Auth
-	w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
-	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	return false
+	// In internal mode, use the standard session/basic auth validation
+	return m.internalAuth.CheckSessionOrBasicAuth(w, r)
 }
 
-// CheckSession checks for session auth (works in both modes)
+// CheckSession checks for session auth
 func (m *Manager) CheckSession(w http.ResponseWriter, r *http.Request) bool {
-	if m.mode == AuthModeInternal {
-		return m.internalAuth.CheckSession(w, r)
-	}
-
-	// In OIDC mode, check for OIDC session cookie
-	cookie, err := r.Cookie("oidc_session")
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"Not authenticated. Please log in."}`))
-		return false
-	}
-
-	session, err := OIDCSessionFromJSON(cookie.Value)
-	if err != nil || session.ExpiresAt.Before(time.Now()) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"Session expired. Please log in again."}`))
-		return false
-	}
-
-	// Create user from session data (tokens were validated at login time)
-	user := &db.User{
-		ID:       0,
-		Username: session.Username,
-		Role:     session.Role,
-	}
-
-	ctx := context.WithValue(r.Context(), UserContextKey, user)
-	*r = *r.WithContext(ctx)
-	return true
+	return m.internalAuth.CheckSession(w, r)
 }
 
-// CheckAdmin checks if the current user is an admin (works in both modes)
+// CheckAdmin checks if the current user is an admin
 func (m *Manager) CheckAdmin(w http.ResponseWriter, r *http.Request) bool {
-	if m.mode == AuthModeInternal {
-		return m.internalAuth.CheckAdmin(w, r)
-	}
-
-	user := GetUserFromContext(r.Context())
-	if user == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"Not authenticated. Please log in again."}`))
-		return false
-	}
-	if !user.IsAdmin() {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"error":"Admin access required"}`))
-		return false
-	}
-	return true
+	return m.internalAuth.CheckAdmin(w, r)
 }

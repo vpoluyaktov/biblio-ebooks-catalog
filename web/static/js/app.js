@@ -173,8 +173,18 @@ const App = {
         this.oidcRedirectPending = false;
       }
       
+      // If in biblio-auth mode and not authenticated, redirect to Biblio Auth login
+      if (authInfo.mode === 'biblio-auth' && !authInfo.authenticated) {
+        // Set flag to prevent router from showing internal login screen
+        this.oidcRedirectPending = true;
+        // Redirect to Biblio Auth with return URL
+        const returnUrl = encodeURIComponent(window.location.href);
+        window.location.href = `/auth/login?returnUrl=${returnUrl}`;
+        return;
+      }
+      
       // If authenticated (either mode), set user
-      if (authInfo.authenticated) {
+      if (authInfo.authenticated && authInfo.user) {
         this.user = authInfo.user;
       }
     } catch (e) {

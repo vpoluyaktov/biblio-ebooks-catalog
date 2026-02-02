@@ -18,16 +18,8 @@ type Server struct {
 }
 
 func New(cfg *config.Config, database *db.DB) (*Server, error) {
-	// Create auth manager based on AUTH_MODE
-	oidcCfg := auth.OIDCConfig{
-		URL:          cfg.OIDC.URL,
-		Realm:        cfg.OIDC.Realm,
-		ClientID:     cfg.OIDC.ClientID,
-		ClientSecret: cfg.OIDC.ClientSecret,
-		RedirectURL:  cfg.OIDC.RedirectURL,
-	}
-
-	authManager, err := auth.NewManager(cfg.Auth.Mode, database, oidcCfg)
+	// Create auth manager with configured mode
+	authManager, err := auth.NewManager(cfg.Auth.Mode, database, cfg.BiblioAuth.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth manager: %w", err)
 	}
@@ -227,6 +219,7 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleSetup(w, r)
 		return
 	}
+	// Auth info endpoint (public - returns auth mode and status)
 	if path == "/auth/info" && r.Method == "GET" {
 		s.handleAuthInfo(w, r)
 		return
@@ -236,22 +229,11 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleLogin(w, r)
 		return
 	}
-	// OIDC auth endpoints
-	if path == "/auth/oidc/login" && r.Method == "GET" {
-		s.handleOIDCLogin(w, r)
-		return
-	}
-	if path == "/auth/oidc/callback" && r.Method == "GET" {
-		s.handleOIDCCallback(w, r)
-		return
-	}
-	if path == "/auth/oidc/logout" && r.Method == "POST" {
-		s.handleOIDCLogout(w, r)
-		return
-	}
 
 	// All other routes require session auth
-	if !s.authManager.CheckSession(w, r) {
+	// In biblio-auth mode, validate auth_token cookie with Biblio Auth
+	// In internal mode, validate session cookie with internal auth
+	if !s.checkSessionByMode(w, r) {
 		return
 	}
 
