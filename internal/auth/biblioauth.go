@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -92,4 +93,60 @@ func (c *BiblioAuthClient) IsAdmin(user *UserInfo) bool {
 		}
 	}
 	return false
+}
+
+// LoginResponse represents the response from Biblio Auth login endpoint
+type LoginResponse struct {
+	Success bool     `json:"success"`
+	User    UserInfo `json:"user"`
+	Error   string   `json:"error"`
+}
+
+// ValidateBasicAuth validates username/password credentials with Biblio Auth
+// This is used for OPDS Basic Auth in biblio-auth mode
+func (c *BiblioAuthClient) ValidateBasicAuth(username, password string) (*UserInfo, error) {
+	// Create login request body
+	loginReq := struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}{
+		Username: username,
+		Password: password,
+	}
+
+	body, err := json.Marshal(loginReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", c.baseURL+"/api/login", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("invalid username or password")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("authentication failed with status: %d", resp.StatusCode)
+	}
+
+	var result LoginResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.Success {
+		return nil, fmt.Errorf("authentication failed: %s", result.Error)
+	}
+
+	return &result.User, nil
 }

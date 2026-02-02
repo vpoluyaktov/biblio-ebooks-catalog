@@ -2,8 +2,12 @@ package auth
 
 import (
 	"biblio-catalog/internal/db"
+	"context"
+	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 )
 
 // AuthMode represents the authentication mode
@@ -142,7 +146,72 @@ func (m *Manager) HasUsers() (bool, error) {
 }
 
 // CheckSessionOrBasicAuth checks for session or basic auth
+// In biblio-auth mode, validates against Biblio Auth service
+// In internal mode, validates against internal database
 func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request) bool {
+	// In biblio-auth mode, check auth_token cookie first, then Basic Auth via Biblio Auth
+	if m.mode == AuthModeBiblioAuth {
+		// Check for auth_token cookie (from Biblio Auth web login)
+		cookie, err := r.Cookie("auth_token")
+		if err == nil {
+			userInfo, err := m.biblioAuth.ValidateSession(cookie.Value)
+			if err == nil {
+				// Convert to db.User for context
+				user := &db.User{
+					ID:       int64(userInfo.ID),
+					Username: userInfo.Username,
+					Role:     "user",
+				}
+				for _, group := range userInfo.Groups {
+					if group == "admin" {
+						user.Role = db.RoleAdmin
+						break
+					}
+				}
+				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				*r = *r.WithContext(ctx)
+				return true
+			}
+		}
+
+		// Try Basic Auth via Biblio Auth
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" && strings.HasPrefix(authHeader, "Basic ") {
+			decoded, err := base64.StdEncoding.DecodeString(authHeader[6:])
+			if err == nil {
+				parts := strings.SplitN(string(decoded), ":", 2)
+				if len(parts) == 2 {
+					userInfo, err := m.biblioAuth.ValidateBasicAuth(parts[0], parts[1])
+					if err == nil {
+						log.Printf("Biblio Auth Basic Auth successful: user=%s", userInfo.Username)
+						// Convert to db.User for context
+						user := &db.User{
+							ID:       int64(userInfo.ID),
+							Username: userInfo.Username,
+							Role:     "user",
+						}
+						for _, group := range userInfo.Groups {
+							if group == "admin" {
+								user.Role = db.RoleAdmin
+								break
+							}
+						}
+						ctx := context.WithValue(r.Context(), UserContextKey, user)
+						*r = *r.WithContext(ctx)
+						return true
+					}
+					log.Printf("Biblio Auth Basic Auth failed: %v", err)
+				}
+			}
+		}
+
+		// Request Basic Auth
+		w.Header().Set("WWW-Authenticate", `Basic realm="opds-server"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+
+	// In internal mode, use the standard session/basic auth validation
 	return m.internalAuth.CheckSessionOrBasicAuth(w, r)
 }
 

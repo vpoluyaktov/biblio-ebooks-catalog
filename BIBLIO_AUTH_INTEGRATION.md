@@ -48,9 +48,9 @@ Now the catalog correctly calls `http://biblio-auth:80/auth/api/validate` which 
 ### 1. Testing & Verification
 - [x] Fix the 404 routing issue
 - [x] Test complete login flow (login → redirect → authenticated session)
+- [x] Test Basic Auth for OPDS (now validates via Biblio Auth API)
 - [ ] Verify session persistence across page reloads
 - [ ] Test logout flow
-- [ ] Test Basic Auth for OPDS (should still work with internal auth)
 - [ ] Test admin features with Biblio Auth groups
 
 ### 2. Documentation Updates
@@ -94,8 +94,9 @@ The catalog supports three authentication modes via `AUTH_MODE` environment vari
 
 **OPDS/E-readers:**
 1. E-reader sends HTTP Basic Auth
-2. Catalog validates against internal user database
-3. Session created for authenticated user
+2. In biblio-auth mode: Catalog validates credentials via Biblio Auth `/api/login` endpoint
+3. In internal mode: Catalog validates against internal user database
+4. User context stored in request
 
 ### Environment Variables
 
