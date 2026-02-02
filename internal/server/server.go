@@ -18,16 +18,8 @@ type Server struct {
 }
 
 func New(cfg *config.Config, database *db.DB) (*Server, error) {
-	// Create auth manager based on AUTH_MODE
-	oidcCfg := auth.OIDCConfig{
-		URL:          cfg.OIDC.URL,
-		Realm:        cfg.OIDC.Realm,
-		ClientID:     cfg.OIDC.ClientID,
-		ClientSecret: cfg.OIDC.ClientSecret,
-		RedirectURL:  cfg.OIDC.RedirectURL,
-	}
-
-	authManager, err := auth.NewManager(cfg.Auth.Mode, database, oidcCfg)
+	// Create auth manager with Biblio Auth
+	authManager, err := auth.NewManager(database, cfg.BiblioAuth.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth manager: %w", err)
 	}
