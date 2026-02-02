@@ -219,6 +219,11 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleSetup(w, r)
 		return
 	}
+	// Auth info endpoint (public - returns auth mode and status)
+	if path == "/auth/info" && r.Method == "GET" {
+		s.handleAuthInfo(w, r)
+		return
+	}
 	// Internal auth endpoints
 	if path == "/auth/login" && r.Method == "POST" {
 		s.handleLogin(w, r)

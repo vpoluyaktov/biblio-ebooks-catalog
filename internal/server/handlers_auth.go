@@ -9,6 +9,30 @@ import (
 	"biblio-catalog/internal/db"
 )
 
+// handleAuthInfo returns the current auth mode and authentication status
+func (s *Server) handleAuthInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"mode":          s.config.Auth.Mode,
+		"authenticated": false,
+		"user":          nil,
+	}
+
+	// Check if user is authenticated
+	user := auth.GetUserFromContext(r.Context())
+	if user != nil {
+		response["authenticated"] = true
+		response["user"] = map[string]interface{}{
+			"id":       user.ID,
+			"username": user.Username,
+			"role":     user.Role,
+		}
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 type LoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
