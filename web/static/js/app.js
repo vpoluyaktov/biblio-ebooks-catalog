@@ -2913,6 +2913,16 @@ const App = {
           window.location.href = logoutData.logout_url;
           return;
         }
+      } else if (authInfo.mode === 'biblio-auth') {
+        // Biblio Auth mode: call biblio-auth logout API with POST
+        await fetch(window.location.origin + '/auth/api/logout', { 
+          method: 'POST',
+          credentials: 'include'
+        });
+        this.user = null;
+        // Redirect to biblio-auth login
+        window.location.href = window.location.origin + '/auth/login?returnUrl=' + encodeURIComponent(window.location.href);
+        return;
       } else {
         // Internal mode: use internal logout
         await fetch(this.apiUrl('/api/auth/logout'), { method: 'POST' });
