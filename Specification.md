@@ -260,6 +260,7 @@ biblio-catalog:
   - Replaced OIDC/Keycloak with lightweight Biblio Auth
   - JWT token validation via Biblio Auth API
   - OPDS Basic Auth validated via Biblio Auth
+  - **Admin Role Detection** (2026-02-02): Fixed config icon visibility for admin users in biblio-auth mode by adding role field to `/api/auth/info` response based on user's groups
 
 ### Future Enhancements
 

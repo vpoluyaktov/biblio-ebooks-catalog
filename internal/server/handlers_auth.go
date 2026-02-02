@@ -26,11 +26,18 @@ func (s *Server) handleAuthInfo(w http.ResponseWriter, r *http.Request) {
 			// Validate token with Biblio Auth
 			userInfo, err := s.authManager.ValidateBiblioAuthSession(cookie.Value)
 			if err == nil {
+				// Determine role based on groups
+				role := "readonly"
+				if s.authManager.IsBiblioAuthAdmin(userInfo) {
+					role = "admin"
+				}
+
 				response["authenticated"] = true
 				response["user"] = map[string]interface{}{
 					"id":       userInfo.ID,
 					"username": userInfo.Username,
 					"email":    userInfo.Email,
+					"role":     role,
 				}
 				json.NewEncoder(w).Encode(response)
 				return

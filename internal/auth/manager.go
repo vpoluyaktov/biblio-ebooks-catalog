@@ -105,6 +105,14 @@ func (m *Manager) GetLogoutURL() string {
 	return m.biblioAuth.GetLogoutURL()
 }
 
+// IsBiblioAuthAdmin checks if a Biblio Auth user has admin privileges
+func (m *Manager) IsBiblioAuthAdmin(userInfo *UserInfo) bool {
+	if m.biblioAuth == nil {
+		return false
+	}
+	return m.biblioAuth.IsAdmin(userInfo)
+}
+
 // DeleteSession deletes a session (internal mode only)
 func (m *Manager) DeleteSession(sessionID string) error {
 	return m.internalAuth.DeleteSession(sessionID)
