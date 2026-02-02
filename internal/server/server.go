@@ -231,7 +231,9 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// All other routes require session auth
-	if !s.authManager.CheckSession(w, r) {
+	// In biblio-auth mode, validate auth_token cookie with Biblio Auth
+	// In internal mode, validate session cookie with internal auth
+	if !s.checkSessionByMode(w, r) {
 		return
 	}
 
