@@ -225,6 +225,42 @@ func (m *Manager) CheckSessionOrBasicAuth(w http.ResponseWriter, r *http.Request
 
 // CheckSession checks for session auth
 func (m *Manager) CheckSession(w http.ResponseWriter, r *http.Request) bool {
+	// In biblio-auth mode, check for auth_token cookie
+	if m.mode == AuthModeBiblioAuth {
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Not authenticated. Please log in again."}`))
+			return false
+		}
+
+		userInfo, err := m.biblioAuth.ValidateSession(cookie.Value)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Session expired. Please log in again."}`))
+			return false
+		}
+
+		// Convert to db.User for context
+		user := &db.User{
+			ID:       int64(userInfo.ID),
+			Username: userInfo.Username,
+			Role:     "user",
+		}
+		for _, group := range userInfo.Groups {
+			if group == "admin" {
+				user.Role = db.RoleAdmin
+				break
+			}
+		}
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
+		*r = *r.WithContext(ctx)
+		return true
+	}
+
+	// In internal mode, use the standard session validation
 	return m.internalAuth.CheckSession(w, r)
 }
 
