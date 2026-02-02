@@ -3,7 +3,7 @@
 ## Biblio Auth Integration (In Progress)
 
 **Branch:** `feature/biblio-auth-integration`  
-**Status:** 90% Complete - One routing issue remaining
+**Status:** 95% Complete - Routing issue fixed, testing remaining
 
 ### What's Working
 - ✅ Frontend redirects to Biblio Auth login page
@@ -11,20 +11,21 @@
 - ✅ JWT token generation and cookie management
 - ✅ Catalog validates auth_token cookies
 - ✅ Three auth modes supported: internal, oidc (deprecated), biblio-auth
+- ✅ Token validation working (404 issue fixed)
 
-### Known Issue: 404 on Token Validation
+### Resolved Issue: 404 on Token Validation
 
-**Problem:** Catalog calls `http://biblio-auth:80/api/validate` → 404 Not Found
+**Problem:** Catalog was calling `http://biblio-auth:80/api/validate` → 404 Not Found
 
-**Root Cause:** Biblio Auth serves APIs at `/auth/api/*` through nginx, not `/api/*` directly
+**Root Cause:** Biblio Auth serves APIs at `/auth/api/*` due to `BIBLIO_AUTH_BASE_PATH=/auth`
 
-**Fix Required:** Update `BIBLIO_AUTH_URL` in stack.yaml from `http://biblio-auth:80` to `http://nginx-gateway:80/auth`
+**Fix Applied:** Updated `BIBLIO_AUTH_URL` in stack.yaml from `http://biblio-auth:80` to `http://biblio-auth:80/auth`
 
 **Details:** See `/home/ubuntu/git/biblio-ebooks-catalog/BIBLIO_AUTH_INTEGRATION.md`
 
 ### Next Steps
-1. Apply the fix (update stack.yaml BIBLIO_AUTH_URL)
-2. Test complete login flow
+1. ~~Apply the fix (update stack.yaml BIBLIO_AUTH_URL)~~ ✅ Done
+2. ~~Test complete login flow~~ ✅ Done
 3. Remove Keycloak references from documentation
 4. Update Playwright tests
 

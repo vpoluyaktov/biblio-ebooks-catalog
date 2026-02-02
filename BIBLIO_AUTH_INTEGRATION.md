@@ -2,7 +2,7 @@
 
 This document tracks the integration of Biblio Auth to replace Keycloak/OIDC authentication in biblio-ebooks-catalog.
 
-**Overall Status:** 90% Complete - Core integration done, one routing issue remaining
+**Overall Status:** 95% Complete - Core integration done, routing issue fixed, testing remaining
 
 ## ✅ Completed Work
 
@@ -31,59 +31,29 @@ This document tracks the integration of Biblio Auth to replace Keycloak/OIDC aut
 - ✅ Removed `internal/auth/oidc.go`
 - ✅ Removed `internal/server/handlers_oidc.go`
 
+## ✅ Resolved Issues
+
+### API Endpoint Path Routing (404 Error) - FIXED
+
+**Problem:** Catalog was calling `http://biblio-auth:80/api/validate` but getting 404
+
+**Root Cause:** The catalog's `BiblioAuthClient` uses `baseURL` and appends `/api/validate`. Biblio Auth serves at `/auth/api/*` due to `BIBLIO_AUTH_BASE_PATH=/auth`.
+
+**Solution Applied:** Updated `BIBLIO_AUTH_URL` in stack.yaml from `http://biblio-auth:80` to `http://biblio-auth:80/auth`
+
+Now the catalog correctly calls `http://biblio-auth:80/auth/api/validate` which matches the actual endpoint.
+
 ## 🔧 Remaining Work
 
-### Critical Issue: API Endpoint Path Routing (404 Error)
-
-**Problem:** Catalog is calling `http://biblio-auth:80/api/validate` but getting 404
-
-**Root Cause:** The catalog's `BiblioAuthClient` uses `baseURL` set to `http://biblio-auth:80` and appends `/api/validate`. However, Biblio Auth's API endpoints are served at `/auth/api/*` through nginx, not directly at `/api/*`.
-
-**Current Behavior:**
-```
-Catalog → http://biblio-auth:80/api/validate (direct service call)
-Result: 404 Not Found
-```
-
-**Expected Behavior:**
-```
-Catalog → http://nginx-gateway:80/auth/api/validate (through nginx)
-OR
-Catalog → http://biblio-auth:80/auth/api/validate (if Biblio Auth serves both paths)
-Result: 200 OK with user validation
-```
-
-**Solution Options:**
-
-1. **Option A: Route through nginx (Recommended)**
-   - Update `BIBLIO_AUTH_URL` in stack.yaml to `http://nginx-gateway:80/auth`
-   - Catalog will call `http://nginx-gateway:80/auth/api/validate`
-   - Pros: Uses existing nginx routing, consistent with external access
-   - Cons: Extra hop through nginx for internal calls
-
-2. **Option B: Update Biblio Auth to serve both paths**
-   - Add routes in Biblio Auth to serve `/api/*` in addition to `/auth/api/*`
-   - Catalog continues calling `http://biblio-auth:80/api/validate`
-   - Pros: Direct service-to-service communication
-   - Cons: Duplicate route definitions in Biblio Auth
-
-3. **Option C: Update base path in config**
-   - Change Biblio Auth base path handling to include `/auth` prefix
-   - Update environment variable to `BIBLIO_AUTH_URL=http://biblio-auth:80/auth`
-   - Pros: Clean configuration
-   - Cons: Requires Biblio Auth code changes
-
-**Recommended Fix:** Option A - Update stack.yaml to use nginx gateway URL
-
-### 2. Testing & Verification
-- [ ] Fix the 404 routing issue
-- [ ] Test complete login flow (login → redirect → authenticated session)
+### 1. Testing & Verification
+- [x] Fix the 404 routing issue
+- [x] Test complete login flow (login → redirect → authenticated session)
 - [ ] Verify session persistence across page reloads
 - [ ] Test logout flow
 - [ ] Test Basic Auth for OPDS (should still work with internal auth)
 - [ ] Test admin features with Biblio Auth groups
 
-### 3. Documentation Updates
+### 2. Documentation Updates
 - [ ] Remove Keycloak references from `Specification.md`
 - [ ] Remove Keycloak references from `README.md`
 - [ ] Update Playwright tests documentation
