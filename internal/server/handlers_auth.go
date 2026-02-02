@@ -19,7 +19,26 @@ func (s *Server) handleAuthInfo(w http.ResponseWriter, r *http.Request) {
 		"user":          nil,
 	}
 
-	// Check if user is authenticated
+	// In biblio-auth mode, check for auth_token cookie
+	if s.authManager.IsBiblioAuthMode() {
+		cookie, err := r.Cookie("auth_token")
+		if err == nil {
+			// Validate token with Biblio Auth
+			userInfo, err := s.authManager.ValidateBiblioAuthSession(cookie.Value)
+			if err == nil {
+				response["authenticated"] = true
+				response["user"] = map[string]interface{}{
+					"id":       userInfo.ID,
+					"username": userInfo.Username,
+					"email":    userInfo.Email,
+				}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
+	}
+
+	// Check if user is authenticated via context (internal mode)
 	user := auth.GetUserFromContext(r.Context())
 	if user != nil {
 		response["authenticated"] = true
