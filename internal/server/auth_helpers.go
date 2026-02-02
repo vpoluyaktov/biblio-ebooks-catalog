@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"biblio-catalog/internal/auth"
@@ -14,11 +15,15 @@ func (s *Server) checkSessionByMode(w http.ResponseWriter, r *http.Request) bool
 	if s.authManager.IsBiblioAuthMode() {
 		cookie, err := r.Cookie("auth_token")
 		if err != nil {
+			// Log for debugging
+			log.Printf("No auth_token cookie found: %v (cookies: %v)", err, r.Cookies())
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"Not authenticated. Please log in."}`))
 			return false
 		}
+
+		log.Printf("Found auth_token cookie, validating with Biblio Auth")
 
 		// Validate token with Biblio Auth
 		userInfo, err := s.authManager.ValidateBiblioAuthSession(cookie.Value)
@@ -36,7 +41,7 @@ func (s *Server) checkSessionByMode(w http.ResponseWriter, r *http.Request) bool
 			Username: userInfo.Username,
 			Role:     "user", // Default role
 		}
-		
+
 		// Check if user is admin
 		for _, group := range userInfo.Groups {
 			if group == "admin" {
