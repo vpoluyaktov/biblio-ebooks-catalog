@@ -57,7 +57,30 @@ The following files need updates to work with the new auth manager:
 
 ## Architecture
 
-### Authentication Flow
+### Authentication Modes
+
+The catalog supports three authentication modes via `AUTH_MODE` environment variable:
+
+#### 1. `AUTH_MODE=internal` (Standalone)
+- Catalog manages its own users in SQLite database
+- Displays its own login screen
+- Used for standalone deployments outside BiblioHub
+- OPDS Basic Auth uses internal user database
+
+#### 2. `AUTH_MODE=oidc` (Legacy - Keycloak)
+- Integrates with Keycloak or other OIDC providers
+- OAuth2 Authorization Code flow for web UI
+- OPDS Basic Auth validated via Keycloak ROPC
+- **Being deprecated** - replaced by biblio-auth mode
+
+#### 3. `AUTH_MODE=biblio-auth` (New - BiblioHub Stack)
+- Integrates with Biblio Auth service
+- Web UI redirects to Biblio Auth for login
+- JWT token validation via Biblio Auth API
+- OPDS Basic Auth uses internal user database (for e-reader compatibility)
+- **This is the target mode** for BiblioHub stack deployment
+
+### Authentication Flow (biblio-auth mode)
 
 **Web UI:**
 1. User accesses catalog → Redirected to Biblio Auth login
@@ -73,10 +96,13 @@ The following files need updates to work with the new auth manager:
 ### Environment Variables
 
 ```bash
-# Biblio Auth URL (internal Docker network)
+# Authentication mode: internal, oidc, or biblio-auth
+AUTH_MODE=biblio-auth
+
+# Biblio Auth URL (internal Docker network, used when AUTH_MODE=biblio-auth)
 BIBLIO_AUTH_URL=http://biblio-auth:80
 
-# Basic Auth for OPDS (optional)
+# Basic Auth for OPDS (optional, used in all modes)
 OPDS_AUTH_ENABLED=true
 OPDS_AUTH_USER=admin
 OPDS_AUTH_PASSWORD=secret
