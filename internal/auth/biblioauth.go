@@ -104,9 +104,10 @@ type LoginResponse struct {
 
 // ValidateBasicAuth validates username/password credentials with Biblio Auth
 // This is used for OPDS Basic Auth in biblio-auth mode
+// Uses the stateless /api/validate-credentials endpoint to avoid rate limiting and session creation
 func (c *BiblioAuthClient) ValidateBasicAuth(username, password string) (*UserInfo, error) {
-	// Create login request body
-	loginReq := struct {
+	// Create validation request body
+	validationReq := struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}{
@@ -114,12 +115,13 @@ func (c *BiblioAuthClient) ValidateBasicAuth(username, password string) (*UserIn
 		Password: password,
 	}
 
-	body, err := json.Marshal(loginReq)
+	body, err := json.Marshal(validationReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.baseURL+"/api/login", bytes.NewReader(body))
+	// Use stateless endpoint that doesn't create sessions or trigger rate limiting
+	req, err := http.NewRequest("POST", c.baseURL+"/api/validate-credentials", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
