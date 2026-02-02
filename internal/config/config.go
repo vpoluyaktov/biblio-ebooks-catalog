@@ -33,6 +33,7 @@ type LibraryConfig struct {
 
 type AuthConfig struct {
 	Enabled  bool   `yaml:"enabled"`
+	Mode     string `yaml:"mode"` // internal, oidc, or biblio-auth
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 }
@@ -60,6 +61,7 @@ func Default() *Config {
 		},
 		Auth: AuthConfig{
 			Enabled: false,
+			Mode:    "internal",
 			User:    "admin",
 		},
 		BiblioAuth: BiblioAuthConfig{
@@ -117,6 +119,9 @@ func (c *Config) loadFromEnv() {
 	}
 	if v := os.Getenv("OPDS_AUTH_PASSWORD"); v != "" {
 		c.Auth.Password = v
+	}
+	if v := os.Getenv("AUTH_MODE"); v != "" {
+		c.Auth.Mode = v
 	}
 
 	// Biblio Auth configuration

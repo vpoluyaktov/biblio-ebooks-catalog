@@ -18,8 +18,8 @@ type Server struct {
 }
 
 func New(cfg *config.Config, database *db.DB) (*Server, error) {
-	// Create auth manager with Biblio Auth
-	authManager, err := auth.NewManager(database, cfg.BiblioAuth.URL)
+	// Create auth manager with configured mode
+	authManager, err := auth.NewManager(cfg.Auth.Mode, database, cfg.BiblioAuth.URL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth manager: %w", err)
 	}
@@ -219,26 +219,9 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleSetup(w, r)
 		return
 	}
-	if path == "/auth/info" && r.Method == "GET" {
-		s.handleAuthInfo(w, r)
-		return
-	}
 	// Internal auth endpoints
 	if path == "/auth/login" && r.Method == "POST" {
 		s.handleLogin(w, r)
-		return
-	}
-	// OIDC auth endpoints
-	if path == "/auth/oidc/login" && r.Method == "GET" {
-		s.handleOIDCLogin(w, r)
-		return
-	}
-	if path == "/auth/oidc/callback" && r.Method == "GET" {
-		s.handleOIDCCallback(w, r)
-		return
-	}
-	if path == "/auth/oidc/logout" && r.Method == "POST" {
-		s.handleOIDCLogout(w, r)
 		return
 	}
 
