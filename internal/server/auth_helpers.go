@@ -28,11 +28,14 @@ func (s *Server) checkSessionByMode(w http.ResponseWriter, r *http.Request) bool
 		// Validate token with Biblio Auth
 		userInfo, err := s.authManager.ValidateBiblioAuthSession(cookie.Value)
 		if err != nil {
+			log.Printf("Biblio Auth validation failed: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"Session expired. Please log in again."}`))
 			return false
 		}
+
+		log.Printf("Biblio Auth validation successful: user=%s, groups=%v", userInfo.Username, userInfo.Groups)
 
 		// Convert Biblio Auth UserInfo to internal db.User for context
 		// Note: We create a temporary user object for the context
