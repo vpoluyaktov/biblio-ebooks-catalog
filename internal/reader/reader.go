@@ -271,10 +271,21 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 
 type fb2Section struct {
 	Title struct {
-		Paragraphs []string `xml:"p"`
+		Paragraphs []fb2Paragraph `xml:"p"`
 	} `xml:"title"`
-	Paragraphs []string     `xml:"p"`
-	Sections   []fb2Section `xml:"section"`
+	Paragraphs []fb2Paragraph `xml:"p"`
+	EmptyLines []struct{}     `xml:"empty-line"`
+	Epigraphs  []fb2Epigraph  `xml:"epigraph"`
+	Sections   []fb2Section   `xml:"section"`
+	Content    string         `xml:",innerxml"`
+}
+
+type fb2Paragraph struct {
+	Content string `xml:",innerxml"`
+}
+
+type fb2Epigraph struct {
+	Paragraphs []fb2Paragraph `xml:"p"`
 }
 
 func extractFB2Section(section fb2Section, chapterNum *int) Chapter {
@@ -283,16 +294,28 @@ func extractFB2Section(section fb2Section, chapterNum *int) Chapter {
 	// Extract title
 	title := fmt.Sprintf("Chapter %d", *chapterNum)
 	if len(section.Title.Paragraphs) > 0 {
-		title = strings.TrimSpace(section.Title.Paragraphs[0])
+		// Strip FB2 tags from title for plain text title
+		title = strings.TrimSpace(stripFB2Tags(section.Title.Paragraphs[0].Content))
 		html.WriteString("<h2>")
 		html.WriteString(htmlEscape(title))
 		html.WriteString("</h2>\n")
 	}
 
-	// Extract paragraphs
+	// Extract epigraphs
+	for _, epigraph := range section.Epigraphs {
+		html.WriteString("<blockquote class=\"epigraph\">\n")
+		for _, p := range epigraph.Paragraphs {
+			html.WriteString("<p>")
+			html.WriteString(convertFB2ToHTML(p.Content))
+			html.WriteString("</p>\n")
+		}
+		html.WriteString("</blockquote>\n")
+	}
+
+	// Extract paragraphs with preserved formatting
 	for _, p := range section.Paragraphs {
 		html.WriteString("<p>")
-		html.WriteString(htmlEscape(p))
+		html.WriteString(convertFB2ToHTML(p.Content))
 		html.WriteString("</p>\n")
 	}
 
@@ -314,6 +337,49 @@ func extractFB2Section(section fb2Section, chapterNum *int) Chapter {
 	}
 
 	return chapter
+}
+
+// convertFB2ToHTML converts FB2 inline formatting tags to HTML equivalents
+func convertFB2ToHTML(content string) string {
+	// Convert FB2 emphasis to HTML em (italic)
+	content = strings.ReplaceAll(content, "<emphasis>", "<em>")
+	content = strings.ReplaceAll(content, "</emphasis>", "</em>")
+
+	// Convert FB2 strong to HTML strong (bold)
+	content = strings.ReplaceAll(content, "<strong>", "<strong>")
+	content = strings.ReplaceAll(content, "</strong>", "</strong>")
+
+	// Convert FB2 strikethrough
+	content = strings.ReplaceAll(content, "<strikethrough>", "<del>")
+	content = strings.ReplaceAll(content, "</strikethrough>", "</del>")
+
+	// Convert FB2 code/style tags
+	content = strings.ReplaceAll(content, "<code>", "<code>")
+	content = strings.ReplaceAll(content, "</code>", "</code>")
+
+	// Convert FB2 sup/sub
+	content = strings.ReplaceAll(content, "<sup>", "<sup>")
+	content = strings.ReplaceAll(content, "</sup>", "</sup>")
+	content = strings.ReplaceAll(content, "<sub>", "<sub>")
+	content = strings.ReplaceAll(content, "</sub>", "</sub>")
+
+	// Handle empty-line tags - convert to line break
+	content = regexp.MustCompile(`<empty-line\s*/>`).ReplaceAllString(content, "<br/>")
+	content = regexp.MustCompile(`<empty-line></empty-line>`).ReplaceAllString(content, "<br/>")
+
+	// Remove any remaining FB2-specific tags that don't have HTML equivalents
+	// but keep their content (like <a> links with l:href)
+	content = regexp.MustCompile(`<a[^>]*l:href="[^"]*"[^>]*>`).ReplaceAllString(content, "")
+	content = strings.ReplaceAll(content, "</a>", "")
+
+	return content
+}
+
+// stripFB2Tags removes all FB2 XML tags and returns plain text
+func stripFB2Tags(content string) string {
+	// Remove all XML tags
+	re := regexp.MustCompile(`<[^>]+>`)
+	return re.ReplaceAllString(content, "")
 }
 
 // Helper functions
