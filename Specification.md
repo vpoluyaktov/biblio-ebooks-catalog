@@ -262,6 +262,12 @@ biblio-catalog:
   - OPDS Basic Auth validated via Biblio Auth
   - **Admin Role Detection** (2026-02-02): Fixed config icon visibility for admin users in biblio-auth mode by adding role field to `/api/auth/info` response based on user's groups
   - **Reader Authentication** (2026-02-02): Fixed reader endpoint to support biblio-auth mode by checking auth_token cookie in CheckSession method
+- **FB2 Reader Formatting Fix** (2026-02-03)
+  - Fixed FB2 parser to preserve inline formatting tags (`<emphasis>`, `<strong>`, `<strikethrough>`, etc.)
+  - Changed paragraph parsing from plain text to `innerxml` to capture raw XML content
+  - Added `convertFB2ToHTML()` function to convert FB2 tags to HTML equivalents (`<emphasis>` → `<em>`, etc.)
+  - Added support for epigraphs and empty-line elements
+  - Emphasis text (dates, italicized content) now displays correctly in the ebook reader
 
 ### Future Enhancements
 
@@ -304,4 +310,4 @@ For integration details, see [biblio-auth/INTEGRATION_GUIDE.md](https://github.c
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*
