@@ -1406,7 +1406,11 @@ const App = {
     this.booksLoading = true;
 
     try {
-      const res = await fetch(this.apiUrl(url));
+      // When loading more books (append=true), the URL from OPDS 'next' link already contains the base path
+      // Only prepend base path for initial loads where URL doesn't already include it
+      const basePath = window.APP_BASE_PATH || '';
+      const fetchUrl = (basePath && url.startsWith(basePath)) ? url : this.apiUrl(url);
+      const res = await fetch(fetchUrl);
       const text = await res.text();
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
