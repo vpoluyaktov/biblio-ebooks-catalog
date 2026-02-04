@@ -268,6 +268,10 @@ biblio-catalog:
   - Added `convertFB2ToHTML()` function to convert FB2 tags to HTML equivalents (`<emphasis>` → `<em>`, etc.)
   - Added support for epigraphs and empty-line elements
   - Emphasis text (dates, italicized content) now displays correctly in the ebook reader
+- **Book List Pagination Fix** (2026-02-04)
+  - Fixed infinite scroll pagination in book list showing only first 50 books
+  - Root cause: OPDS `next` link already contains base path, but `loadBooks()` was prepending it again
+  - Fix: Check if URL already starts with base path before prepending in `loadBooks()` function
 
 ### Future Enhancements
 
@@ -310,4 +314,4 @@ For integration details, see [biblio-auth/INTEGRATION_GUIDE.md](https://github.c
 
 ---
 
-*Last updated: 2026-02-03*
+*Last updated: 2026-02-04*
