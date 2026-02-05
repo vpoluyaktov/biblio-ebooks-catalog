@@ -12,6 +12,7 @@ const MobileUI = {
   vsAuthors: { items: [], total: 0, offset: 0, loading: false, filter: '' },
   vsSeries: { items: [], total: 0, offset: 0, loading: false, filter: '' },
   vsGenres: { items: [], total: 0, offset: 0, loading: false, filter: '' },
+  vsBooks: { items: [], nextUrl: null, loading: false },
   VS_PAGE_SIZE: 50,
 
   init() {
@@ -86,6 +87,8 @@ const MobileUI = {
         break;
       case 'books':
         container.innerHTML = this.renderBooks();
+        // Reset books state when navigating to books screen
+        this.vsBooks = { items: [], nextUrl: null, loading: false };
         this.loadBooks();
         break;
       case 'book-detail':
@@ -1056,8 +1059,12 @@ const MobileUI = {
     }
   },
 
-  async loadBooks() {
+  async loadBooks(url = null, append = false) {
+    if (this.vsBooks.loading) return;
+    
     try {
+      this.vsBooks.loading = true;
+      
       // Ensure library is set
       if (!App.currentLibrary && App.libraries.length > 0) {
         App.currentLibrary = App.libraries[0].id;
@@ -1066,22 +1073,33 @@ const MobileUI = {
       if (!App.currentLibrary) {
         const list = document.getElementById('mobile-books-list');
         if (list) list.innerHTML = '<div class="mobile-empty">No library selected</div>';
+        this.vsBooks.loading = false;
         return;
       }
 
-      let opdsUrl = '';
+      let opdsUrl = url;
       
-      if (this.selectedAuthor) {
-        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/author/${this.selectedAuthor.id}`);
-      } else if (this.selectedSeries) {
-        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/series/${this.selectedSeries.id}`);
-      } else if (this.selectedGenre) {
-        opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/genres/${encodeURIComponent(this.selectedGenre)}`);
+      if (!opdsUrl) {
+        // Initial load - construct URL based on selection
+        if (this.selectedAuthor) {
+          opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/author/${this.selectedAuthor.id}`);
+        } else if (this.selectedSeries) {
+          opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/series/${this.selectedSeries.id}`);
+        } else if (this.selectedGenre) {
+          opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/genres/${encodeURIComponent(this.selectedGenre)}`);
+        }
+      } else {
+        // Loading more - URL from OPDS 'next' link may already contain base path
+        const basePath = window.APP_BASE_PATH || '';
+        if (basePath && !opdsUrl.startsWith(basePath)) {
+          opdsUrl = basePath + opdsUrl;
+        }
       }
 
       if (!opdsUrl) {
         const list = document.getElementById('mobile-books-list');
         if (list) list.innerHTML = '<div class="mobile-empty">No selection</div>';
+        this.vsBooks.loading = false;
         return;
       }
 
@@ -1091,9 +1109,19 @@ const MobileUI = {
       const parser = new DOMParser();
       const xml = parser.parseFromString(text, 'text/xml');
       
+      // Parse pagination links - look for 'next' link
+      const links = xml.querySelectorAll('feed > link');
+      this.vsBooks.nextUrl = null;
+      for (const link of links) {
+        if (link.getAttribute('rel') === 'next') {
+          this.vsBooks.nextUrl = link.getAttribute('href');
+          break;
+        }
+      }
+      
       // Parse OPDS entries
       const entries = xml.querySelectorAll('entry');
-      const books = Array.from(entries).map(entry => {
+      const newBooks = Array.from(entries).map(entry => {
         const id = entry.querySelector('id')?.textContent || '';
         const bookId = id.split(':').pop();
         const title = entry.querySelector('title')?.textContent || 'Unknown';
@@ -1151,52 +1179,92 @@ const MobileUI = {
         };
       });
 
-      const list = document.getElementById('mobile-books-list');
-      if (!list) return;
-
-      if (!books || books.length === 0) {
-        list.innerHTML = '<div class="mobile-empty">No books found</div>';
-        return;
+      // Append or replace books
+      if (append) {
+        this.vsBooks.items.push(...newBooks);
+      } else {
+        this.vsBooks.items = newBooks;
       }
 
-      list.innerHTML = books.map(book => `
-        <div class="mobile-book-item" data-book-id="${book.id}">
-          <div class="mobile-book-item-cover">
-            ${book.cover_url ? 
-              `<img src="${book.cover_url}" alt="${book.title}">` :
-              `<div class="mobile-book-item-cover-placeholder">📚</div>`
-            }
-          </div>
-          <div class="mobile-book-item-info">
-            <div class="mobile-book-item-title">${book.title}</div>
-            <div class="mobile-book-item-author">${book.author}</div>
-            ${book.series ? `<div class="mobile-book-item-series">${book.series}</div>` : ''}
-            <div class="mobile-book-item-meta">
-              ${book.lang ? `<span>${book.lang.toUpperCase()}</span>` : ''}
-              ${book.size ? `<span>${book.size}</span>` : ''}
-            </div>
-          </div>
-          <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
-      `).join('');
-
-      list.querySelectorAll('[data-book-id]').forEach(item => {
-        item.addEventListener('click', () => {
-          const bookId = item.dataset.bookId;
-          const book = books.find(b => String(b.id) === String(bookId));
-          if (book) {
-            console.log('Navigating to book:', book);
-            this.navigateTo('book-detail', { selectedBook: book });
-          } else {
-            console.error('Book not found:', bookId);
-          }
-        });
-      });
+      this.renderBooksList();
+      this.vsBooks.loading = false;
     } catch (e) {
       console.error('Failed to load books:', e);
+      this.vsBooks.loading = false;
     }
+  },
+
+  renderBooksList() {
+    const list = document.getElementById('mobile-books-list');
+    if (!list) return;
+
+    const books = this.vsBooks.items;
+
+    if (!books || books.length === 0) {
+      list.innerHTML = '<div class="mobile-empty">No books found</div>';
+      return;
+    }
+
+    list.innerHTML = books.map(book => `
+      <div class="mobile-book-item" data-book-id="${book.id}">
+        <div class="mobile-book-item-cover">
+          ${book.cover_url ? 
+            `<img src="${book.cover_url}" alt="${this.escapeHtml(book.title)}">` :
+            `<div class="mobile-book-item-cover-placeholder">📚</div>`
+          }
+        </div>
+        <div class="mobile-book-item-info">
+          <div class="mobile-book-item-title">${this.escapeHtml(book.title)}</div>
+          <div class="mobile-book-item-author">${this.escapeHtml(book.author)}</div>
+          ${book.series ? `<div class="mobile-book-item-series">${this.escapeHtml(book.series)}</div>` : ''}
+          <div class="mobile-book-item-meta">
+            ${book.lang ? `<span>${book.lang.toUpperCase()}</span>` : ''}
+            ${book.size ? `<span>${book.size}</span>` : ''}
+          </div>
+        </div>
+        <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </div>
+    `).join('');
+
+    // Bind click events
+    list.querySelectorAll('[data-book-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        const bookId = item.dataset.bookId;
+        const book = books.find(b => String(b.id) === String(bookId));
+        if (book) {
+          this.navigateTo('book-detail', { selectedBook: book });
+        }
+      });
+    });
+    
+    // Setup scroll handler for automatic loading
+    this.setupBooksScrollHandler();
+  },
+
+  setupBooksScrollHandler() {
+    const list = document.getElementById('mobile-books-list');
+    if (!list) return;
+    
+    const content = list.closest('.mobile-content');
+    if (!content) return;
+    
+    // Remove previous handler if exists
+    if (this.booksScrollHandler) {
+      content.removeEventListener('scroll', this.booksScrollHandler);
+    }
+    
+    this.booksScrollHandler = () => {
+      if (!this.vsBooks.nextUrl || this.vsBooks.loading) return;
+      
+      const threshold = 100;
+      if (content.scrollTop + content.clientHeight >= content.scrollHeight - threshold) {
+        this.loadBooks(this.vsBooks.nextUrl, true);
+      }
+    };
+    
+    content.addEventListener('scroll', this.booksScrollHandler);
   },
 
   filterList(query) {
