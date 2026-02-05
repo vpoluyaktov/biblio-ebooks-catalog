@@ -272,6 +272,10 @@ biblio-catalog:
   - Fixed infinite scroll pagination in book list showing only first 50 books
   - Root cause: OPDS `next` link already contains base path, but `loadBooks()` was prepending it again
   - Fix: Check if URL already starts with base path before prepending in `loadBooks()` function
+- **Mobile Books List Pagination Fix** (2026-02-04)
+  - Fixed mobile UI showing only first page of books (no infinite scroll)
+  - Root cause: Mobile `loadBooks()` did not parse OPDS `next` link or have scroll handler
+  - Fix: Added `vsBooks` state tracking, `next` link parsing, `renderBooksList()`, and `setupBooksScrollHandler()` to mobile.js
 
 ### Future Enhancements
 
