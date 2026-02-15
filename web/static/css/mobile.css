@@ -330,6 +330,10 @@
   flex-shrink: 0;
 }
 
+.mobile-genre-item {
+  gap: 0.625rem;
+}
+
 .mobile-loading,
 .mobile-empty {
   padding: 3rem 1rem;
