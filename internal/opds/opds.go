@@ -52,6 +52,8 @@ type Entry struct {
 	Authors    []EntryAuthor `xml:"author,omitempty"`
 	Links      []Link        `xml:"link"`
 	Categories []Category    `xml:"category,omitempty"`
+	SeriesName string        `xml:"series_name,omitempty"`
+	SeriesNum  int           `xml:"series_num,omitempty"`
 	Language   string        `xml:"dc:language,omitempty"`
 	Format     string        `xml:"dc:format,omitempty"`
 	Issued     string        `xml:"dc:issued,omitempty"`
@@ -145,12 +147,14 @@ type BookEntry struct {
 
 func (f *Feed) AddBookEntry(book BookEntry, baseURL string) {
 	entry := Entry{
-		ID:       fmt.Sprintf("urn:book:%d", book.ID),
-		Title:    book.Title,
-		Updated:  book.AddedAt,
-		Language: book.Language,
-		Format:   book.Format,
-		Extent:   formatSize(book.Size),
+		ID:         fmt.Sprintf("urn:book:%d", book.ID),
+		Title:      book.Title,
+		Updated:    book.AddedAt,
+		SeriesName: book.SeriesName,
+		SeriesNum:  book.SeriesNum,
+		Language:   book.Language,
+		Format:     book.Format,
+		Extent:     formatSize(book.Size),
 	}
 
 	if book.SeriesName != "" && book.SeriesNum > 0 {

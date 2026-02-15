@@ -600,7 +600,11 @@ func (s *Server) addBookToFeed(feed *opds.Feed, book db.Book, libID int64, baseU
 	var seqNum int
 	if len(series) > 0 {
 		seriesName = series[0].Name
-		// TODO: get sequence number from book_series table
+		var bs db.BookSeries
+		err := s.db.Get(&bs, "SELECT seq_num FROM book_series WHERE book_id = ? AND series_id = ?", book.ID, series[0].ID)
+		if err == nil {
+			seqNum = bs.SeqNum
+		}
 	}
 
 	// Extract annotation from FB2 file

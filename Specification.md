@@ -54,6 +54,12 @@ biblio-ebooks-catalog/
 - ✅ Web UI, OPDS, and API surfaces are available
 - ✅ Multi-library catalog workflows are in production use
 - ✅ Mobile-friendly browsing and reading experience is available
+- ✅ Genres UX supports direct nested genre selection, including mobile single-tap flow with context-preserving back navigation
+- ✅ Legacy hash-route UI entry points now resolve to the main browser dashboard for consistent navigation
+- ✅ Browser dashboard date-column sorting now uses actual date values (not lexicographic string order)
+- ✅ Browser dashboard book table includes Series and Series Order columns with sortable values
+- ✅ Browser dashboard table columns are resizable and persisted per user in browser local storage
+- ✅ Browser dashboard book table header stays sticky while scrolling the books list
 - ✅ Integrated with Biblio Auth and BiblioHub routing model
 
 ## Development Priorities

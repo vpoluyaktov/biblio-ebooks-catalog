@@ -45,6 +45,7 @@ const MobileUI = {
       const prev = this.history.pop();
       this.screen = prev.screen;
       Object.assign(this, prev.data);
+      this.params = prev.data?.params || {};
       this.render();
     }
   },
@@ -54,7 +55,8 @@ const MobileUI = {
       selectedAuthor: this.selectedAuthor,
       selectedSeries: this.selectedSeries,
       selectedGenre: this.selectedGenre,
-      selectedBook: this.selectedBook
+      selectedBook: this.selectedBook,
+      params: this.params ? { ...this.params } : {}
     };
   },
 
@@ -497,7 +499,7 @@ const MobileUI = {
   renderBooks() {
     const title = this.selectedAuthor ? `Books by ${this.selectedAuthor.name}` :
                   this.selectedSeries ? `Series: ${this.selectedSeries.name}` :
-                  this.selectedGenre ? `Genre: ${this.selectedGenre}` : 'Books';
+                  this.selectedGenre ? `Genre: ${this.selectedGenre.name || this.selectedGenre}` : 'Books';
     
     return `
       <div class="mobile-screen">
@@ -1028,13 +1030,15 @@ const MobileUI = {
         const hasChildren = genres.some(g => g.parent_id === genre.id);
         
         return `
-          <div class="mobile-list-item" data-genre-id="${genre.id}" data-genre-name="${genre.name}" data-has-children="${hasChildren}">
+          <div class="mobile-list-item mobile-genre-item" data-genre-id="${genre.id}" data-genre-name="${genre.name}" data-has-children="${hasChildren}">
             <div class="mobile-list-item-text">
               <div class="mobile-list-item-title">${genre.name}</div>
             </div>
-            <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
+            ${hasChildren ? `
+              <svg class="mobile-list-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -1044,13 +1048,13 @@ const MobileUI = {
           const genreId = parseInt(item.dataset.genreId);
           const genreName = item.dataset.genreName;
           const hasChildren = item.dataset.hasChildren === 'true';
-          
+
           if (hasChildren) {
             // Navigate to child genres
             this.navigateTo('genres', { parentGenreId: genreId, parentGenreName: genreName });
           } else {
             // Navigate to books for this genre
-            this.navigateTo('books', { selectedGenre: genreId });
+            this.navigateTo('books', { selectedGenre: { id: genreId, name: genreName } });
           }
         });
       });
@@ -1086,7 +1090,8 @@ const MobileUI = {
         } else if (this.selectedSeries) {
           opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/series/${this.selectedSeries.id}`);
         } else if (this.selectedGenre) {
-          opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/genres/${encodeURIComponent(this.selectedGenre)}`);
+          const genreId = typeof this.selectedGenre === 'object' ? this.selectedGenre.id : this.selectedGenre;
+          opdsUrl = App.apiUrl(`/opds/${App.currentLibrary}/genres/${encodeURIComponent(genreId)}`);
         }
       } else {
         // Loading more - URL from OPDS 'next' link may already contain base path

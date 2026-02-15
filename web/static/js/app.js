@@ -12,7 +12,7 @@ const ReadingHistoryHelper = {
       return [];
     }
   },
-  
+
   formatRelativeTime(isoString) {
     const date = new Date(isoString);
     const now = new Date();
@@ -39,12 +39,16 @@ const App = {
   currentTab: 'authors',
   currentAuthor: null,
   currentSeries: null,
+  currentGenre: null,
   currentBook: null,
   books: [],
   authors: [],
   series: [],
   sortColumn: 'title',
   sortDirection: 'asc',
+  booksTableColumnWidths: null,
+  booksHeaderPinningCleanup: null,
+  BOOKS_TABLE_WIDTHS_KEY: 'booksTableColumnWidths',
   
   // Mobile navigation state
   mobileScreen: 'home', // home, authors, series, genres, search, books, book-detail, config
@@ -267,33 +271,40 @@ const App = {
         this.renderBrowser();
         break;
       case 'library':
-        this.currentLibrary = parseInt(params[0]) || 1;
-        this.renderLibrary(params[1] || 'authors');
+        this.currentLibrary = parseInt(params[0]) || this.currentLibrary || 1;
+        if (params[1]) {
+          this.currentTab = params[1];
+        }
+        window.location.hash = `#browser/${this.currentLibrary}`;
         break;
       case 'authors':
-        this.currentLibrary = parseInt(params[0]) || 1;
-        this.renderAuthors(params[1]);
+        this.currentLibrary = parseInt(params[0]) || this.currentLibrary || 1;
+        this.currentTab = 'authors';
+        window.location.hash = `#browser/${this.currentLibrary}`;
         break;
       case 'author':
-        this.renderAuthor(params[0]);
+        window.location.hash = `#browser/${this.currentLibrary || 1}`;
         break;
       case 'series':
-        this.currentLibrary = parseInt(params[0]) || 1;
-        this.renderSeries();
+        this.currentLibrary = parseInt(params[0]) || this.currentLibrary || 1;
+        this.currentTab = 'series';
+        window.location.hash = `#browser/${this.currentLibrary}`;
         break;
       case 'series-books':
-        this.renderSeriesBooks(params[0]);
+        window.location.hash = `#browser/${this.currentLibrary || 1}`;
         break;
       case 'genres':
-        this.currentLibrary = parseInt(params[0]) || 1;
-        this.renderGenres();
+        this.currentLibrary = parseInt(params[0]) || this.currentLibrary || 1;
+        this.currentTab = 'genres';
+        window.location.hash = `#browser/${this.currentLibrary}`;
         break;
       case 'genre':
-        this.renderGenreBooks(params[0]);
+        window.location.hash = `#browser/${this.currentLibrary || 1}`;
         break;
       case 'search':
-        this.currentLibrary = parseInt(params[0]) || 1;
-        this.renderSearch();
+        this.currentLibrary = parseInt(params[0]) || this.currentLibrary || 1;
+        this.currentTab = 'search';
+        window.location.hash = `#browser/${this.currentLibrary}`;
         break;
       case 'settings':
         this.renderSettings();
@@ -433,6 +444,13 @@ const App = {
     }
 
     const currentLib = this.libraries.find(l => l.id === this.currentLibrary);
+    const tableColumnWidths = this.getBookTableColumnWidths();
+    const tableColumnStyle = (key) => {
+      const width = tableColumnWidths[key];
+      if (!width || !Number.isFinite(width)) return '';
+      const px = Math.max(60, Math.round(width));
+      return ` style="width:${px}px;min-width:${px}px"`;
+    };
 
     document.getElementById('app').innerHTML = `
       <div class="app-browser">
@@ -540,18 +558,30 @@ const App = {
           <div class="panel-center">
             <div class="books-table-wrapper">
               <table class="books-table" id="books-table">
+                <colgroup>
+                  <col data-col-key="author"${tableColumnStyle('author')}>
+                  <col data-col-key="title"${tableColumnStyle('title')}>
+                  <col data-col-key="series"${tableColumnStyle('series')}>
+                  <col data-col-key="seriesSeq"${tableColumnStyle('seriesSeq')}>
+                  <col data-col-key="size"${tableColumnStyle('size')}>
+                  <col data-col-key="date"${tableColumnStyle('date')}>
+                  <col data-col-key="genre"${tableColumnStyle('genre')}>
+                  <col data-col-key="lang"${tableColumnStyle('lang')}>
+                </colgroup>
                 <thead>
                   <tr>
-                    <th data-sort="author" class="sortable ${this.sortColumn === 'author' ? 'sorted-' + this.sortDirection : ''}">Author</th>
-                    <th data-sort="title" class="sortable ${this.sortColumn === 'title' ? 'sorted-' + this.sortDirection : ''}">Title</th>
-                    <th data-sort="size" class="col-size sortable ${this.sortColumn === 'size' ? 'sorted-' + this.sortDirection : ''}">Size</th>
-                    <th data-sort="date" class="col-date sortable ${this.sortColumn === 'date' ? 'sorted-' + this.sortDirection : ''}">Date</th>
-                    <th data-sort="genre" class="col-genre sortable ${this.sortColumn === 'genre' ? 'sorted-' + this.sortDirection : ''}">Genre</th>
-                    <th data-sort="lang" class="sortable ${this.sortColumn === 'lang' ? 'sorted-' + this.sortDirection : ''}">Lang</th>
+                    <th data-col-key="author" data-sort="author" class="sortable ${this.sortColumn === 'author' ? 'sorted-' + this.sortDirection : ''}">Author<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="title" data-sort="title" class="sortable ${this.sortColumn === 'title' ? 'sorted-' + this.sortDirection : ''}">Title<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="series" data-sort="series" class="col-series sortable ${this.sortColumn === 'series' ? 'sorted-' + this.sortDirection : ''}">Series<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="seriesSeq" data-sort="seriesSeq" class="col-series-seq sortable ${this.sortColumn === 'seriesSeq' ? 'sorted-' + this.sortDirection : ''}">Order<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="size" data-sort="size" class="col-size sortable ${this.sortColumn === 'size' ? 'sorted-' + this.sortDirection : ''}">Size<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="date" data-sort="date" class="col-date sortable ${this.sortColumn === 'date' ? 'sorted-' + this.sortDirection : ''}">Date<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="genre" data-sort="genre" class="col-genre sortable ${this.sortColumn === 'genre' ? 'sorted-' + this.sortDirection : ''}">Genre<span class="col-resize-handle" data-col-resize></span></th>
+                    <th data-col-key="lang" data-sort="lang" class="sortable ${this.sortColumn === 'lang' ? 'sorted-' + this.sortDirection : ''}">Lang<span class="col-resize-handle" data-col-resize></span></th>
                   </tr>
                 </thead>
                 <tbody id="books-tbody">
-                  <tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Select an author or series</td></tr>
+                  <tr><td colspan="8" class="text-muted text-center" style="padding:2rem">Select an author or series</td></tr>
                 </tbody>
               </table>
             </div>
@@ -668,6 +698,135 @@ const App = {
 
     // Reading history dropdown
     this.initReadingHistoryDropdown();
+
+    // Column resizers with persisted widths
+    this.initBookTableColumnResizers();
+
+    // Keep table headers visible while scrolling (sticky + fallback)
+    this.initBooksTableHeaderPinning();
+  },
+
+  getBookTableColumnWidths() {
+    if (this.booksTableColumnWidths) {
+      return this.booksTableColumnWidths;
+    }
+
+    try {
+      const raw = localStorage.getItem(this.BOOKS_TABLE_WIDTHS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      this.booksTableColumnWidths = Object.fromEntries(
+        Object.entries(parsed).filter(([, value]) => Number.isFinite(value) && value > 0)
+      );
+    } catch (e) {
+      this.booksTableColumnWidths = {};
+    }
+
+    return this.booksTableColumnWidths;
+  },
+
+  saveBookTableColumnWidths() {
+    try {
+      localStorage.setItem(this.BOOKS_TABLE_WIDTHS_KEY, JSON.stringify(this.getBookTableColumnWidths()));
+    } catch (e) {
+      // Ignore storage write errors
+    }
+  },
+
+  setBookTableColumnWidth(columnKey, widthPx) {
+    const width = Math.max(60, Math.min(900, Math.round(widthPx)));
+    const map = this.getBookTableColumnWidths();
+    map[columnKey] = width;
+    this.saveBookTableColumnWidths();
+
+    const colEl = document.querySelector(`#books-table col[data-col-key="${columnKey}"]`);
+    if (colEl) {
+      colEl.style.width = `${width}px`;
+      colEl.style.minWidth = `${width}px`;
+    }
+  },
+
+  initBookTableColumnResizers() {
+    const table = document.getElementById('books-table');
+    if (!table) return;
+
+    table.querySelectorAll('th[data-col-key]').forEach((th) => {
+      const handle = th.querySelector('[data-col-resize]');
+      if (!handle) return;
+
+      handle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+
+      handle.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const columnKey = th.dataset.colKey;
+        const colEl = table.querySelector(`col[data-col-key="${columnKey}"]`);
+        const startWidth = colEl ? colEl.getBoundingClientRect().width : th.getBoundingClientRect().width;
+        const startX = event.clientX;
+
+        const onMouseMove = (moveEvent) => {
+          const delta = moveEvent.clientX - startX;
+          this.setBookTableColumnWidth(columnKey, startWidth + delta);
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  },
+
+  initBooksTableHeaderPinning() {
+    const wrapper = document.querySelector('.books-table-wrapper');
+    const table = document.getElementById('books-table');
+    const thead = table?.querySelector('thead');
+    const firstTh = thead?.querySelector('th');
+    if (!wrapper || !table || !thead || !firstTh) return;
+
+    if (this.booksHeaderPinningCleanup) {
+      this.booksHeaderPinningCleanup();
+      this.booksHeaderPinningCleanup = null;
+    }
+
+    table.classList.remove('books-header-fallback');
+    thead.style.transform = '';
+
+    const maxScroll = wrapper.scrollHeight - wrapper.clientHeight;
+    if (maxScroll <= 0) return;
+
+    const testScroll = Math.min(40, maxScroll);
+
+    const originalScrollTop = wrapper.scrollTop;
+    wrapper.scrollTop = testScroll;
+
+    const wrapperTop = wrapper.getBoundingClientRect().top;
+    const thTop = firstTh.getBoundingClientRect().top;
+    const stickyWorks = Math.abs(thTop - wrapperTop) <= 2;
+
+    wrapper.scrollTop = originalScrollTop;
+
+    if (stickyWorks) {
+      return;
+    }
+
+    table.classList.add('books-header-fallback');
+
+    const syncHeader = () => {
+      thead.style.transform = `translateY(${wrapper.scrollTop}px)`;
+    };
+
+    wrapper.addEventListener('scroll', syncHeader, { passive: true });
+    this.booksHeaderPinningCleanup = () => {
+      wrapper.removeEventListener('scroll', syncHeader);
+    };
+    syncHeader();
   },
 
   initReadingHistoryDropdown() {
@@ -864,6 +1023,12 @@ const App = {
       if (this.sortColumn === 'size') {
         valA = this.parseSizeToBytes(valA);
         valB = this.parseSizeToBytes(valB);
+      } else if (this.sortColumn === 'date') {
+        valA = Number.isFinite(a.dateTs) ? a.dateTs : (Date.parse(a.date) || 0);
+        valB = Number.isFinite(b.dateTs) ? b.dateTs : (Date.parse(b.date) || 0);
+      } else if (this.sortColumn === 'seriesSeq') {
+        valA = Number.isFinite(a.seriesSeq) ? a.seriesSeq : (parseInt(a.seriesSeq, 10) || 0);
+        valB = Number.isFinite(b.seriesSeq) ? b.seriesSeq : (parseInt(b.seriesSeq, 10) || 0);
       }
 
       if (typeof valA === 'string') {
@@ -908,6 +1073,8 @@ const App = {
       <tr data-book-idx="${idx}">
         <td class="col-author" title="${book.author}">${book.author}</td>
         <td class="col-title" title="${book.title}">${book.title}</td>
+        <td class="col-series" title="${book.series || ''}">${book.series || ''}</td>
+        <td class="col-series-seq">${book.seriesSeq || ''}</td>
         <td class="col-size">${book.size}</td>
         <td class="col-date">${book.date}</td>
         <td class="col-genre" title="${book.genre}">${book.genre}</td>
@@ -928,6 +1095,8 @@ const App = {
       table.setAttribute('tabindex', '0');
       table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
     }
+
+    this.initBooksTableHeaderPinning();
   },
 
   selectBookRow(row) {
@@ -1333,19 +1502,56 @@ const App = {
     try {
       const genres = await this.fetchAPI('/api/genres');
       const topLevel = genres.filter(g => g.parent_id === 0);
+      const childrenByParent = new Map();
+
+      genres.forEach((genre) => {
+        const parentId = Number(genre.parent_id) || 0;
+        if (!childrenByParent.has(parentId)) {
+          childrenByParent.set(parentId, []);
+        }
+        childrenByParent.get(parentId).push(genre);
+      });
+
+      const renderGenreChildren = (parentId, depth = 1) => {
+        const children = childrenByParent.get(parentId) || [];
+        if (children.length === 0) return '';
+
+        const depthClass = `depth-${Math.min(depth, 4)}`;
+        return children.map((genre) => {
+          const hasChildren = (childrenByParent.get(genre.id) || []).length > 0;
+          const selectedClass = this.currentGenre === genre.id ? 'selected' : '';
+          return `
+            <div class="genre-children-row ${depthClass}">
+              <button
+                type="button"
+                class="genre-chip ${selectedClass}"
+                data-genre-id="${genre.id}"
+                data-has-children="${hasChildren}"
+                title="${this.escapeHtml(genre.name)}"
+              >
+                ${this.escapeHtml(genre.name)}
+              </button>
+            </div>
+            ${renderGenreChildren(genre.id, depth + 1)}
+          `;
+        }).join('');
+      };
 
       panelList.innerHTML = topLevel.map(genre => {
-        const children = genres.filter(g => g.parent_id === genre.id);
+        const hasChildren = (childrenByParent.get(genre.id) || []).length > 0;
+        const selectedClass = this.currentGenre === genre.id ? 'selected' : '';
         return `
-          <div class="panel-item" style="flex-direction:column;align-items:flex-start">
-            <strong style="margin-bottom:0.25rem">${genre.name}</strong>
-            ${children.length > 0 ? `
-              <div style="display:flex;flex-wrap:wrap;gap:0.25rem">
-                ${children.map(c => `
-                  <span class="badge" style="cursor:pointer;font-size:0.7rem" data-genre-id="${c.id}">${c.name}</span>
-                `).join('')}
-              </div>
-            ` : ''}
+          <div class="panel-item genre-group-item" style="flex-direction:column;align-items:flex-start">
+            <button
+              type="button"
+              class="genre-group-title ${selectedClass}"
+              data-genre-id="${genre.id}"
+              data-has-children="${hasChildren}"
+              title="${this.escapeHtml(genre.name)}"
+            >
+              ${this.escapeHtml(genre.name)}
+            </button>
+            ${renderGenreChildren(genre.id)}
           </div>
         `;
       }).join('');
@@ -1353,7 +1559,9 @@ const App = {
       panelList.querySelectorAll('[data-genre-id]').forEach(item => {
         item.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.loadBooksByGenre(item.dataset.genreId);
+          panelList.querySelectorAll('[data-genre-id]').forEach(i => i.classList.remove('selected'));
+          item.classList.add('selected');
+          this.loadBooksByGenre(Number(item.dataset.genreId));
         });
       });
 
@@ -1375,6 +1583,7 @@ const App = {
   },
 
   async loadBooksByGenre(genreId) {
+    this.currentGenre = Number(genreId);
     await this.loadBooks(`/opds/${this.currentLibrary}/genres/${genreId}`);
   },
 
@@ -1448,6 +1657,8 @@ const App = {
         const categories = entry.querySelectorAll('category');
         const genres = Array.from(categories).map(c => c.getAttribute('label') || c.getAttribute('term')).filter(Boolean);
         const genre = genres.join(', ');
+        const series = entry.querySelector('series_name')?.textContent || '';
+        const seriesSeq = parseInt(entry.querySelector('series_num')?.textContent || '0', 10) || 0;
         
         // Find acquisition link
         let downloadLink = '';
@@ -1469,8 +1680,11 @@ const App = {
           id: bookId, 
           title, 
           author, 
+          series,
+          seriesSeq,
           size, 
           date: updated ? new Date(updated).toLocaleDateString() : '',
+          dateTs: updated ? (Date.parse(updated) || 0) : 0,
           genre,
           lang,
           format,
@@ -1487,7 +1701,7 @@ const App = {
       }
 
       if (this.books.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">No books found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="padding:2rem">No books found</td></tr>';
         return;
       }
 
@@ -1515,7 +1729,7 @@ const App = {
     } catch (e) {
       console.error('Failed to load books:', e);
       if (!append) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="padding:2rem">Failed to load</td></tr>';
       }
       this.showToast('Failed to load books', 'error');
     } finally {
@@ -1531,6 +1745,8 @@ const App = {
       <tr data-book-idx="${idx}">
         <td class="col-author" title="${this.escapeHtml(book.author)}">${this.escapeHtml(book.author)}</td>
         <td class="col-title" title="${this.escapeHtml(book.title)}">${this.escapeHtml(book.title)}</td>
+        <td class="col-series" title="${this.escapeHtml(book.series || '')}">${this.escapeHtml(book.series || '')}</td>
+        <td class="col-series-seq">${book.seriesSeq || ''}</td>
         <td class="col-size">${book.size}</td>
         <td class="col-date">${book.date}</td>
         <td class="col-genre" title="${this.escapeHtml(book.genre)}">${this.escapeHtml(book.genre)}</td>
@@ -1551,6 +1767,8 @@ const App = {
       table.setAttribute('tabindex', '0');
       table.addEventListener('keydown', (e) => this.handleBooksKeyboard(e));
     }
+
+    this.initBooksTableHeaderPinning();
   },
   
   escapeHtml(text) {
@@ -2109,7 +2327,7 @@ const App = {
                       ${librariesWithStats.map(lib => `
                         <tr>
                           <td>
-                            <a href="#library/${lib.id}" class="table-link">${lib.name}</a>
+                            <a href="#browser/${lib.id}" class="table-link">${lib.name}</a>
                             <div class="text-muted" style="font-size:0.75rem;max-width:250px;overflow:hidden;text-overflow:ellipsis" title="${lib.path}">${lib.path}</div>
                           </td>
                           <td>${lib.book_count?.toLocaleString() || 0}</td>
