@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/parser"
 )
 
 // ScannedBook represents a book found during directory scanning
@@ -253,8 +253,8 @@ func (s *Scanner) parseFile(path string) []*ScannedBook {
 		Size:     info.Size(),
 	}
 
-	// Parse metadata using the parser registry
-	metadata, parseErr := parser.Parse(format, path)
+	// Parse metadata using the unified parser
+	metadata, parseErr := parser.ParseMetadataFromFile(path, format)
 	if parseErr != nil {
 		log.Printf("Warning: failed to parse %s: %v", path, parseErr)
 		book.ParseError = parseErr

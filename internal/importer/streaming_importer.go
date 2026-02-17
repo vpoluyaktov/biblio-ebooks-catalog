@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/parser"
 )
 
 // StreamingImporter imports books one-by-one with frequent cancellation checks
@@ -155,7 +155,7 @@ func (si *StreamingImporter) parseFile(fileInfo *FileInfo) (*ScannedBook, error)
 	} else {
 		// Parse regular file
 		format := fileInfo.GetFormat()
-		metadata, err = parser.Parse(format, fileInfo.Path)
+		metadata, err = parser.ParseMetadataFromFile(fileInfo.Path, format)
 	}
 
 	if err != nil {
@@ -202,8 +202,7 @@ func (si *StreamingImporter) parseFromZip(fileInfo *FileInfo) (*parser.Metadata,
 			}
 
 			// Parse metadata
-			format := fileInfo.GetFormat()
-			metadata, err := parser.ParseFromBytes(format, data)
+			metadata, err := parser.ParseMetadataFromBytes(data, fileInfo.GetFormat())
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse metadata: %w", err)
 			}

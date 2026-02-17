@@ -47,6 +47,36 @@ biblio-ebooks-catalog/
 └── testdata/            # test fixtures and sample datasets
 ```
 
+## Recent Changes
+
+### Unified Ebook Parser Integration (2026-02-17)
+
+Migrated from internal parser implementation to the shared `biblio-ebook-parser` library:
+
+**Benefits:**
+- Eliminates code duplication with biblio-audiobook-builder-tts
+- Single source of truth for EPUB/FB2 parsing logic
+- Easier to add new formats (MOBI, AZW3, PDF)
+- Bug fixes apply to all Biblio services
+- Element-based content model enables flexible rendering
+
+**Implementation:**
+- Added dependency on `github.com/vpoluyaktov/biblio-ebook-parser`
+- Created adapter layer in `internal/parser/adapter.go`
+- Uses HTML renderer for web reader content
+- Maintains backward compatibility with existing API
+- Fixed module import paths (biblio-catalog → biblio-ebooks-catalog)
+
+**Architecture:**
+```
+Parser Library (biblio-ebook-parser)
+  ├── EPUB Parser → Element Model → HTML Renderer
+  └── FB2 Parser  → Element Model → HTML Renderer
+                                        ↓
+                            biblio-ebooks-catalog
+                            (ExtractContent API)
+```
+
 ## Current State
 
 **Service status: Operational**

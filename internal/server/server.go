@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"biblio-catalog/internal/auth"
-	"biblio-catalog/internal/config"
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/auth"
+	"biblio-ebooks-catalog/internal/config"
+	"biblio-ebooks-catalog/internal/db"
 )
 
 type Server struct {

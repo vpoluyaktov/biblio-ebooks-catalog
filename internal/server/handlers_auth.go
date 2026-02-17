@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"biblio-catalog/internal/auth"
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/auth"
+	"biblio-ebooks-catalog/internal/db"
 )
 
 // handleAuthInfo returns the current auth mode and authentication status
