@@ -6,6 +6,9 @@ WORKDIR /app
 # Install build dependencies including ICU for Unicode support
 RUN apk add --no-cache gcc musl-dev icu-dev
 
+# Copy parser library for local replace directive
+COPY ../biblio-ebook-parser /biblio-ebook-parser
+
 # Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
