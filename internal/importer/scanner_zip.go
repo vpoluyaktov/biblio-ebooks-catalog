@@ -2,7 +2,7 @@ package importer
 
 import (
 	"archive/zip"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/parser"
 	"io"
 	"log"
 	"strings"

@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"biblio-catalog/internal/auth"
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/auth"
+	"biblio-ebooks-catalog/internal/db"
 )
 
 // checkSessionByMode validates authentication based on the configured auth mode

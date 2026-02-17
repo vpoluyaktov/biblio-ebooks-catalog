@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/parser"
 )
 
 // StreamingImporter imports books one-by-one with frequent cancellation checks

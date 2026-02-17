@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/db"
 )
 
 type contextKey string

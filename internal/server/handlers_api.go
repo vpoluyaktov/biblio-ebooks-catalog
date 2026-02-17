@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"biblio-catalog/internal/bookfile"
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/importer"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/bookfile"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/importer"
+	"biblio-ebooks-catalog/internal/parser"
 )
 
 // API handlers for opds-server

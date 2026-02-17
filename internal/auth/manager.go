@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/db"
 	"context"
 	"encoding/base64"
 	"fmt"

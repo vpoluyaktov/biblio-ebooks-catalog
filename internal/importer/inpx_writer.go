@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"biblio-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/db"
 )
 
 // INPXWriter handles exporting library data to INPX format

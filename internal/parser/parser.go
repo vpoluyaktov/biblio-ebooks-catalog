@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"io"
-	"strings"
 )
 
 // Metadata represents book metadata extracted from various formats
@@ -94,13 +93,8 @@ func (r *Registry) ParseFromBytes(format string, data []byte) (*Metadata, error)
 }
 
 // DefaultRegistry is the global parser registry with all standard parsers registered
+// Note: Now using the unified biblio-ebook-parser library
 var DefaultRegistry = NewRegistry()
-
-func init() {
-	// Register standard parsers
-	DefaultRegistry.Register("epub", &EPUBParser{})
-	DefaultRegistry.Register("fb2", &FB2Parser{})
-}
 
 // Parse is a convenience function using the default registry
 func Parse(format, filePath string) (*Metadata, error) {
@@ -110,16 +104,4 @@ func Parse(format, filePath string) (*Metadata, error) {
 // ParseFromBytes is a convenience function using the default registry
 func ParseFromBytes(format string, data []byte) (*Metadata, error) {
 	return DefaultRegistry.ParseFromBytes(format, data)
-}
-
-// ExtractContent extracts reader content for supported book formats.
-func ExtractContent(reader io.ReaderAt, size int64, format string) (*BookContent, error) {
-	switch strings.ToLower(format) {
-	case "epub", "epub.zip":
-		return extractEPUBContent(reader, size)
-	case "fb2", "fb2.zip":
-		return extractFB2Content(reader, size)
-	default:
-		return nil, fmt.Errorf("unsupported format: %s", format)
-	}
 }

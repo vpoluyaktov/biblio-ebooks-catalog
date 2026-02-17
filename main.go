@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"biblio-catalog/internal/auth"
-	"biblio-catalog/internal/config"
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/importer"
-	"biblio-catalog/internal/server"
+	"biblio-ebooks-catalog/internal/auth"
+	"biblio-ebooks-catalog/internal/config"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/importer"
+	"biblio-ebooks-catalog/internal/server"
 )
 
 // Run with: go run .

@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"biblio-catalog/internal/bookfile"
-	"biblio-catalog/internal/db"
-	"biblio-catalog/internal/opds"
-	"biblio-catalog/internal/parser"
+	"biblio-ebooks-catalog/internal/bookfile"
+	"biblio-ebooks-catalog/internal/db"
+	"biblio-ebooks-catalog/internal/opds"
+	"biblio-ebooks-catalog/internal/parser"
 )
 
 func (s *Server) writeOPDS(w http.ResponseWriter, feed *opds.Feed) {
