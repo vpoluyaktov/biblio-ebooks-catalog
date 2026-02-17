@@ -6,8 +6,15 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+type epubTOCEntry struct {
+	Title  string
+	Path   string
+	Anchor string
+}
 
 // EPUBMetadata represents metadata extracted from an EPUB file
 type EPUBMetadata struct {
@@ -278,6 +285,380 @@ func parseXMLFromZipFile(f *zip.File, v interface{}) error {
 	}
 
 	return xml.Unmarshal(data, v)
+}
+
+func extractEPUBContent(reader io.ReaderAt, size int64) (*BookContent, error) {
+	zr, err := zip.NewReader(reader, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open EPUB: %w", err)
+	}
+
+	containerFile, err := findFileInZip(zr, "META-INF/container.xml")
+	if err != nil {
+		return nil, fmt.Errorf("container.xml not found: %w", err)
+	}
+
+	var container epubContainer
+	if err := parseXMLFromZipFile(containerFile, &container); err != nil {
+		return nil, fmt.Errorf("failed to parse container.xml: %w", err)
+	}
+
+	packageFile, err := findFileInZip(zr, container.RootFile.FullPath)
+	if err != nil {
+		return nil, fmt.Errorf("package file not found: %w", err)
+	}
+
+	var pkg struct {
+		XMLName  xml.Name `xml:"package"`
+		Metadata struct {
+			Titles   []string `xml:"title"`
+			Creators []struct {
+				Name string `xml:",chardata"`
+			} `xml:"creator"`
+		} `xml:"metadata"`
+		Manifest struct {
+			Items []struct {
+				ID        string `xml:"id,attr"`
+				Href      string `xml:"href,attr"`
+				MediaType string `xml:"media-type,attr"`
+			} `xml:"item"`
+		} `xml:"manifest"`
+		Spine struct {
+			TOC      string `xml:"toc,attr"`
+			ItemRefs []struct {
+				IDRef string `xml:"idref,attr"`
+			} `xml:"itemref"`
+		} `xml:"spine"`
+	}
+
+	if err := parseXMLFromZipFile(packageFile, &pkg); err != nil {
+		return nil, fmt.Errorf("failed to parse package file: %w", err)
+	}
+
+	content := &BookContent{Format: "epub", Chapters: []Chapter{}}
+	if len(pkg.Metadata.Titles) > 0 {
+		content.Title = strings.TrimSpace(pkg.Metadata.Titles[0])
+	}
+	if len(pkg.Metadata.Creators) > 0 {
+		content.Author = strings.TrimSpace(pkg.Metadata.Creators[0].Name)
+	}
+
+	manifestMap := make(map[string]string)
+	manifestMediaTypeMap := make(map[string]string)
+	for _, item := range pkg.Manifest.Items {
+		manifestMap[item.ID] = item.Href
+		manifestMediaTypeMap[item.ID] = item.MediaType
+	}
+
+	baseDir := filepath.Dir(container.RootFile.FullPath)
+	if tocChapters := extractChaptersFromEPUBTOC(zr, baseDir, manifestMap, manifestMediaTypeMap, pkg.Spine.TOC); len(tocChapters) > 0 {
+		content.Chapters = tocChapters
+		return content, nil
+	}
+
+	for i, itemRef := range pkg.Spine.ItemRefs {
+		href, ok := manifestMap[itemRef.IDRef]
+		if !ok {
+			continue
+		}
+
+		fullPath := normalizeEPUBPath(baseDir, href)
+		chapterFile, err := findFileInZip(zr, fullPath)
+		if err != nil {
+			continue
+		}
+
+		rc, err := chapterFile.Open()
+		if err != nil {
+			continue
+		}
+
+		chapterData, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+
+		htmlContent := string(chapterData)
+		defaultTitle := fmt.Sprintf("Chapter %d", i+1)
+		chapterTitle := extractEPUBChapterTitle(htmlContent, defaultTitle)
+
+		content.Chapters = append(content.Chapters, Chapter{
+			ID:      itemRef.IDRef,
+			Title:   strings.TrimSpace(chapterTitle),
+			Content: htmlContent,
+		})
+	}
+
+	return content, nil
+}
+
+func extractChaptersFromEPUBTOC(zr *zip.Reader, packageBaseDir string, manifestMap map[string]string, manifestMediaTypeMap map[string]string, spineTOCID string) []Chapter {
+	entries := extractEPUBTOCEntries(zr, packageBaseDir, manifestMap, manifestMediaTypeMap, spineTOCID)
+	if len(entries) == 0 {
+		return nil
+	}
+
+	htmlCache := make(map[string]string)
+	chapters := make([]Chapter, 0, len(entries))
+	for i, entry := range entries {
+		if entry.Path == "" || strings.TrimSpace(entry.Title) == "" {
+			continue
+		}
+
+		htmlContent, ok := htmlCache[entry.Path]
+		if !ok {
+			chapterFile, err := findFileInZip(zr, entry.Path)
+			if err != nil {
+				continue
+			}
+			rc, err := chapterFile.Open()
+			if err != nil {
+				continue
+			}
+			data, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				continue
+			}
+			htmlContent = string(data)
+			htmlCache[entry.Path] = htmlContent
+		}
+
+		start := findEPUBAnchorStart(htmlContent, entry.Anchor)
+		end := len(htmlContent)
+		if i+1 < len(entries) && entries[i+1].Path == entry.Path {
+			nextStart := findEPUBAnchorStart(htmlContent, entries[i+1].Anchor)
+			if nextStart > start {
+				end = nextStart
+			}
+		}
+		if start < 0 || start >= len(htmlContent) {
+			start = 0
+		}
+		if end <= start || end > len(htmlContent) {
+			end = len(htmlContent)
+		}
+
+		segment := strings.TrimSpace(htmlContent[start:end])
+		if segment == "" {
+			continue
+		}
+
+		title := strings.TrimSpace(entry.Title)
+		title = extractEPUBChapterTitle(segment, title)
+		chapters = append(chapters, Chapter{
+			ID:      fmt.Sprintf("toc-%d", i+1),
+			Title:   title,
+			Content: segment,
+		})
+	}
+
+	return chapters
+}
+
+func extractEPUBTOCEntries(zr *zip.Reader, packageBaseDir string, manifestMap map[string]string, manifestMediaTypeMap map[string]string, spineTOCID string) []epubTOCEntry {
+	tocIDs := make([]string, 0, 4)
+	if spineTOCID != "" {
+		tocIDs = append(tocIDs, spineTOCID)
+	}
+	for id, mediaType := range manifestMediaTypeMap {
+		if mediaType == "application/x-dtbncx+xml" || (mediaType == "application/xhtml+xml" && strings.Contains(strings.ToLower(id), "nav")) {
+			tocIDs = append(tocIDs, id)
+		}
+	}
+
+	for _, tocID := range tocIDs {
+		tocHref, ok := manifestMap[tocID]
+		if !ok {
+			continue
+		}
+		tocPath := normalizeEPUBPath(packageBaseDir, tocHref)
+		tocFile, err := findFileInZip(zr, tocPath)
+		if err != nil {
+			continue
+		}
+
+		mediaType := manifestMediaTypeMap[tocID]
+		tocBaseDir := filepath.Dir(tocPath)
+		if mediaType == "application/x-dtbncx+xml" {
+			entries, err := parseNCXTOCEntriesFromZipFile(tocFile, tocBaseDir)
+			if err == nil && len(entries) > 0 {
+				return entries
+			}
+			continue
+		}
+		if mediaType == "application/xhtml+xml" {
+			entries, err := parseNavXHTMLTOCEntriesFromZipFile(tocFile, tocBaseDir)
+			if err == nil && len(entries) > 0 {
+				return entries
+			}
+		}
+	}
+
+	return nil
+}
+
+func parseNCXTOCEntriesFromZipFile(f *zip.File, tocBaseDir string) ([]epubTOCEntry, error) {
+	var ncx struct {
+		NavMap struct {
+			NavPoints []ncxNavPoint `xml:"navPoint"`
+		} `xml:"navMap"`
+	}
+	if err := parseXMLFromZipFile(f, &ncx); err != nil {
+		return nil, err
+	}
+
+	entries := make([]epubTOCEntry, 0, len(ncx.NavMap.NavPoints))
+	collectNCXTOCEntries(ncx.NavMap.NavPoints, tocBaseDir, &entries)
+	return entries, nil
+}
+
+type ncxNavPoint struct {
+	NavLabel struct {
+		Text string `xml:"text"`
+	} `xml:"navLabel"`
+	Content struct {
+		Src string `xml:"src,attr"`
+	} `xml:"content"`
+	NavPoints []ncxNavPoint `xml:"navPoint"`
+}
+
+func collectNCXTOCEntries(points []ncxNavPoint, tocBaseDir string, out *[]epubTOCEntry) {
+	for _, point := range points {
+		title := strings.TrimSpace(stripHTMLTagsForContent(point.NavLabel.Text))
+		src := strings.TrimSpace(point.Content.Src)
+		if title != "" && src != "" {
+			filePath, anchor := splitEPUBHref(src)
+			*out = append(*out, epubTOCEntry{
+				Title:  title,
+				Path:   normalizeEPUBPath(tocBaseDir, filePath),
+				Anchor: anchor,
+			})
+		}
+		if len(point.NavPoints) > 0 {
+			collectNCXTOCEntries(point.NavPoints, tocBaseDir, out)
+		}
+	}
+}
+
+func parseNavXHTMLTOCEntriesFromZipFile(f *zip.File, tocBaseDir string) ([]epubTOCEntry, error) {
+	rc, err := f.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Lenient fallback parser for nav.xhtml when XML namespaces are inconsistent.
+	re := regexp.MustCompile(`(?is)<a[^>]*href\s*=\s*"([^"]+)"[^>]*>(.*?)</a>`)
+	matches := re.FindAllStringSubmatch(string(data), -1)
+	entries := make([]epubTOCEntry, 0, len(matches))
+	for _, m := range matches {
+		href := strings.TrimSpace(m[1])
+		title := strings.TrimSpace(stripHTMLTagsForContent(m[2]))
+		if href == "" || title == "" {
+			continue
+		}
+		filePath, anchor := splitEPUBHref(href)
+		entries = append(entries, epubTOCEntry{
+			Title:  title,
+			Path:   normalizeEPUBPath(tocBaseDir, filePath),
+			Anchor: anchor,
+		})
+	}
+
+	return entries, nil
+}
+
+func extractEPUBChapterTitle(htmlContent, fallback string) string {
+	headingPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?is)<h1[^>]*>(.*?)</h1>`),
+		regexp.MustCompile(`(?is)<h2[^>]*>(.*?)</h2>`),
+	}
+	for _, pattern := range headingPatterns {
+		matches := pattern.FindStringSubmatch(htmlContent)
+		if len(matches) < 2 {
+			continue
+		}
+		title := strings.TrimSpace(stripHTMLTagsForContent(matches[1]))
+		if title != "" {
+			return title
+		}
+	}
+
+	titlePattern := regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	titleMatches := titlePattern.FindStringSubmatch(htmlContent)
+	if len(titleMatches) >= 2 {
+		title := strings.TrimSpace(stripHTMLTagsForContent(titleMatches[1]))
+		if title != "" {
+			return title
+		}
+	}
+
+	return fallback
+}
+
+func findEPUBAnchorStart(htmlContent, anchor string) int {
+	if anchor == "" {
+		return 0
+	}
+	quotedAnchor := regexp.QuoteMeta(anchor)
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?is)<[^>]*\sid\s*=\s*"` + quotedAnchor + `"[^>]*>`),
+		regexp.MustCompile(`(?is)<[^>]*\sname\s*=\s*"` + quotedAnchor + `"[^>]*>`),
+		regexp.MustCompile(`(?is)<[^>]*\sid\s*=\s*'` + quotedAnchor + `'[^>]*>`),
+		regexp.MustCompile(`(?is)<[^>]*\sname\s*=\s*'` + quotedAnchor + `'[^>]*>`),
+	}
+	for _, pattern := range patterns {
+		loc := pattern.FindStringIndex(htmlContent)
+		if loc != nil {
+			return loc[0]
+		}
+	}
+	return 0
+}
+
+func splitEPUBHref(href string) (string, string) {
+	href = strings.TrimSpace(href)
+	if href == "" {
+		return "", ""
+	}
+	parts := strings.SplitN(href, "#", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.TrimSpace(parts[1])
+}
+
+func normalizeEPUBPath(baseDir, href string) string {
+	href = strings.TrimSpace(href)
+	if href == "" {
+		return ""
+	}
+	if i := strings.Index(href, "?"); i >= 0 {
+		href = href[:i]
+	}
+	return filepath.ToSlash(filepath.Clean(filepath.Join(baseDir, href)))
+}
+
+func stripHTMLTagsForContent(s string) string {
+	var result strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+		} else if r == '>' {
+			inTag = false
+		} else if !inTag {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
 // ExtractEPUBCover extracts the cover image from an EPUB file

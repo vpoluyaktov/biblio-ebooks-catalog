@@ -16,7 +16,7 @@ import (
 	"biblio-catalog/internal/bookfile"
 	"biblio-catalog/internal/db"
 	"biblio-catalog/internal/importer"
-	"biblio-catalog/internal/reader"
+	"biblio-catalog/internal/parser"
 )
 
 // API handlers for opds-server
@@ -699,8 +699,8 @@ func (s *Server) apiGetBookContent(w http.ResponseWriter, r *http.Request, bookI
 	// Create a ReaderAt from the data
 	readerAt := &bytesReaderAt{data: data}
 
-	// Extract content using the reader package
-	content, err := reader.ExtractContent(readerAt, size, book.Format)
+	// Extract content using format-specific parsers
+	content, err := parser.ExtractContent(readerAt, size, book.Format)
 	if err != nil {
 		s.jsonError(w, "Failed to extract book content: "+err.Error(), http.StatusInternalServerError)
 		return
