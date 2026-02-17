@@ -441,17 +441,14 @@ func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
 			continue
 		}
 		for _, section := range body.Sections {
-			chapter := extractFB2SectionContent(section, &chapterNum)
-			if chapter.Content != "" {
-				content.Chapters = append(content.Chapters, chapter)
-			}
+			extractFB2SectionContentRecursive(section, &chapterNum, content)
 		}
 	}
 
 	return content, nil
 }
 
-func extractFB2SectionContent(section fb2ContentSection, chapterNum *int) Chapter {
+func extractFB2SectionContentRecursive(section fb2ContentSection, chapterNum *int, content *BookContent) {
 	var html strings.Builder
 	title := fmt.Sprintf("Chapter %d", *chapterNum)
 	if len(section.Title.Paragraphs) > 0 {
@@ -484,11 +481,14 @@ func extractFB2SectionContent(section fb2ContentSection, chapterNum *int) Chapte
 	}
 	*chapterNum++
 
-	for _, subsection := range section.Sections {
-		_ = extractFB2SectionContent(subsection, chapterNum)
+	if chapter.Content != "" {
+		content.Chapters = append(content.Chapters, chapter)
 	}
 
-	return chapter
+	// Recursively process subsections
+	for _, subsection := range section.Sections {
+		extractFB2SectionContentRecursive(subsection, chapterNum, content)
+	}
 }
 
 func convertFB2ToHTMLForContent(content string) string {
