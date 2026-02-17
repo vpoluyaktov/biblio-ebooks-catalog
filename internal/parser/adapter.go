@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	ebookparser "github.com/vpoluyaktov/biblio-ebook-parser/parser"
 	_ "github.com/vpoluyaktov/biblio-ebook-parser/formats" // Register parsers
+	ebookparser "github.com/vpoluyaktov/biblio-ebook-parser/parser"
 	"github.com/vpoluyaktov/biblio-ebook-parser/renderer/html"
 )
 
@@ -24,7 +24,7 @@ func ExtractContent(reader io.ReaderAt, size int64, format string) (*BookContent
 
 	// Render to HTML for web reader
 	renderer := html.NewRenderer(html.Config{
-		PreserveStructure: true,
+		PreserveStructure: false,
 	})
 
 	content, err := renderer.RenderContent(book)
