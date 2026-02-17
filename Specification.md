@@ -75,6 +75,15 @@ biblio-ebooks-catalog/
 - Keep endpoint tables, env var references, and run/deploy commands in `README.md`.
 - Update **Current State** and **Development Priorities** as capabilities change.
 
+## Implementation Progress (Active Work)
+
+- 2026-02-16: Investigated incorrect chapter list labels in Web Reader (`/catalog/reader`) for EPUB content.
+- Root cause identified in reader EPUB chapter-title extraction: parser prioritized HTML `<title>` tags (often identical across files in Project Gutenberg EPUBs) over in-body chapter headings.
+- Fix implemented to prefer `<h1>`/`<h2>` chapter headings first, then fall back to `<title>`, then fallback chapter numbering.
+- 2026-02-16: Refactored book content extraction into `internal/parser` with format-specific implementations for EPUB and FB2; API content endpoint now uses parser package directly.
+- EPUB parser content extraction now supports TOC-driven virtual chapters (including NCX/nav anchor-based slicing for single-file multi-section EPUBs).
+- 2026-02-16: Consolidated parser layout by merging shared content types/dispatcher into `parser.go` and merging EPUB/FB2 content extraction into `epub.go` and `fb2.go` (removed separate `*_content.go` files).
+
 ---
 
-*Last updated: 2026-02-14*
+*Last updated: 2026-02-16*

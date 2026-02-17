@@ -14,8 +14,26 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/ianaindex"
 	"golang.org/x/text/encoding/unicode"
 )
+
+type fb2ContentSection struct {
+	Title struct {
+		Paragraphs []fb2ContentParagraph `xml:"p"`
+	} `xml:"title"`
+	Paragraphs []fb2ContentParagraph `xml:"p"`
+	Epigraphs  []fb2ContentEpigraph  `xml:"epigraph"`
+	Sections   []fb2ContentSection   `xml:"section"`
+}
+
+type fb2ContentParagraph struct {
+	Content string `xml:",innerxml"`
+}
+
+type fb2ContentEpigraph struct {
+	Paragraphs []fb2ContentParagraph `xml:"p"`
+}
 
 type Fb2TitleInfo struct {
 	Coverpage  Fb2Coverpage  `xml:"coverpage"`
@@ -358,6 +376,145 @@ func parseFB2MetadataFromBytes(data []byte) (*EPUBMetadata, error) {
 	}
 
 	return metadata, nil
+}
+
+func extractFB2Content(reader io.ReaderAt, size int64) (*BookContent, error) {
+	data := make([]byte, size)
+	_, err := reader.ReadAt(data, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read FB2 file: %w", err)
+	}
+
+	contentStr := string(data)
+	contentStr = regexp.MustCompile(`xmlns[^=]*="[^"]*"`).ReplaceAllString(contentStr, "")
+	contentStr = regexp.MustCompile(`<[a-zA-Z]+:`).ReplaceAllString(contentStr, "<")
+	contentStr = regexp.MustCompile(`</[a-zA-Z]+:`).ReplaceAllString(contentStr, "</")
+
+	var fb2 struct {
+		XMLName     xml.Name `xml:"FictionBook"`
+		Description struct {
+			TitleInfo struct {
+				BookTitle string `xml:"book-title"`
+				Authors   []struct {
+					FirstName  string `xml:"first-name"`
+					LastName   string `xml:"last-name"`
+					MiddleName string `xml:"middle-name"`
+				} `xml:"author"`
+			} `xml:"title-info"`
+		} `xml:"description"`
+		Body []struct {
+			Name     string              `xml:"name,attr"`
+			Sections []fb2ContentSection `xml:"section"`
+		} `xml:"body"`
+	}
+
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(contentStr)))
+	decoder.Strict = false
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		enc, err := ianaindex.IANA.Encoding(charset)
+		if err != nil {
+			return nil, fmt.Errorf("unsupported charset %q: %w", charset, err)
+		}
+		if enc == nil {
+			return input, nil
+		}
+		return enc.NewDecoder().Reader(input), nil
+	}
+
+	if err := decoder.Decode(&fb2); err != nil {
+		return nil, fmt.Errorf("failed to parse FB2 XML: %w", err)
+	}
+
+	content := &BookContent{
+		Format:   "fb2",
+		Title:    strings.TrimSpace(fb2.Description.TitleInfo.BookTitle),
+		Chapters: []Chapter{},
+	}
+	if len(fb2.Description.TitleInfo.Authors) > 0 {
+		author := fb2.Description.TitleInfo.Authors[0]
+		content.Author = strings.TrimSpace(strings.TrimSpace(author.FirstName + " " + author.MiddleName + " " + author.LastName))
+	}
+
+	chapterNum := 1
+	for _, body := range fb2.Body {
+		if body.Name == "notes" || body.Name == "comments" {
+			continue
+		}
+		for _, section := range body.Sections {
+			chapter := extractFB2SectionContent(section, &chapterNum)
+			if chapter.Content != "" {
+				content.Chapters = append(content.Chapters, chapter)
+			}
+		}
+	}
+
+	return content, nil
+}
+
+func extractFB2SectionContent(section fb2ContentSection, chapterNum *int) Chapter {
+	var html strings.Builder
+	title := fmt.Sprintf("Chapter %d", *chapterNum)
+	if len(section.Title.Paragraphs) > 0 {
+		title = strings.TrimSpace(stripFB2TagsForContent(section.Title.Paragraphs[0].Content))
+		html.WriteString("<h2>")
+		html.WriteString(htmlEscapeForContent(title))
+		html.WriteString("</h2>\n")
+	}
+
+	for _, epigraph := range section.Epigraphs {
+		html.WriteString("<blockquote class=\"epigraph\">\n")
+		for _, p := range epigraph.Paragraphs {
+			html.WriteString("<p>")
+			html.WriteString(convertFB2ToHTMLForContent(p.Content))
+			html.WriteString("</p>\n")
+		}
+		html.WriteString("</blockquote>\n")
+	}
+
+	for _, p := range section.Paragraphs {
+		html.WriteString("<p>")
+		html.WriteString(convertFB2ToHTMLForContent(p.Content))
+		html.WriteString("</p>\n")
+	}
+
+	chapter := Chapter{
+		ID:      fmt.Sprintf("chapter-%d", *chapterNum),
+		Title:   title,
+		Content: html.String(),
+	}
+	*chapterNum++
+
+	for _, subsection := range section.Sections {
+		_ = extractFB2SectionContent(subsection, chapterNum)
+	}
+
+	return chapter
+}
+
+func convertFB2ToHTMLForContent(content string) string {
+	content = strings.ReplaceAll(content, "<emphasis>", "<em>")
+	content = strings.ReplaceAll(content, "</emphasis>", "</em>")
+	content = strings.ReplaceAll(content, "<strikethrough>", "<del>")
+	content = strings.ReplaceAll(content, "</strikethrough>", "</del>")
+	content = regexp.MustCompile(`<empty-line\s*/>`).ReplaceAllString(content, "<br/>")
+	content = regexp.MustCompile(`<empty-line></empty-line>`).ReplaceAllString(content, "<br/>")
+	content = regexp.MustCompile(`<a[^>]*l:href="[^"]*"[^>]*>`).ReplaceAllString(content, "")
+	content = strings.ReplaceAll(content, "</a>", "")
+	return content
+}
+
+func stripFB2TagsForContent(content string) string {
+	re := regexp.MustCompile(`<[^>]+>`)
+	return re.ReplaceAllString(content, "")
+}
+
+func htmlEscapeForContent(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, `"`, "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
 }
 
 // FB2Parser implements the Parser interface for FB2 files
