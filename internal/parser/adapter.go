@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -64,6 +65,74 @@ func ParseMetadata(reader io.ReaderAt, size int64, format string) (*Metadata, er
 	}
 
 	book, err := parser.ParseReader(reader, size)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse book: %w", err)
+	}
+
+	// Convert to our Metadata format
+	metadata := &Metadata{
+		Title:       book.Metadata.Title,
+		Language:    book.Metadata.Language,
+		Description: book.Metadata.Description,
+		Genres:      book.Metadata.Genres,
+		Series:      book.Metadata.Series,
+		SeriesIndex: book.Metadata.SeriesIndex,
+		CoverData:   book.Metadata.CoverData,
+		CoverType:   book.Metadata.CoverType,
+	}
+
+	// Convert authors
+	metadata.Authors = make([]string, len(book.Metadata.Authors))
+	for i, author := range book.Metadata.Authors {
+		metadata.Authors[i] = author.FullName()
+	}
+
+	return metadata, nil
+}
+
+// ParseMetadataFromFile extracts metadata from a file path
+func ParseMetadataFromFile(filePath string, format string) (*Metadata, error) {
+	parser, err := ebookparser.GetParser(format)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported format: %s", format)
+	}
+
+	book, err := parser.Parse(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse book: %w", err)
+	}
+
+	// Convert to our Metadata format
+	metadata := &Metadata{
+		Title:       book.Metadata.Title,
+		Language:    book.Metadata.Language,
+		Description: book.Metadata.Description,
+		Genres:      book.Metadata.Genres,
+		Series:      book.Metadata.Series,
+		SeriesIndex: book.Metadata.SeriesIndex,
+		CoverData:   book.Metadata.CoverData,
+		CoverType:   book.Metadata.CoverType,
+	}
+
+	// Convert authors
+	metadata.Authors = make([]string, len(book.Metadata.Authors))
+	for i, author := range book.Metadata.Authors {
+		metadata.Authors[i] = author.FullName()
+	}
+
+	return metadata, nil
+}
+
+// ParseMetadataFromBytes extracts metadata from raw bytes
+func ParseMetadataFromBytes(data []byte, format string) (*Metadata, error) {
+	parser, err := ebookparser.GetParser(format)
+	if err != nil {
+		return nil, fmt.Errorf("unsupported format: %s", format)
+	}
+
+	// Use ParseReader with a bytes.Reader (which implements io.ReaderAt)
+	reader := bytes.NewReader(data)
+	book, err := parser.ParseReader(reader, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse book: %w", err)
 	}

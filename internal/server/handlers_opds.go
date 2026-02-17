@@ -427,7 +427,7 @@ func (s *Server) handleOPDSCoverDirect(w http.ResponseWriter, r *http.Request, l
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		}
 
-		metadata, err := parser.Parse("epub", fullPath)
+		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
 		if err == nil && metadata.CoverData != nil {
 			coverData = metadata.CoverData
 			contentType = metadata.CoverType
@@ -497,7 +497,7 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		}
 
-		metadata, err := parser.Parse("epub", fullPath)
+		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
 		if err != nil || metadata.Description == "" {
 			http.Error(w, "Annotation not found", http.StatusNotFound)
 			return

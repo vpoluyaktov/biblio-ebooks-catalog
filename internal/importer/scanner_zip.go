@@ -71,5 +71,5 @@ func parseFB2MetadataFromReader(r io.Reader) (*parser.Metadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parser.ParseFromBytes("fb2", data)
+	return parser.ParseMetadataFromBytes(data, "fb2")
 }

@@ -129,7 +129,7 @@ func (si *StreamingImporter) parseBookFromZip(zipPath string, file *zip.File) (*
 	}
 
 	// Parse metadata
-	metadata, err := parser.ParseFromBytes(format, data)
+	metadata, err := parser.ParseMetadataFromBytes(data, format)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
