@@ -9,7 +9,7 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.33
-	github.com/vpoluyaktov/biblio-ebook-parser v0.0.0-20260217210620-3a7a5fbf1be9
+	github.com/vpoluyaktov/biblio-ebook-parser v0.1.0
 	golang.org/x/crypto v0.47.0
 	golang.org/x/text v0.34.0
 	gopkg.in/yaml.v3 v3.0.1
