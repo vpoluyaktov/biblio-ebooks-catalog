@@ -49,6 +49,27 @@ biblio-ebooks-catalog/
 
 ## Recent Changes
 
+### 2026-02-18: Cover and Annotation Extraction Migration
+
+**Migrated cover and annotation extraction to unified parser library:**
+- Removed duplicate `ExtractFB2Cover()` and `ExtractFB2Annotation()` implementations
+- Removed duplicate `GeneratePlaceholderCover()` implementation
+- Now uses `biblio-ebook-parser` library for all cover/annotation operations
+- Created thin wrapper in `internal/bookfile/extraction.go` for backward compatibility
+
+**Benefits:**
+- Eliminates code duplication with audiobook builder
+- Single source of truth for cover extraction logic
+- Faster extraction using parser library's optimized methods
+- Automatic bug fixes when parser library is updated
+- Shared cover generation with consistent styling
+
+**Implementation:**
+- Wrapper functions in `internal/bookfile/extraction.go`
+- Uses `formats/epub` and `formats/fb2` packages for fast extraction
+- Uses `cover.GeneratePlaceholder()` for missing cover generation
+- Removed old `cover.go`, `cover_generator.go`, and related files
+
 ### Unified Ebook Parser Integration (2026-02-17)
 
 Migrated from internal parser implementation to the shared `biblio-ebook-parser` library:
