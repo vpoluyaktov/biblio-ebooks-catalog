@@ -4,8 +4,7 @@ import (
 	"io"
 
 	"github.com/vpoluyaktov/biblio-ebook-parser/cover"
-	"github.com/vpoluyaktov/biblio-ebook-parser/formats/epub"
-	"github.com/vpoluyaktov/biblio-ebook-parser/formats/fb2"
+	"github.com/vpoluyaktov/biblio-ebook-parser/parser"
 )
 
 // ExtractFB2Cover extracts the cover image from an FB2 file
@@ -17,8 +16,7 @@ func ExtractFB2Cover(reader io.Reader) ([]byte, string, error) {
 	}
 
 	// Use the parser library's fast extraction
-	extractor := &fb2.Extractor{}
-	return extractor.ExtractCoverFromReader(&bytesReaderAt{data}, int64(len(data)))
+	return parser.ExtractCoverFromReader(&bytesReaderAt{data}, int64(len(data)), "fb2")
 }
 
 // ExtractFB2Annotation extracts the annotation/description from an FB2 file
@@ -30,8 +28,7 @@ func ExtractFB2Annotation(reader io.Reader) (string, error) {
 	}
 
 	// Use the parser library's fast extraction
-	extractor := &fb2.Extractor{}
-	return extractor.ExtractAnnotationFromReader(&bytesReaderAt{data}, int64(len(data)))
+	return parser.ExtractAnnotationFromReader(&bytesReaderAt{data}, int64(len(data)), "fb2")
 }
 
 // GeneratePlaceholderCover creates a book cover image with title and author
@@ -48,8 +45,7 @@ func ExtractEPUBCover(reader io.Reader) ([]byte, string, error) {
 	}
 
 	// Use the parser library's fast extraction
-	extractor := &epub.Extractor{}
-	return extractor.ExtractCoverFromReader(&bytesReaderAt{data}, int64(len(data)))
+	return parser.ExtractCoverFromReader(&bytesReaderAt{data}, int64(len(data)), "epub")
 }
 
 // ExtractEPUBAnnotation extracts the annotation/description from an EPUB file
@@ -60,8 +56,7 @@ func ExtractEPUBAnnotation(reader io.Reader) (string, error) {
 	}
 
 	// Use the parser library's fast extraction
-	extractor := &epub.Extractor{}
-	return extractor.ExtractAnnotationFromReader(&bytesReaderAt{data}, int64(len(data)))
+	return parser.ExtractAnnotationFromReader(&bytesReaderAt{data}, int64(len(data)), "epub")
 }
 
 // bytesReaderAt implements io.ReaderAt for a byte slice
