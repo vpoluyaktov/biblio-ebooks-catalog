@@ -406,34 +406,21 @@ func (s *Server) handleOPDSCoverDirect(w http.ResponseWriter, r *http.Request, l
 	var coverData []byte
 	var contentType string
 
-	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
+	// Use parser library for both FB2 and EPUB to properly handle encoding and namespaces
+	var fullPath string
+	if book.Archive == "" {
+		fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+	} else {
+		// For files in archives, construct the path to the archive
+		fullPath = filepath.Join(library.Path, book.Archive)
+	}
 
-	// Try to extract cover based on format
-	if book.Format == "fb2" {
-		reader, _, err := bf.GetReader()
-		if err == nil {
-			coverData, contentType, _ = bookfile.ExtractFB2Cover(reader)
-			reader.Close()
-		}
-	} else if book.Format == "epub" {
-		// Extract cover from EPUB
-		// For EPUB files, we need the actual file path (not from archive)
-		var fullPath string
-		if book.Archive == "" {
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
-		} else {
-			// EPUB in archive - need to extract first or read from archive
-			// For now, try direct file path (most EPUBs are not in archives)
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
-		}
-
-		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
-		if err == nil && metadata.CoverData != nil {
-			coverData = metadata.CoverData
-			contentType = metadata.CoverType
-			if contentType == "" {
-				contentType = "image/jpeg"
-			}
+	metadata, err := parser.ParseMetadataFromFile(fullPath, book.Format)
+	if err == nil && metadata.CoverData != nil {
+		coverData = metadata.CoverData
+		contentType = metadata.CoverType
+		if contentType == "" {
+			contentType = "image/jpeg"
 		}
 	}
 
@@ -472,41 +459,22 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var annotation string
-
-	if book.Format == "fb2" {
-		bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
-		reader, _, err := bf.GetReader()
-		if err != nil {
-			http.Error(w, "Failed to read book", http.StatusInternalServerError)
-			return
-		}
-		defer reader.Close()
-
-		annotation, err = bookfile.ExtractFB2Annotation(reader)
-		if err != nil || annotation == "" {
-			http.Error(w, "Annotation not found", http.StatusNotFound)
-			return
-		}
-	} else if book.Format == "epub" {
-		// Extract description from EPUB
-		var fullPath string
-		if book.Archive == "" {
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
-		} else {
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
-		}
-
-		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
-		if err != nil || metadata.Description == "" {
-			http.Error(w, "Annotation not found", http.StatusNotFound)
-			return
-		}
-		annotation = metadata.Description
+	// Use parser library for both FB2 and EPUB to properly handle encoding and namespaces
+	var fullPath string
+	if book.Archive == "" {
+		fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 	} else {
-		http.Error(w, "Annotation not available for this format", http.StatusNotFound)
+		// For files in archives, construct the path to the archive
+		fullPath = filepath.Join(library.Path, book.Archive)
+	}
+
+	metadata, err := parser.ParseMetadataFromFile(fullPath, book.Format)
+	if err != nil || metadata.Description == "" {
+		http.Error(w, "Annotation not found", http.StatusNotFound)
 		return
 	}
+
+	annotation := metadata.Description
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
