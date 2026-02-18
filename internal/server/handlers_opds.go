@@ -408,7 +408,7 @@ func (s *Server) handleOPDSCoverDirect(w http.ResponseWriter, r *http.Request, l
 
 	bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
 
-	// Try to extract cover based on format
+	// Extract cover directly without parsing entire book content
 	if book.Format == "fb2" {
 		reader, _, err := bf.GetReader()
 		if err == nil {
@@ -416,15 +416,12 @@ func (s *Server) handleOPDSCoverDirect(w http.ResponseWriter, r *http.Request, l
 			reader.Close()
 		}
 	} else if book.Format == "epub" {
-		// Extract cover from EPUB
-		// For EPUB files, we need the actual file path (not from archive)
+		// For EPUB, use parser (it's more efficient for EPUB)
 		var fullPath string
 		if book.Archive == "" {
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		} else {
-			// EPUB in archive - need to extract first or read from archive
-			// For now, try direct file path (most EPUBs are not in archives)
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+			fullPath = filepath.Join(library.Path, book.Archive)
 		}
 
 		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
@@ -474,6 +471,7 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 
 	var annotation string
 
+	// Extract annotation directly without parsing entire book content
 	if book.Format == "fb2" {
 		bf := bookfile.New(library.Path, book.Archive, book.File, book.Format)
 		reader, _, err := bf.GetReader()
@@ -489,12 +487,12 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	} else if book.Format == "epub" {
-		// Extract description from EPUB
+		// For EPUB, use parser (it's more efficient for EPUB)
 		var fullPath string
 		if book.Archive == "" {
 			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
 		} else {
-			fullPath = filepath.Join(library.Path, book.File+"."+book.Format)
+			fullPath = filepath.Join(library.Path, book.Archive)
 		}
 
 		metadata, err := parser.ParseMetadataFromFile(fullPath, "epub")
