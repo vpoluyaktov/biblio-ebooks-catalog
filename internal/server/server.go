@@ -190,6 +190,10 @@ func (s *Server) handleOPDSLibraryRoutes(w http.ResponseWriter, r *http.Request,
 		}
 	} else if action == "search" {
 		s.handleOPDSSearch(w, r)
+	} else if action == "search/authors" {
+		s.handleOPDSSearchAuthors(w, r)
+	} else if action == "search/series" {
+		s.handleOPDSSearchSeries(w, r)
 	} else if action == "opensearch.xml" {
 		s.handleOpenSearch(w, r)
 	} else {

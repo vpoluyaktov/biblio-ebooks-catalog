@@ -128,6 +128,30 @@ Parser Library (biblio-ebook-parser)
 
 ## Implementation Progress (Active Work)
 
+### 2026-02-18: OPDS Author and Series Search
+
+**Implemented separate search endpoints for authors and series:**
+- Added `SearchAuthors()` and `SearchSeries()` database methods with Cyrillic support
+- Created `/opds/{libID}/search/authors?q={query}` endpoint for author name search
+- Created `/opds/{libID}/search/series?q={query}` endpoint for series name search
+- Updated OpenSearch descriptor to advertise all three search types (books, authors, series)
+- Search results include book counts and link to author/series detail pages
+- All search endpoints support pagination
+
+**Benefits:**
+- E-reader clients can now search for books by author name or series name
+- Consistent search experience across all OPDS navigation types
+- Cyrillic and Latin character support with case-insensitive matching
+- Efficient queries using existing database indexes
+
+**Implementation:**
+- Database layer: `internal/db/queries.go` - `SearchAuthors()`, `SearchSeries()`
+- OPDS handlers: `internal/server/handlers_opds.go` - `handleOPDSSearchAuthors()`, `handleOPDSSearchSeries()`
+- Routing: `internal/server/server.go` - added `search/authors` and `search/series` routes
+- OpenSearch: Updated descriptor to include all three search URL templates
+
+### Previous Work
+
 - 2026-02-16: Investigated incorrect chapter list labels in Web Reader (`/catalog/reader`) for EPUB content.
 - Root cause identified in reader EPUB chapter-title extraction: parser prioritized HTML `<title>` tags (often identical across files in Project Gutenberg EPUBs) over in-body chapter headings.
 - Fix implemented to prefer `<h1>`/`<h2>` chapter headings first, then fall back to `<title>`, then fallback chapter numbering.
@@ -137,4 +161,4 @@ Parser Library (biblio-ebook-parser)
 
 ---
 
-*Last updated: 2026-02-16*
+*Last updated: 2026-02-18*

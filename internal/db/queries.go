@@ -440,6 +440,83 @@ func toTitleCase(s string) string {
 	return string(runes)
 }
 
+func (db *DB) SearchAuthors(libraryID int64, query string, limit, offset int) ([]AuthorWithCount, int64, error) {
+	// Use multiple case variants for Cyrillic support
+	pattern := "%" + query + "%"
+	patternLower := "%" + strings.ToLower(query) + "%"
+	patternUpper := "%" + strings.ToUpper(query) + "%"
+	patternTitle := "%" + toTitleCase(query) + "%"
+
+	var total int64
+	err := db.Get(&total, `
+		SELECT COUNT(DISTINCT a.id) FROM author a
+		WHERE a.library_id = ? 
+		AND (a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ?
+		  OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ?
+		  OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ?)`,
+		libraryID,
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var authors []AuthorWithCount
+	err = db.Select(&authors, `
+		SELECT a.*, COUNT(ba.book_id) as book_count
+		FROM author a
+		LEFT JOIN book_author ba ON a.id = ba.author_id
+		WHERE a.library_id = ? 
+		AND (a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ?
+		  OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ?
+		  OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ?)
+		GROUP BY a.id
+		ORDER BY a.last_name, a.first_name
+		LIMIT ? OFFSET ?`,
+		libraryID,
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+		limit, offset,
+	)
+	return authors, total, err
+}
+
+func (db *DB) SearchSeries(libraryID int64, query string, limit, offset int) ([]SeriesWithCount, int64, error) {
+	// Use multiple case variants for Cyrillic support
+	pattern := "%" + query + "%"
+	patternLower := "%" + strings.ToLower(query) + "%"
+	patternUpper := "%" + strings.ToUpper(query) + "%"
+	patternTitle := "%" + toTitleCase(query) + "%"
+
+	var total int64
+	err := db.Get(&total, `
+		SELECT COUNT(*) FROM series
+		WHERE library_id = ? 
+		AND (name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?)`,
+		libraryID, pattern, patternLower, patternUpper, patternTitle,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var series []SeriesWithCount
+	err = db.Select(&series, `
+		SELECT s.*, COUNT(bs.book_id) as book_count
+		FROM series s
+		LEFT JOIN book_series bs ON s.id = bs.series_id
+		WHERE s.library_id = ? 
+		AND (s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ?)
+		GROUP BY s.id
+		ORDER BY s.name
+		LIMIT ? OFFSET ?`,
+		libraryID, pattern, patternLower, patternUpper, patternTitle, limit, offset,
+	)
+	return series, total, err
+}
+
 func (db *DB) GetBookAuthors(bookID int64) ([]Author, error) {
 	var authors []Author
 	err := db.Select(&authors, `

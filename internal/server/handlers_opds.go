@@ -555,6 +555,110 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
+func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request) {
+	libID := s.getLibraryID(r)
+	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		query = r.URL.Query().Get("query")
+	}
+
+	if query == "" {
+		http.Error(w, "Query parameter required", http.StatusBadRequest)
+		return
+	}
+
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		page, _ = strconv.Atoi(p)
+	}
+	limit := s.config.Library.BooksPerPage
+	offset := (page - 1) * limit
+
+	authors, total, err := s.db.SearchAuthors(libID, query, limit, offset)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := opds.NewFeed(
+		"urn:opds-server:search:authors",
+		fmt.Sprintf("Поиск авторов: %s", query),
+	)
+	feed.AddLink("self", fmt.Sprintf("%s/search/authors?q=%s", baseURL, query), "application/atom+xml;profile=opds-catalog")
+	feed.AddLink("up", baseURL, "application/atom+xml;profile=opds-catalog")
+
+	totalPages := (int(total) + limit - 1) / limit
+	feed.AddPagination(fmt.Sprintf("%s/search/authors?q=%s", baseURL, query), page, totalPages)
+
+	for _, author := range authors {
+		title := author.FullName()
+		if author.BookCount > 0 {
+			title = fmt.Sprintf("%s (%d)", title, author.BookCount)
+		}
+		feed.AddAcquisitionEntry(
+			fmt.Sprintf("urn:opds-server:author:%d", author.ID),
+			title,
+			fmt.Sprintf("%s/author/%d", baseURL, author.ID),
+		)
+	}
+
+	s.writeOPDS(w, feed)
+}
+
+func (s *Server) handleOPDSSearchSeries(w http.ResponseWriter, r *http.Request) {
+	libID := s.getLibraryID(r)
+	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		query = r.URL.Query().Get("query")
+	}
+
+	if query == "" {
+		http.Error(w, "Query parameter required", http.StatusBadRequest)
+		return
+	}
+
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		page, _ = strconv.Atoi(p)
+	}
+	limit := s.config.Library.BooksPerPage
+	offset := (page - 1) * limit
+
+	series, total, err := s.db.SearchSeries(libID, query, limit, offset)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	feed := opds.NewFeed(
+		"urn:opds-server:search:series",
+		fmt.Sprintf("Поиск серий: %s", query),
+	)
+	feed.AddLink("self", fmt.Sprintf("%s/search/series?q=%s", baseURL, query), "application/atom+xml;profile=opds-catalog")
+	feed.AddLink("up", baseURL, "application/atom+xml;profile=opds-catalog")
+
+	totalPages := (int(total) + limit - 1) / limit
+	feed.AddPagination(fmt.Sprintf("%s/search/series?q=%s", baseURL, query), page, totalPages)
+
+	for _, s := range series {
+		title := s.Name
+		if s.BookCount > 0 {
+			title = fmt.Sprintf("%s (%d)", s.Name, s.BookCount)
+		}
+		feed.AddAcquisitionEntry(
+			fmt.Sprintf("urn:opds-server:series:%d", s.ID),
+			title,
+			fmt.Sprintf("%s/series/%d", baseURL, s.ID),
+		)
+	}
+
+	s.writeOPDS(w, feed)
+}
+
 func (s *Server) handleOpenSearch(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 
@@ -573,11 +677,13 @@ func (s *Server) handleOpenSearch(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
   <ShortName>opds-server</ShortName>
-  <Description>Search books</Description>
+  <Description>Search books, authors, and series</Description>
   <InputEncoding>UTF-8</InputEncoding>
   <OutputEncoding>UTF-8</OutputEncoding>
-  <Url type="application/atom+xml;profile=opds-catalog" template="%s/search?q={searchTerms}"/>
-</OpenSearchDescription>`, baseURL)))
+  <Url type="application/atom+xml;profile=opds-catalog" template="%s/search?q={searchTerms}" rel="results" title="Search books"/>
+  <Url type="application/atom+xml;profile=opds-catalog" template="%s/search/authors?q={searchTerms}" rel="results" title="Search authors"/>
+  <Url type="application/atom+xml;profile=opds-catalog" template="%s/search/series?q={searchTerms}" rel="results" title="Search series"/>
+</OpenSearchDescription>`, baseURL, baseURL, baseURL)))
 }
 
 func (s *Server) addBookToFeed(feed *opds.Feed, book db.Book, libID int64, baseURL string) {
