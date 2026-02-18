@@ -7,7 +7,7 @@ toolchain go1.24.12
 require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.33
-	github.com/vpoluyaktov/biblio-ebook-parser v0.2.0
+	github.com/vpoluyaktov/biblio-ebook-parser v0.2.1
 	golang.org/x/crypto v0.47.0
 	gopkg.in/yaml.v3 v3.0.1
 )
