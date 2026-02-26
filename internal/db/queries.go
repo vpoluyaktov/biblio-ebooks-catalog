@@ -199,6 +199,36 @@ func (db *DB) GetAuthorsByLetter(libraryID int64, letter string) ([]AuthorWithCo
 	return authors, err
 }
 
+// CountAuthorsByPrefix counts authors whose last_name starts with the given prefix
+func (db *DB) CountAuthorsByPrefix(libraryID int64, prefix string) (int, error) {
+	var count int
+	err := db.Get(&count, `
+		SELECT COUNT(DISTINCT a.id) FROM author a
+		WHERE a.library_id = ? AND a.last_name LIKE ?`,
+		libraryID, prefix+"%",
+	)
+	return count, err
+}
+
+// GetAuthorPrefixCounts returns counts for each possible next character after the given prefix
+// This is used for adaptive navigation to determine if we need to drill down further
+func (db *DB) GetAuthorPrefixCounts(libraryID int64, prefix string, alphabet string) (map[string]int, error) {
+	counts := make(map[string]int)
+	
+	for _, char := range alphabet {
+		nextPrefix := prefix + string(char)
+		count, err := db.CountAuthorsByPrefix(libraryID, nextPrefix)
+		if err != nil {
+			return nil, err
+		}
+		if count > 0 {
+			counts[string(char)] = count
+		}
+	}
+	
+	return counts, nil
+}
+
 func (db *DB) GetAuthor(id int64) (*Author, error) {
 	var author Author
 	err := db.Get(&author, "SELECT * FROM author WHERE id = ?", id)
