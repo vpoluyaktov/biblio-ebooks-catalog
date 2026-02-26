@@ -81,11 +81,13 @@ counts := {
 ## Performance Considerations
 
 ### Database Indexes
-Ensure you have an index on `author.last_name` for optimal performance:
+The existing schema already includes an optimal index for prefix queries:
 
 ```sql
-CREATE INDEX idx_author_last_name ON author(library_id, last_name);
+CREATE INDEX idx_author_name ON author(last_name, first_name);
 ```
+
+This composite index supports efficient prefix matching on `last_name`.
 
 ### Query Optimization
 - Prefix matching uses `LIKE 'prefix%'` which is index-friendly
