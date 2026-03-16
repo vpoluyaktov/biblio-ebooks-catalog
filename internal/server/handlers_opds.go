@@ -100,36 +100,85 @@ func (s *Server) handleOPDSAuthors(w http.ResponseWriter, r *http.Request) {
 	s.writeOPDS(w, feed)
 }
 
-func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.Request, libID int64, letter string) {
-	// URL decode the letter for Cyrillic support
-	if decoded, err := url.QueryUnescape(letter); err == nil {
-		letter = decoded
+func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.Request, libID int64, prefix string) {
+	// URL decode the prefix for Cyrillic support
+	if decoded, err := url.QueryUnescape(prefix); err == nil {
+		prefix = decoded
 	}
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
 
-	authors, err := s.db.GetAuthorsByLetter(libID, letter)
+	// Adaptive navigation threshold - if more than this many authors, drill down further
+	const threshold = 100
+
+	// Count authors with this prefix
+	count, err := s.db.CountAuthorsByPrefix(libID, prefix)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	feed := opds.NewFeed(
-		fmt.Sprintf("urn:opds-server:authors:%s", letter),
-		fmt.Sprintf("Авторы на '%s'", letter),
+		fmt.Sprintf("urn:opds-server:authors:%s", prefix),
+		fmt.Sprintf("Авторы на '%s'", prefix),
 	)
-	feed.AddLink("self", fmt.Sprintf("%s/authors/%s", baseURL, letter), "application/atom+xml;profile=opds-catalog")
+	feed.AddLink("self", fmt.Sprintf("%s/authors/%s", baseURL, url.PathEscape(prefix)), "application/atom+xml;profile=opds-catalog")
 	feed.AddLink("up", baseURL+"/authors", "application/atom+xml;profile=opds-catalog")
 
-	for _, author := range authors {
-		title := author.FullName()
-		if author.BookCount > 0 {
-			title = fmt.Sprintf("%s (%d)", title, author.BookCount)
+	// If count exceeds threshold, show next-level navigation
+	if count > threshold {
+		// Determine alphabet based on first character
+		var alphabet string
+		if len(prefix) > 0 {
+			firstChar := []rune(prefix)[0]
+			if firstChar >= 'А' && firstChar <= 'Я' || firstChar >= 'а' && firstChar <= 'я' {
+				alphabet = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ"
+			} else {
+				alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			}
+		} else {
+			// Shouldn't happen, but default to Cyrillic
+			alphabet = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ"
 		}
-		feed.AddAcquisitionEntry(
-			fmt.Sprintf("urn:opds-server:author:%d", author.ID),
-			title,
-			fmt.Sprintf("%s/author/%d", baseURL, author.ID),
-		)
+
+		// Get counts for each next character
+		prefixCounts, err := s.db.GetAuthorPrefixCounts(libID, prefix, alphabet)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Add navigation entries for each character that has authors
+		for _, char := range alphabet {
+			charStr := string(char)
+			if count, ok := prefixCounts[charStr]; ok && count > 0 {
+				nextPrefix := prefix + charStr
+				title := fmt.Sprintf("%s (%d)", nextPrefix, count)
+				feed.AddNavEntry(
+					fmt.Sprintf("urn:opds-server:authors:%s", nextPrefix),
+					title,
+					fmt.Sprintf("%s/authors/%s", baseURL, url.PathEscape(nextPrefix)),
+				)
+			}
+		}
+	} else {
+		// Count is below threshold, show actual authors
+		authors, err := s.db.GetAuthorsByLetter(libID, prefix)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		for _, author := range authors {
+			title := author.FullName()
+			if author.BookCount > 0 {
+				title = fmt.Sprintf("%s (%d)", title, author.BookCount)
+			}
+			feed.AddAcquisitionEntry(
+				fmt.Sprintf("urn:opds-server:author:%d", author.ID),
+				title,
+				fmt.Sprintf("%s/author/%d", baseURL, author.ID),
+			)
+		}
 	}
 
 	s.writeOPDS(w, feed)

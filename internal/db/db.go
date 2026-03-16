@@ -12,7 +12,7 @@ import (
 //go:embed schema.sql
 var schemaFS embed.FS
 
-//go:embed genres.tsv
+//go:embed genres_en.tsv
 var genresFS embed.FS
 
 type DB struct {
@@ -47,17 +47,7 @@ func (db *DB) Migrate() error {
 		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
-	// Run migrations for existing databases
-	db.runMigrations()
-
 	return nil
-}
-
-func (db *DB) runMigrations() {
-	// Add enabled column to library table if it doesn't exist
-	db.Exec("ALTER TABLE library ADD COLUMN enabled INTEGER DEFAULT 1")
-
-	// Add user and session tables if they don't exist (handled by schema.sql with IF NOT EXISTS)
 }
 
 func (db *DB) LoadGenres() error {
@@ -70,7 +60,7 @@ func (db *DB) LoadGenres() error {
 		return nil
 	}
 
-	data, err := genresFS.ReadFile("genres.tsv")
+	data, err := genresFS.ReadFile("genres_en.tsv")
 	if err != nil {
 		return fmt.Errorf("failed to read genres: %w", err)
 	}

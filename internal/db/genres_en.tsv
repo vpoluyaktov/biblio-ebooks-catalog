@@ -1,0 +1,142 @@
+#parent_id	id	name	code
+0	1	Science Fiction & Fantasy	
+1	100	Science Fiction	sf,sf_writing
+1	101	Fantasy	sf_fantasy,foreign_fantasy
+1	102	Action Fantasy	sf_action
+1	103	Horror	sf_horror
+1	104	Humorous Fantasy	sf_humor
+1	105	Alternate History	sf_history,fantasy_alt_hist
+1	106	Social Science Fiction	sf_social
+1	107	Space Opera	sf_space,sf_space_opera
+1	108	Romantic Fantasy	love_sf,love_fantasy
+1	109	Children's Fantasy	child_sf
+1	110	Heroic Fantasy	sf_heroic
+1	111	Detective Fantasy	sf_detective,fantasy_det
+1	112	Epic Fantasy	sf_epic
+1	113	Urban Fantasy	sf_fantasy_city,city_fantasy
+1	114	Post-Apocalyptic	sf_postapocalyptic
+1	115	Mysticism	sf_mystic
+1	116	Cyberpunk	sf_cyberpunk
+1	117	Portal Fantasy	popadanec,popadancy
+1	118	Fantasy: Other	sf_etc,sf_all
+1	120	Fairy Tale Fantasy	fairy_fantasy
+1	121	LitRPG	sf_litrpg
+0	2	Prose	
+2	200	Contemporary Prose	prose_contemporary
+2	201	Classic Prose	prose_classic
+2	202	Russian Classics	prose_rus_classic
+2	203	Soviet Classics	prose_su_classics
+2	204	Historical Prose	prose_history
+2	205	War Fiction	prose_military
+2	206	Short Story	short_story
+2	207	Prose	prose,prose_all
+0	3	Science & Education	
+3	300	History	sci_history
+3	301	Psychology	sci_psychology
+3	302	Philosophy	sci_philosophy
+3	303	Engineering & Technology	sci_tech
+3	304	Politics	sci_politics
+3	305	Scientific Literature	science,sci_all
+3	306	Cultural Studies	sci_culture
+3	307	Literary Criticism	sci_philology
+3	308	Linguistics	sci_linguistic
+3	309	Medicine	sci_medicine
+0	4	Mystery & Thriller	
+4	400	Detective	detective,det_all
+4	401	Thriller	thriller
+4	402	Classic Detective	det_classic
+4	403	Action	det_action
+4	404	Police Procedural	det_police
+4	405	Children's Mystery	child_det
+4	406	Romantic Suspense	love_detective
+4	407	Crime Fiction	det_crime
+4	408	Historical Mystery	det_history
+4	409	Cozy Mystery	det_irony
+4	410	Spy Thriller	det_espionage
+0	5	Non-Fiction	
+5	500	Biography & Memoir	nonf_biography
+5	501	Journalism	nonf_publicism
+5	502	Travel & Geography	adv_geo
+5	503	Popular Science	sci_popular
+5	504	Non-Fiction	nonfiction,nonf_all
+0	6	Romance	
+6	600	Short Romance	love_short
+6	601	Contemporary Romance	love_contemporary
+6	602	Historical Romance	love_history
+6	604	Romance	love,love_all
+6	607	Erotica	love_erotica
+0	7	Children's Literature	
+7	700	Children's Literature	children,child_all
+7	701	Fairy Tales	child_tale
+7	702	Children's Prose	child_prose
+7	705	Educational Literature	child_education
+7	706	Children's Poetry	child_verse
+7	707	Children's Adventure	child_adv
+0	8	Home & Lifestyle	
+8	801	Cooking	home_cooking
+8	802	Health & Wellness	home_health
+8	803	Hobbies & Crafts	home_crafts
+8	804	Sports	home_sport
+8	805	Pets	home_pets
+8	806	Home & Lifestyle	home,home_all
+0	9	Religion & Spirituality	
+9	900	Esoterics	religion_esoterics
+9	901	Religion	religion_rel
+9	902	Christianity	religion_christianity
+9	903	Orthodoxy	religion_orthodoxy
+9	904	Self-Improvement	religion_self
+0	10	Adventure	
+10	1000	Adventure	adventure,adv_all
+10	1001	Historical Adventure	adv_history
+10	1005	Maritime Adventure	adv_maritime
+10	1006	Western	adv_western
+0	11	Other	
+11	1100	Newspapers & Magazines	periodic
+11	1101	Unfinished	unfinished
+11	1102	Fanfiction	fanfiction
+11	1112	Unsorted	other,other_all
+0	12	Humor	
+12	1201	Humorous Prose	humor_prose
+12	1202	Humor	humor,humor_all
+12	1203	Comedy	comedy
+12	1204	Jokes & Anecdotes	humor_anecdote
+0	13	Poetry	
+13	1300	Poetry	poetry,poetry_all
+13	1303	Lyrics	lyrics
+13	1304	Verse	in_verse
+0	14	Reference	
+14	1400	Encyclopedias	ref_encyc
+14	1401	Reference Books	ref_ref
+14	1402	Manuals & Guides	ref_guide
+0	15	Technology	
+15	1501	Electronics & Radio	sci_radio
+15	1502	Transportation & Aviation	sci_transport
+15	1503	Construction	sci_build
+0	16	Military	
+16	1602	Military Technology	military_weapon
+16	1604	Martial Arts	military_arts
+16	1606	Military	military,military_all
+0	17	Computers & Internet	
+17	1700	Computer Literature	computers,comp_all
+17	1701	Programming	comp_programming
+17	1702	OS & Networks	comp_osnet
+0	18	Drama	
+18	1800	Drama	dramaturgy,dramaturgy_all
+18	1802	Drama	drama
+18	1803	Tragedy	tragedy
+0	19	Ancient Literature	
+19	1900	Myths, Legends & Epics	antique_myths
+19	1901	Ancient Literature	antique_ant
+19	1904	Ancient Literature	antique,antique_all
+0	20	Business	
+20	2000	Popular Business	popular_business
+20	2001	Marketing, PR & Advertising	marketing
+20	2002	Management & HR	management
+20	2003	Economics	economics,economics_all
+0	21	Folklore	
+21	2100	Folk Tales	folk_tale
+21	2102	Folklore	folklore,folklore_all
+0	22	Culture & Arts	
+22	2200	Art Criticism	art_criticism
+22	2201	Painting	painting
+22	2205	Music	music
