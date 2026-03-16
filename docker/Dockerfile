@@ -29,7 +29,8 @@ COPY --from=builder /app/biblio-catalog .
 
 # Copy static files and templates
 COPY --from=builder /app/web ./web
-COPY --from=builder /app/internal/db/genres.tsv ./internal/db/genres.tsv
+COPY --from=builder /app/internal/db/genres_en.tsv ./internal/db/genres_en.tsv
+COPY --from=builder /app/internal/db/genres_ru.tsv ./internal/db/genres_ru.tsv
 
 # Create directories for database and books
 RUN mkdir -p /db /books
