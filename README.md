@@ -2,7 +2,8 @@
 
 > Part of the [BiblioHub](https://github.com/vpoluyaktov/biblio-hub) application suite
 
-![Biblio Catalog](docs/images/biblio-catalog-screenshot.png)
+<img width="1728" height="842" alt="Screenshot 2026-03-22 at 23 00 50" src="https://github.com/user-attachments/assets/a1b1bd88-7d0d-467a-98c7-1c457dae37f7" />
+
 
 A lightweight OPDS (Open Publication Distribution System) catalog server for e-book libraries. Import EPUB and FB2 book collections with or without INPX index files and serve them via OPDS protocol to e-readers and reading apps. Written in Go with a vanilla JavaScript frontend.
 
