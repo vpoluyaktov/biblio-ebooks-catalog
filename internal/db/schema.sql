@@ -147,3 +147,9 @@ CREATE TABLE IF NOT EXISTS oidc_session (
 );
 
 CREATE INDEX IF NOT EXISTS idx_oidc_session_expires ON oidc_session(expires_at);
+
+-- Application settings (key-value store)
+CREATE TABLE IF NOT EXISTS setting (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);

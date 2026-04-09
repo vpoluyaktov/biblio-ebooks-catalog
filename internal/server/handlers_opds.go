@@ -106,12 +106,13 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 		prefix = decoded
 	}
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	// Adaptive navigation threshold - if more than this many authors, drill down further
 	const threshold = 100
 
 	// Count authors with this prefix
-	count, err := s.db.CountAuthorsByPrefix(libID, prefix)
+	count, err := s.db.CountAuthorsByPrefix(libID, prefix, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -141,7 +142,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 		}
 
 		// Get counts for each next character
-		prefixCounts, err := s.db.GetAuthorPrefixCounts(libID, prefix, alphabet)
+		prefixCounts, err := s.db.GetAuthorPrefixCounts(libID, prefix, alphabet, langs)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -162,7 +163,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 		}
 	} else {
 		// Count is below threshold, show actual authors
-		authors, err := s.db.GetAuthorsByLetter(libID, prefix)
+		authors, err := s.db.GetAuthorsByLetter(libID, prefix, langs)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -186,6 +187,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 
 func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, libID int64, authorID int64) {
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	author, err := s.db.GetAuthor(authorID)
 	if err != nil {
@@ -200,7 +202,7 @@ func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, 
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	books, total, err := s.db.GetBooksByAuthor(authorID, limit, offset)
+	books, total, err := s.db.GetBooksByAuthor(authorID, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -227,6 +229,7 @@ func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, 
 func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
@@ -235,7 +238,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	series, total, err := s.db.GetSeries(libID, limit, offset)
+	series, total, err := s.db.GetSeries(libID, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -265,6 +268,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, seriesID int64) {
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	series, err := s.db.GetSeriesByID(seriesID)
 	if err != nil {
@@ -279,7 +283,7 @@ func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Requ
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	books, total, err := s.db.GetBooksBySeriesPaginated(seriesID, limit, offset)
+	books, total, err := s.db.GetBooksBySeriesPaginated(seriesID, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -331,6 +335,7 @@ func (s *Server) handleOPDSGenres(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOPDSGenreBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, genreIDStr string) {
 	genreID, _ := strconv.Atoi(genreIDStr)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	// Check if this is a parent genre (show subgenres) or leaf genre (show books)
 	subGenres, err := s.db.GetSubGenres(genreID)
@@ -373,7 +378,7 @@ func (s *Server) handleOPDSGenreBooksDirect(w http.ResponseWriter, r *http.Reque
 		limit := s.config.Library.BooksPerPage
 		offset := (page - 1) * limit
 
-		books, total, err := s.db.GetBooksByGenre(genreID, libID, limit, offset)
+		books, total, err := s.db.GetBooksByGenre(genreID, libID, limit, offset, langs)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -563,6 +568,7 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -581,7 +587,7 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	books, total, err := s.db.SearchBooks(libID, query, limit, offset)
+	books, total, err := s.db.SearchBooks(libID, query, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -607,6 +613,7 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -625,7 +632,7 @@ func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request)
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	authors, total, err := s.db.SearchAuthors(libID, query, limit, offset)
+	authors, total, err := s.db.SearchAuthors(libID, query, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -659,6 +666,7 @@ func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleOPDSSearchSeries(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
+	langs := s.getSelectedLanguages()
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -677,7 +685,7 @@ func (s *Server) handleOPDSSearchSeries(w http.ResponseWriter, r *http.Request) 
 	limit := s.config.Library.BooksPerPage
 	offset := (page - 1) * limit
 
-	series, total, err := s.db.SearchSeries(libID, query, limit, offset)
+	series, total, err := s.db.SearchSeries(libID, query, limit, offset, langs)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
