@@ -2224,13 +2224,30 @@ const App = {
     }
 
     const users = await this.fetchAPI('/api/users');
-    
+
     document.getElementById('app').innerHTML = `
       <div class="app">
         ${this.renderSidebar('settings')}
         <div class="main">
           ${this.renderHeader('Settings')}
           <div class="content">
+            <div class="card mb-4">
+              <div class="card-header">
+                <h2 class="card-title">Language Filter</h2>
+              </div>
+              <div class="card-body">
+                <p class="text-muted" style="margin-bottom:1rem">
+                  Select which languages to show in the catalog. If none are selected, all languages are shown.
+                </p>
+                <div id="language-selector" class="language-selector">
+                  <div class="loading"><div class="spinner"></div></div>
+                </div>
+                <div style="margin-top:1rem">
+                  <button type="button" class="btn btn-primary btn-sm" data-action="saveLanguages">Save</button>
+                  <button type="button" class="btn btn-outline btn-sm" data-action="clearLanguages" style="margin-left:0.5rem">Clear All</button>
+                </div>
+              </div>
+            </div>
             <div class="card mb-4">
               <div class="card-header">
                 <h2 class="card-title">Users</h2>
@@ -2265,11 +2282,12 @@ const App = {
                 </table>
               </div>
             </div>
-            
+
           </div>
         </div>
       </div>
     `;
+    this.loadLanguageSelector();
   },
 
   async renderLibraries() {
@@ -3594,6 +3612,46 @@ const App = {
       window.dangerDialogResolve = resolve;
       document.body.appendChild(modal);
     });
+  },
+
+  async loadLanguageSelector() {
+    const [available, selected] = await Promise.all([
+      this.fetchAPI('/api/languages'),
+      this.fetchAPI('/api/settings/languages')
+    ]);
+    const selectedSet = new Set(selected || []);
+    const container = document.getElementById('language-selector');
+    if (!container) return;
+    if (!available || available.length === 0) {
+      container.innerHTML = '<p class="text-muted">No languages found in catalog.</p>';
+      return;
+    }
+    container.innerHTML = available.map(lang => `
+        <label class="language-checkbox">
+            <input type="checkbox" value="${lang}" ${selectedSet.has(lang) ? 'checked' : ''}>
+            <span>${lang}</span>
+        </label>
+    `).join('');
+  },
+
+  async saveLanguages() {
+    const checkboxes = document.querySelectorAll('#language-selector input[type="checkbox"]');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    try {
+      await fetch(this.apiUrl('/api/settings/languages'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ languages: selected })
+      });
+      this.showToast('Language filter saved', 'success');
+    } catch (e) {
+      console.error('Failed to save languages:', e);
+      this.showToast('Failed to save language filter', 'error');
+    }
+  },
+
+  clearLanguages() {
+    document.querySelectorAll('#language-selector input[type="checkbox"]').forEach(cb => cb.checked = false);
   }
 };
 

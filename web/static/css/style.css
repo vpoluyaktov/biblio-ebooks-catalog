@@ -2247,3 +2247,29 @@ a:hover {
     width: 280px;
   }
 }
+
+/* Language Selector */
+.language-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.language-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.875rem;
+    user-select: none;
+}
+.language-checkbox:has(input:checked) {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+.language-checkbox input {
+    display: none;
+}
