@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS library (
     first_author INTEGER DEFAULT 0,
     without_deleted INTEGER DEFAULT 0,
     enabled INTEGER DEFAULT 1,
+    lang_filter TEXT NOT NULL DEFAULT '[]',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -301,23 +301,6 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Language settings routes
-	if path == "/languages" && r.Method == "GET" {
-		s.apiGetAvailableLanguages(w, r)
-		return
-	}
-	if path == "/settings/languages" && r.Method == "GET" {
-		s.apiGetSelectedLanguages(w, r)
-		return
-	}
-	if path == "/settings/languages" && r.Method == "PUT" {
-		if !s.authManager.CheckAdmin(w, r) {
-			return
-		}
-		s.apiSaveSelectedLanguages(w, r)
-		return
-	}
-
 	// Admin-only routes
 	if !s.authManager.CheckAdmin(w, r) {
 		return
@@ -372,6 +355,15 @@ func (s *Server) handleLibraryRoutes(w http.ResponseWriter, r *http.Request, rem
 			return
 		}
 		s.apiGetLibraryStatsWithID(w, r, libID)
+	} else if action == "languages" && r.Method == "GET" {
+		s.apiGetLibraryAvailableLanguages(w, r, libID)
+	} else if action == "lang-filter" && r.Method == "GET" {
+		s.apiGetLibraryLangFilter(w, r, libID)
+	} else if action == "lang-filter" && r.Method == "PUT" {
+		if !s.authManager.CheckAdmin(w, r) {
+			return
+		}
+		s.apiSaveLibraryLangFilter(w, r, libID)
 	} else if action == "toggle" && r.Method == "PUT" {
 		if !s.authManager.CheckAdmin(w, r) {
 			return
@@ -484,10 +476,10 @@ func parseInt64(s string) (int64, error) {
 	return result, nil
 }
 
-// getSelectedLanguages loads the language filter from the database.
-// Returns nil (no filter) on error to avoid breaking the app.
-func (s *Server) getSelectedLanguages() []string {
-	langs, err := s.db.GetSelectedLanguages()
+// getLibraryLangFilter loads the language filter for a specific library.
+// Returns nil (no filter) on error.
+func (s *Server) getLibraryLangFilter(libraryID int64) []string {
+	langs, err := s.db.GetLibraryLangFilter(libraryID)
 	if err != nil {
 		return nil
 	}

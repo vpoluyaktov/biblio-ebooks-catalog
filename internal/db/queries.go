@@ -984,10 +984,10 @@ func (db *DB) DeleteExpiredOIDCSessions() error {
 
 // Language settings queries
 
-// GetAvailableLanguages returns all distinct non-empty language codes in the catalog.
-func (db *DB) GetAvailableLanguages() ([]string, error) {
+// GetAvailableLanguages returns all distinct non-empty language codes for a specific library.
+func (db *DB) GetAvailableLanguages(libraryID int64) ([]string, error) {
 	var langs []string
-	err := db.Select(&langs, "SELECT DISTINCT lang FROM book WHERE lang != '' AND deleted = 0 ORDER BY lang")
+	err := db.Select(&langs, "SELECT DISTINCT lang FROM book WHERE library_id = ? AND lang != '' AND deleted = 0 ORDER BY lang", libraryID)
 	if err != nil {
 		return nil, err
 	}
@@ -997,13 +997,12 @@ func (db *DB) GetAvailableLanguages() ([]string, error) {
 	return langs, nil
 }
 
-// GetSelectedLanguages returns the admin-configured language filter (from setting table).
-// Returns empty slice if no languages are selected (meaning "show all").
-func (db *DB) GetSelectedLanguages() ([]string, error) {
+// GetLibraryLangFilter returns the language filter for a specific library.
+// Returns empty slice if not configured (meaning show all).
+func (db *DB) GetLibraryLangFilter(libraryID int64) ([]string, error) {
 	var value string
-	err := db.Get(&value, "SELECT value FROM setting WHERE key = 'selected_languages'")
+	err := db.Get(&value, "SELECT lang_filter FROM library WHERE id = ?", libraryID)
 	if err != nil {
-		// No row means no filter configured
 		return []string{}, nil
 	}
 	var langs []string
@@ -1016,9 +1015,8 @@ func (db *DB) GetSelectedLanguages() ([]string, error) {
 	return langs, nil
 }
 
-// SaveSelectedLanguages stores the language filter setting.
-// Pass empty slice to clear the filter (show all).
-func (db *DB) SaveSelectedLanguages(langs []string) error {
+// SaveLibraryLangFilter stores the language filter for a specific library.
+func (db *DB) SaveLibraryLangFilter(libraryID int64, langs []string) error {
 	if langs == nil {
 		langs = []string{}
 	}
@@ -1027,9 +1025,8 @@ func (db *DB) SaveSelectedLanguages(langs []string) error {
 		return err
 	}
 	_, err = db.Exec(`
-		INSERT INTO setting (key, value) VALUES ('selected_languages', ?)
-		ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-		string(data),
+		UPDATE library SET lang_filter = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		string(data), libraryID,
 	)
 	return err
 }

@@ -109,9 +109,8 @@ func TestGetAvailableLanguages_Empty(t *testing.T) {
 	database := newTestDB(t)
 	libID := seedLibrary(t, database)
 	// No books inserted.
-	_ = libID
 
-	langs, err := database.GetAvailableLanguages()
+	langs, err := database.GetAvailableLanguages(libID)
 	if err != nil {
 		t.Fatalf("GetAvailableLanguages error: %v", err)
 	}
@@ -140,7 +139,7 @@ func TestGetAvailableLanguages_ReturnsDistinctNonEmpty(t *testing.T) {
 		t.Fatalf("insert deleted book: %v", err)
 	}
 
-	langs, err := database.GetAvailableLanguages()
+	langs, err := database.GetAvailableLanguages(libID)
 	if err != nil {
 		t.Fatalf("GetAvailableLanguages error: %v", err)
 	}
@@ -157,31 +156,33 @@ func TestGetAvailableLanguages_ReturnsDistinctNonEmpty(t *testing.T) {
 	}
 }
 
-// ---- GetSelectedLanguages / SaveSelectedLanguages ----
+// ---- GetLibraryLangFilter / SaveLibraryLangFilter ----
 
-func TestGetSelectedLanguages_NotSet(t *testing.T) {
+func TestGetLibraryLangFilter_NotSet(t *testing.T) {
 	database := newTestDB(t)
+	libID := seedLibrary(t, database)
 
-	langs, err := database.GetSelectedLanguages()
+	langs, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages error: %v", err)
+		t.Fatalf("GetLibraryLangFilter error: %v", err)
 	}
 	if len(langs) != 0 {
 		t.Errorf("expected empty slice when not set, got %v", langs)
 	}
 }
 
-func TestSaveAndGetSelectedLanguages_RoundTrip(t *testing.T) {
+func TestSaveAndGetLibraryLangFilter_RoundTrip(t *testing.T) {
 	database := newTestDB(t)
+	libID := seedLibrary(t, database)
 
 	want := []string{"ru", "en"}
-	if err := database.SaveSelectedLanguages(want); err != nil {
-		t.Fatalf("SaveSelectedLanguages error: %v", err)
+	if err := database.SaveLibraryLangFilter(libID, want); err != nil {
+		t.Fatalf("SaveLibraryLangFilter error: %v", err)
 	}
 
-	got, err := database.GetSelectedLanguages()
+	got, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages error: %v", err)
+		t.Fatalf("GetLibraryLangFilter error: %v", err)
 	}
 
 	if len(got) != len(want) {
@@ -195,42 +196,44 @@ func TestSaveAndGetSelectedLanguages_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestSaveSelectedLanguages_Overwrites(t *testing.T) {
+func TestSaveLibraryLangFilter_Overwrites(t *testing.T) {
 	database := newTestDB(t)
+	libID := seedLibrary(t, database)
 
 	// Save first value.
-	if err := database.SaveSelectedLanguages([]string{"ru", "en", "de"}); err != nil {
-		t.Fatalf("first SaveSelectedLanguages error: %v", err)
+	if err := database.SaveLibraryLangFilter(libID, []string{"ru", "en", "de"}); err != nil {
+		t.Fatalf("first SaveLibraryLangFilter error: %v", err)
 	}
 	// Overwrite with different value.
-	if err := database.SaveSelectedLanguages([]string{"fr"}); err != nil {
-		t.Fatalf("second SaveSelectedLanguages error: %v", err)
+	if err := database.SaveLibraryLangFilter(libID, []string{"fr"}); err != nil {
+		t.Fatalf("second SaveLibraryLangFilter error: %v", err)
 	}
 
-	got, err := database.GetSelectedLanguages()
+	got, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages error: %v", err)
+		t.Fatalf("GetLibraryLangFilter error: %v", err)
 	}
 	if len(got) != 1 || got[0] != "fr" {
 		t.Errorf("expected [fr], got %v", got)
 	}
 }
 
-func TestSaveSelectedLanguages_EmptySlice(t *testing.T) {
+func TestSaveLibraryLangFilter_EmptySlice(t *testing.T) {
 	database := newTestDB(t)
+	libID := seedLibrary(t, database)
 
 	// First set something.
-	if err := database.SaveSelectedLanguages([]string{"ru"}); err != nil {
-		t.Fatalf("SaveSelectedLanguages error: %v", err)
+	if err := database.SaveLibraryLangFilter(libID, []string{"ru"}); err != nil {
+		t.Fatalf("SaveLibraryLangFilter error: %v", err)
 	}
 	// Then clear with empty slice.
-	if err := database.SaveSelectedLanguages([]string{}); err != nil {
-		t.Fatalf("SaveSelectedLanguages(empty) error: %v", err)
+	if err := database.SaveLibraryLangFilter(libID, []string{}); err != nil {
+		t.Fatalf("SaveLibraryLangFilter(empty) error: %v", err)
 	}
 
-	got, err := database.GetSelectedLanguages()
+	got, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages error: %v", err)
+		t.Fatalf("GetLibraryLangFilter error: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected empty slice after clearing, got %v", got)

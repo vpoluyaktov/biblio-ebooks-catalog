@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -112,11 +113,11 @@ func seedDBLibrary(t *testing.T, database *db.DB) int64 {
 	return id
 }
 
-// ---- GET /api/languages ----
+// ---- GET /api/libraries/{id}/languages ----
 
-// TestAPIGetAvailableLanguages_Returns200AndArray verifies that the
-// GET /api/languages endpoint returns HTTP 200 with a JSON array body.
-func TestAPIGetAvailableLanguages_Returns200AndArray(t *testing.T) {
+// TestAPIGetLibraryAvailableLanguages_Returns200AndArray verifies that the
+// GET /api/libraries/{id}/languages endpoint returns HTTP 200 with a JSON array body.
+func TestAPIGetLibraryAvailableLanguages_Returns200AndArray(t *testing.T) {
 	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
@@ -125,7 +126,8 @@ func TestAPIGetAvailableLanguages_Returns200AndArray(t *testing.T) {
 	seedDBBook(t, database, libID, "English Book", "en")
 	seedDBBook(t, database, libID, "Russian Book", "ru")
 
-	rr := doRequest(t, mux, http.MethodGet, "/api/languages", "", cookie)
+	path := fmt.Sprintf("/api/libraries/%d/languages", libID)
+	rr := doRequest(t, mux, http.MethodGet, path, "", cookie)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -134,7 +136,6 @@ func TestAPIGetAvailableLanguages_Returns200AndArray(t *testing.T) {
 	// Must decode as []string.
 	var langs []string
 	if err := json.NewDecoder(rr.Body).Decode(&langs); err != nil {
-		// Accept null for empty catalog edge case.
 		body := strings.TrimSpace(rr.Body.String())
 		if body != "null" && body != "[]" {
 			t.Fatalf("decode as []string: %v (body: %s)", err, body)
@@ -142,14 +143,16 @@ func TestAPIGetAvailableLanguages_Returns200AndArray(t *testing.T) {
 	}
 }
 
-// TestAPIGetAvailableLanguages_EmptyCatalog_ReturnsEmptyArray verifies that the
-// endpoint returns an empty array (or null) when no books exist.
-func TestAPIGetAvailableLanguages_EmptyCatalog_ReturnsEmptyArray(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+// TestAPIGetLibraryAvailableLanguages_EmptyCatalog_ReturnsEmptyArray verifies that the
+// endpoint returns an empty array when no books exist in the library.
+func TestAPIGetLibraryAvailableLanguages_EmptyCatalog_ReturnsEmptyArray(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodGet, "/api/languages", "", cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/languages", libID)
+	rr := doRequest(t, mux, http.MethodGet, path, "", cookie)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -165,17 +168,19 @@ func TestAPIGetAvailableLanguages_EmptyCatalog_ReturnsEmptyArray(t *testing.T) {
 	// If we got here, the response was decodeable — acceptable.
 }
 
-// ---- GET /api/settings/languages ----
+// ---- GET /api/libraries/{id}/lang-filter ----
 
-// TestAPIGetSelectedLanguages_Returns200AndEmptyArrayWhenNotSet verifies that
-// GET /api/settings/languages returns HTTP 200 and an empty array when no
-// language setting has been saved.
-func TestAPIGetSelectedLanguages_Returns200AndEmptyArrayWhenNotSet(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+// TestAPIGetLibraryLangFilter_Returns200AndEmptyArrayWhenNotSet verifies that
+// GET /api/libraries/{id}/lang-filter returns HTTP 200 and an empty array when no
+// language filter has been saved for the library.
+func TestAPIGetLibraryLangFilter_Returns200AndEmptyArrayWhenNotSet(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodGet, "/api/settings/languages", "", cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodGet, path, "", cookie)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -189,23 +194,26 @@ func TestAPIGetSelectedLanguages_Returns200AndEmptyArrayWhenNotSet(t *testing.T)
 		}
 	}
 	if len(langs) != 0 {
-		t.Errorf("expected empty slice when no setting saved, got %v", langs)
+		t.Errorf("expected empty slice when no filter saved, got %v", langs)
 	}
 }
 
-// TestAPIGetSelectedLanguages_ReturnsSetLanguages verifies that already-saved
+// TestAPIGetLibraryLangFilter_ReturnsSetLanguages verifies that already-saved
 // languages are returned correctly.
-func TestAPIGetSelectedLanguages_ReturnsSetLanguages(t *testing.T) {
+func TestAPIGetLibraryLangFilter_ReturnsSetLanguages(t *testing.T) {
 	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	// Pre-populate the setting directly in the DB.
-	if err := database.SaveSelectedLanguages([]string{"ru", "de"}); err != nil {
-		t.Fatalf("SaveSelectedLanguages pre-seed: %v", err)
+	libID := seedDBLibrary(t, database)
+
+	// Pre-populate the filter directly in the DB.
+	if err := database.SaveLibraryLangFilter(libID, []string{"ru", "de"}); err != nil {
+		t.Fatalf("SaveLibraryLangFilter pre-seed: %v", err)
 	}
 
-	rr := doRequest(t, mux, http.MethodGet, "/api/settings/languages", "", cookie)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodGet, path, "", cookie)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -220,38 +228,42 @@ func TestAPIGetSelectedLanguages_ReturnsSetLanguages(t *testing.T) {
 	}
 }
 
-// ---- PUT /api/settings/languages ----
+// ---- PUT /api/libraries/{id}/lang-filter ----
 
-// TestAPISaveSelectedLanguages_AdminReturns204 verifies that an admin user
-// can save language settings and receives HTTP 204.
-func TestAPISaveSelectedLanguages_AdminReturns204(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+// TestAPISaveLibraryLangFilter_AdminReturns204 verifies that an admin user
+// can save the library language filter and receives HTTP 204.
+func TestAPISaveLibraryLangFilter_AdminReturns204(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `{"languages":["ru","en"]}`, cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `{"languages":["ru","en"]}`, cookie)
 
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
-// TestAPISaveSelectedLanguages_PersistsData verifies that the saved languages
+// TestAPISaveLibraryLangFilter_PersistsData verifies that the saved languages
 // can be retrieved from the database after a successful PUT.
-func TestAPISaveSelectedLanguages_PersistsData(t *testing.T) {
+func TestAPISaveLibraryLangFilter_PersistsData(t *testing.T) {
 	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `{"languages":["fr","de"]}`, cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `{"languages":["fr","de"]}`, cookie)
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	saved, err := database.GetSelectedLanguages()
+	saved, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages: %v", err)
+		t.Fatalf("GetLibraryLangFilter: %v", err)
 	}
 	if len(saved) != 2 {
 		t.Errorf("expected 2 languages saved, got %v", saved)
@@ -267,69 +279,78 @@ func TestAPISaveSelectedLanguages_PersistsData(t *testing.T) {
 	}
 }
 
-// TestAPISaveSelectedLanguages_EmptyList_Clears verifies that saving an empty
+// TestAPISaveLibraryLangFilter_EmptyList_Clears verifies that saving an empty
 // list clears the language filter.
-func TestAPISaveSelectedLanguages_EmptyList_Clears(t *testing.T) {
+func TestAPISaveLibraryLangFilter_EmptyList_Clears(t *testing.T) {
 	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
+	libID := seedDBLibrary(t, database)
+
 	// Pre-seed a value.
-	if err := database.SaveSelectedLanguages([]string{"ru"}); err != nil {
+	if err := database.SaveLibraryLangFilter(libID, []string{"ru"}); err != nil {
 		t.Fatalf("pre-seed: %v", err)
 	}
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `{"languages":[]}`, cookie)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `{"languages":[]}`, cookie)
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	saved, err := database.GetSelectedLanguages()
+	saved, err := database.GetLibraryLangFilter(libID)
 	if err != nil {
-		t.Fatalf("GetSelectedLanguages: %v", err)
+		t.Fatalf("GetLibraryLangFilter: %v", err)
 	}
 	if len(saved) != 0 {
 		t.Errorf("expected empty list after clearing, got %v", saved)
 	}
 }
 
-// TestAPISaveSelectedLanguages_InvalidJSON_Returns400 verifies that malformed
+// TestAPISaveLibraryLangFilter_InvalidJSON_Returns400 verifies that malformed
 // JSON in the request body results in HTTP 400.
-func TestAPISaveSelectedLanguages_InvalidJSON_Returns400(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+func TestAPISaveLibraryLangFilter_InvalidJSON_Returns400(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createAdminSession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `not-valid-json`, cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `not-valid-json`, cookie)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for invalid JSON, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
-// TestAPISaveSelectedLanguages_NonAdminReturns401or403 verifies that a
+// TestAPISaveLibraryLangFilter_NonAdminReturns401or403 verifies that a
 // read-only user cannot save language settings and receives 401 or 403.
-func TestAPISaveSelectedLanguages_NonAdminReturns401or403(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+func TestAPISaveLibraryLangFilter_NonAdminReturns401or403(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	cookie := createReadonlySession(t, srv)
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `{"languages":["ru"]}`, cookie)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `{"languages":["ru"]}`, cookie)
 
 	if rr.Code != http.StatusForbidden && rr.Code != http.StatusUnauthorized {
 		t.Errorf("expected 403 or 401 for non-admin, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
-// TestAPISaveSelectedLanguages_UnauthenticatedReturns401 verifies that an
+// TestAPISaveLibraryLangFilter_UnauthenticatedReturns401 verifies that an
 // unauthenticated request receives HTTP 401.
-func TestAPISaveSelectedLanguages_UnauthenticatedReturns401(t *testing.T) {
-	srv, _ := newLangTestServer(t)
+func TestAPISaveLibraryLangFilter_UnauthenticatedReturns401(t *testing.T) {
+	srv, database := newLangTestServer(t)
 	mux := srv.setupRoutes()
 	// No session cookie.
 
-	rr := doRequest(t, mux, http.MethodPut, "/api/settings/languages", `{"languages":["ru"]}`, nil)
+	libID := seedDBLibrary(t, database)
+	path := fmt.Sprintf("/api/libraries/%d/lang-filter", libID)
+	rr := doRequest(t, mux, http.MethodPut, path, `{"languages":["ru"]}`, nil)
 
 	if rr.Code != http.StatusUnauthorized && rr.Code != http.StatusForbidden {
 		t.Errorf("expected 401 or 403 for unauthenticated request, got %d: %s", rr.Code, rr.Body.String())

@@ -106,7 +106,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 		prefix = decoded
 	}
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	// Adaptive navigation threshold - if more than this many authors, drill down further
 	const threshold = 100
@@ -187,7 +187,7 @@ func (s *Server) handleOPDSAuthorsByLetterDirect(w http.ResponseWriter, r *http.
 
 func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, libID int64, authorID int64) {
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	author, err := s.db.GetAuthor(authorID)
 	if err != nil {
@@ -229,7 +229,7 @@ func (s *Server) handleOPDSAuthorDirect(w http.ResponseWriter, r *http.Request, 
 func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
@@ -268,7 +268,7 @@ func (s *Server) handleOPDSSeries(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOPDSSeriesBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, seriesID int64) {
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	series, err := s.db.GetSeriesByID(seriesID)
 	if err != nil {
@@ -335,7 +335,7 @@ func (s *Server) handleOPDSGenres(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOPDSGenreBooksDirect(w http.ResponseWriter, r *http.Request, libID int64, genreIDStr string) {
 	genreID, _ := strconv.Atoi(genreIDStr)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	// Check if this is a parent genre (show subgenres) or leaf genre (show books)
 	subGenres, err := s.db.GetSubGenres(genreID)
@@ -568,7 +568,7 @@ func (s *Server) handleOPDSAnnotationDirect(w http.ResponseWriter, r *http.Reque
 func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -613,7 +613,7 @@ func (s *Server) handleOPDSSearch(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	query := r.URL.Query().Get("q")
 	if query == "" {
@@ -666,7 +666,7 @@ func (s *Server) handleOPDSSearchAuthors(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleOPDSSearchSeries(w http.ResponseWriter, r *http.Request) {
 	libID := s.getLibraryID(r)
 	baseURL := s.apiURL(fmt.Sprintf("/opds/%d", libID))
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 
 	query := r.URL.Query().Get("q")
 	if query == "" {

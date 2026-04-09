@@ -11,6 +11,7 @@ type Library struct {
 	FirstAuthorOnly bool      `db:"first_author" json:"first_author_only"`
 	WithoutDeleted  bool      `db:"without_deleted" json:"without_deleted"`
 	Enabled         bool      `db:"enabled" json:"enabled"`
+	LangFilter      string    `db:"lang_filter" json:"lang_filter"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt       time.Time `db:"updated_at" json:"updated_at"`
 }

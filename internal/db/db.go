@@ -47,6 +47,9 @@ func (db *DB) Migrate() error {
 		return fmt.Errorf("failed to execute schema: %w", err)
 	}
 
+	// Add lang_filter column to existing library tables (ignore error if already exists)
+	db.Exec("ALTER TABLE library ADD COLUMN lang_filter TEXT NOT NULL DEFAULT '[]'")
+
 	return nil
 }
 

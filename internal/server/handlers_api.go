@@ -347,7 +347,7 @@ func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request, libID int
 		}
 	}
 
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 	result, err := s.db.GetAuthorsFiltered(libID, filter, limit, offset, langs)
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -375,7 +375,7 @@ func (s *Server) apiGetSeries(w http.ResponseWriter, r *http.Request, libID int6
 		}
 	}
 
-	langs := s.getSelectedLanguages()
+	langs := s.getLibraryLangFilter(libID)
 	result, err := s.db.GetSeriesFiltered(libID, filter, limit, offset, langs)
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -731,10 +731,10 @@ func (b *bytesReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	return n, err
 }
 
-// Language settings handlers
+// Per-library language handlers
 
-func (s *Server) apiGetAvailableLanguages(w http.ResponseWriter, r *http.Request) {
-	langs, err := s.db.GetAvailableLanguages()
+func (s *Server) apiGetLibraryAvailableLanguages(w http.ResponseWriter, r *http.Request, libID int64) {
+	langs, err := s.db.GetAvailableLanguages(libID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -742,8 +742,8 @@ func (s *Server) apiGetAvailableLanguages(w http.ResponseWriter, r *http.Request
 	s.jsonResponse(w, langs)
 }
 
-func (s *Server) apiGetSelectedLanguages(w http.ResponseWriter, r *http.Request) {
-	langs, err := s.db.GetSelectedLanguages()
+func (s *Server) apiGetLibraryLangFilter(w http.ResponseWriter, r *http.Request, libID int64) {
+	langs, err := s.db.GetLibraryLangFilter(libID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -751,7 +751,7 @@ func (s *Server) apiGetSelectedLanguages(w http.ResponseWriter, r *http.Request)
 	s.jsonResponse(w, langs)
 }
 
-func (s *Server) apiSaveSelectedLanguages(w http.ResponseWriter, r *http.Request) {
+func (s *Server) apiSaveLibraryLangFilter(w http.ResponseWriter, r *http.Request, libID int64) {
 	var body struct {
 		Languages []string `json:"languages"`
 	}
@@ -759,7 +759,7 @@ func (s *Server) apiSaveSelectedLanguages(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := s.db.SaveSelectedLanguages(body.Languages); err != nil {
+	if err := s.db.SaveLibraryLangFilter(libID, body.Languages); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
