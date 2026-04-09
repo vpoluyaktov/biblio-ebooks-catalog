@@ -2223,7 +2223,8 @@ const App = {
       return;
     }
 
-    const users = await this.fetchAPI('/api/users');
+    const usersData = await this.fetchAPI('/api/users');
+    const users = Array.isArray(usersData) ? usersData : null;
 
     document.getElementById('app').innerHTML = `
       <div class="app">
@@ -2248,6 +2249,7 @@ const App = {
                 </div>
               </div>
             </div>
+            ${users !== null ? `
             <div class="card mb-4">
               <div class="card-header">
                 <h2 class="card-title">Users</h2>
@@ -2282,6 +2284,7 @@ const App = {
                 </table>
               </div>
             </div>
+            ` : ''}
 
           </div>
         </div>
