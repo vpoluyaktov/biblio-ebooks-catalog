@@ -2232,23 +2232,6 @@ const App = {
         <div class="main">
           ${this.renderHeader('Settings')}
           <div class="content">
-            <div class="card mb-4">
-              <div class="card-header">
-                <h2 class="card-title">Language Filter</h2>
-              </div>
-              <div class="card-body">
-                <p class="text-muted" style="margin-bottom:1rem">
-                  Select which languages to show in the catalog. If none are selected, all languages are shown.
-                </p>
-                <div id="language-selector" class="language-selector">
-                  <div class="loading"><div class="spinner"></div></div>
-                </div>
-                <div style="margin-top:1rem">
-                  <button type="button" class="btn btn-primary btn-sm" data-action="saveLanguages">Save</button>
-                  <button type="button" class="btn btn-outline btn-sm" data-action="clearLanguages" style="margin-left:0.5rem">Clear All</button>
-                </div>
-              </div>
-            </div>
             ${users !== null ? `
             <div class="card mb-4">
               <div class="card-header">
@@ -2290,7 +2273,6 @@ const App = {
         </div>
       </div>
     `;
-    this.loadLanguageSelector();
   },
 
   async renderLibraries() {
@@ -2508,6 +2490,23 @@ const App = {
 
           <hr class="my-4">
 
+          <!-- Language Filter Section -->
+          <h4 class="mb-2">Language Filter</h4>
+          <p class="text-muted" style="margin-bottom:0.5rem">
+            Select which languages to show for this library. If none selected, all languages are shown.
+          </p>
+          <div id="lib-language-selector" class="language-selector">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+          <div style="margin-top:0.75rem" class="mb-4">
+            <button type="button" class="btn btn-primary btn-sm"
+                    data-action="saveLibraryLangFilter" data-library-id="${id}">Save Filter</button>
+            <button type="button" class="btn btn-outline btn-sm"
+                    data-action="clearLibraryLangFilter" style="margin-left:0.5rem">Clear All</button>
+          </div>
+
+          <hr class="my-4">
+
           <!-- Delete Section -->
           <h4 class="mb-2">Delete Library</h4>
           <p class="text-muted mb-2">This will remove all books, authors, and series from the database. The actual book files will not be deleted.</p>
@@ -2516,6 +2515,7 @@ const App = {
       </div>
     `;
     document.body.appendChild(modal);
+    this.loadLibraryLanguageSelector(id, 'lib-language-selector');
   },
 
   async submitEditLibrary(form) {
@@ -3617,16 +3617,16 @@ const App = {
     });
   },
 
-  async loadLanguageSelector() {
-    const [available, selected] = await Promise.all([
-      this.fetchAPI('/api/languages'),
-      this.fetchAPI('/api/settings/languages')
+  async loadLibraryLanguageSelector(libID, containerID) {
+    const [available, filter] = await Promise.all([
+      this.fetchAPI(`/api/libraries/${libID}/languages`),
+      this.fetchAPI(`/api/libraries/${libID}/lang-filter`)
     ]);
-    const selectedSet = new Set(selected || []);
-    const container = document.getElementById('language-selector');
+    const selectedSet = new Set(Array.isArray(filter) ? filter : []);
+    const container = document.getElementById(containerID);
     if (!container) return;
     if (!available || available.length === 0) {
-      container.innerHTML = '<p class="text-muted">No languages found in catalog.</p>';
+      container.innerHTML = '<p class="text-muted">No languages found in this library.</p>';
       return;
     }
     container.innerHTML = available.map(lang => `
@@ -3637,24 +3637,25 @@ const App = {
     `).join('');
   },
 
-  async saveLanguages() {
-    const checkboxes = document.querySelectorAll('#language-selector input[type="checkbox"]');
+  async saveLibraryLangFilter(btn) {
+    const libID = btn.dataset.libraryId;
+    const checkboxes = document.querySelectorAll('#lib-language-selector input[type="checkbox"]');
     const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     try {
-      await fetch(this.apiUrl('/api/settings/languages'), {
+      await fetch(this.apiUrl(`/api/libraries/${libID}/lang-filter`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ languages: selected })
       });
       this.showToast('Language filter saved', 'success');
     } catch (e) {
-      console.error('Failed to save languages:', e);
       this.showToast('Failed to save language filter', 'error');
     }
   },
 
-  clearLanguages() {
-    document.querySelectorAll('#language-selector input[type="checkbox"]').forEach(cb => cb.checked = false);
+  clearLibraryLangFilter() {
+    document.querySelectorAll('#lib-language-selector input[type="checkbox"]')
+      .forEach(cb => cb.checked = false);
   }
 };
 

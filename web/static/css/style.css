@@ -2253,23 +2253,13 @@ a:hover {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    align-items: center;
 }
 .language-checkbox {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    gap: 0.35rem;
     cursor: pointer;
     font-size: 0.875rem;
     user-select: none;
-}
-.language-checkbox:has(input:checked) {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-.language-checkbox input {
-    display: none;
 }
