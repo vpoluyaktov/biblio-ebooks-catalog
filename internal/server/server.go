@@ -301,6 +301,23 @@ func (s *Server) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Language settings routes
+	if path == "/languages" && r.Method == "GET" {
+		s.apiGetAvailableLanguages(w, r)
+		return
+	}
+	if path == "/settings/languages" && r.Method == "GET" {
+		s.apiGetSelectedLanguages(w, r)
+		return
+	}
+	if path == "/settings/languages" && r.Method == "PUT" {
+		if !s.authManager.CheckAdmin(w, r) {
+			return
+		}
+		s.apiSaveSelectedLanguages(w, r)
+		return
+	}
+
 	// Admin-only routes
 	if !s.authManager.CheckAdmin(w, r) {
 		return
@@ -465,6 +482,16 @@ func parseInt64(s string) (int64, error) {
 		result = result*10 + int64(s[i]-'0')
 	}
 	return result, nil
+}
+
+// getSelectedLanguages loads the language filter from the database.
+// Returns nil (no filter) on error to avoid breaking the app.
+func (s *Server) getSelectedLanguages() []string {
+	langs, err := s.db.GetSelectedLanguages()
+	if err != nil {
+		return nil
+	}
+	return langs
 }
 
 func (s *Server) Run(addr string) error {

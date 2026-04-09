@@ -1,9 +1,41 @@
 package db
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"unicode"
 )
+
+// buildLangFilter returns a SQL WHERE clause fragment and args for language filtering.
+// If langs is empty, returns empty string and no args (no filtering).
+// tableAlias is the book table alias (e.g., "b" or "book").
+func buildLangFilter(tableAlias string, langs []string) (string, []interface{}) {
+	if len(langs) == 0 {
+		return "", nil
+	}
+	placeholders := make([]string, len(langs))
+	args := make([]interface{}, len(langs))
+	for i, l := range langs {
+		placeholders[i] = "?"
+		args[i] = l
+	}
+	clause := fmt.Sprintf(" AND %s.lang IN (%s)", tableAlias, strings.Join(placeholders, ","))
+	return clause, args
+}
+
+// buildLangJoinCond returns a SQL JOIN ON condition fragment for language filtering.
+// Used when the lang filter is applied as part of a JOIN condition rather than a WHERE clause.
+func buildLangJoinCond(tableAlias string, langs []string) string {
+	if len(langs) == 0 {
+		return ""
+	}
+	placeholders := make([]string, len(langs))
+	for i := range langs {
+		placeholders[i] = "?"
+	}
+	return fmt.Sprintf(" AND %s.lang IN (%s)", tableAlias, strings.Join(placeholders, ","))
+}
 
 func (db *DB) GetLibraries() ([]Library, error) {
 	var libraries []Library
@@ -118,18 +150,34 @@ func (db *DB) GetGenreByCode(code string) (*Genre, error) {
 	return &genre, nil
 }
 
-func (db *DB) GetAuthors(libraryID int64, limit, offset int) ([]AuthorWithCount, error) {
+func (db *DB) GetAuthors(libraryID int64, limit, offset int, langs []string) ([]AuthorWithCount, error) {
 	var authors []AuthorWithCount
-	err := db.Select(&authors, `
-		SELECT a.*, COUNT(ba.book_id) as book_count
+	if len(langs) == 0 {
+		err := db.Select(&authors, `
+			SELECT a.*, COUNT(ba.book_id) as book_count
+			FROM author a
+			LEFT JOIN book_author ba ON a.id = ba.author_id
+			WHERE a.library_id = ?
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name
+			LIMIT ? OFFSET ?`,
+			libraryID, limit, offset,
+		)
+		return authors, err
+	}
+	_, langArgs := buildLangFilter("b", langs)
+	langJoin := buildLangJoinCond("b", langs)
+	query := `
+		SELECT a.*, COUNT(DISTINCT b.id) as book_count
 		FROM author a
-		LEFT JOIN book_author ba ON a.id = ba.author_id
+		JOIN book_author ba ON a.id = ba.author_id
+		JOIN book b ON b.id = ba.book_id AND b.deleted = 0` + langJoin + `
 		WHERE a.library_id = ?
 		GROUP BY a.id
 		ORDER BY a.last_name, a.first_name
-		LIMIT ? OFFSET ?`,
-		libraryID, limit, offset,
-	)
+		LIMIT ? OFFSET ?`
+	args := append(langArgs, libraryID, limit, offset)
+	err := db.Select(&authors, query, args...)
 	return authors, err
 }
 
@@ -141,39 +189,74 @@ type AuthorsResult struct {
 	HasMore bool              `json:"has_more"`
 }
 
-func (db *DB) GetAuthorsFiltered(libraryID int64, filter string, limit, offset int) (*AuthorsResult, error) {
+func (db *DB) GetAuthorsFiltered(libraryID int64, filter string, limit, offset int, langs []string) (*AuthorsResult, error) {
 	var total int
 	var authors []AuthorWithCount
 
 	// Build filter condition
 	filterCond := ""
-	args := []interface{}{libraryID}
+	filterArgs := []interface{}{}
 	if filter != "" {
 		filterCond = " AND (a.last_name LIKE ? OR a.first_name LIKE ? OR a.middle_name LIKE ?)"
 		filterPattern := "%" + filter + "%"
-		args = append(args, filterPattern, filterPattern, filterPattern)
+		filterArgs = append(filterArgs, filterPattern, filterPattern, filterPattern)
 	}
 
-	// Get total count
-	countQuery := `SELECT COUNT(DISTINCT a.id) FROM author a WHERE a.library_id = ?` + filterCond
-	err := db.Get(&total, countQuery, args...)
-	if err != nil {
-		return nil, err
-	}
+	langClause, langArgs := buildLangFilter("b", langs)
 
-	// Get paginated results
-	query := `
-		SELECT a.*, COUNT(ba.book_id) as book_count
-		FROM author a
-		LEFT JOIN book_author ba ON a.id = ba.author_id
-		WHERE a.library_id = ?` + filterCond + `
-		GROUP BY a.id
-		ORDER BY a.last_name, a.first_name
-		LIMIT ? OFFSET ?`
-	args = append(args, limit, offset)
-	err = db.Select(&authors, query, args...)
-	if err != nil {
-		return nil, err
+	if len(langs) == 0 {
+		// No language filter: use existing LEFT JOIN approach
+		countArgs := append([]interface{}{libraryID}, filterArgs...)
+		countQuery := `SELECT COUNT(DISTINCT a.id) FROM author a WHERE a.library_id = ?` + filterCond
+		if err := db.Get(&total, countQuery, countArgs...); err != nil {
+			return nil, err
+		}
+
+		dataArgs := append([]interface{}{libraryID}, filterArgs...)
+		dataArgs = append(dataArgs, limit, offset)
+		query := `
+			SELECT a.*, COUNT(ba.book_id) as book_count
+			FROM author a
+			LEFT JOIN book_author ba ON a.id = ba.author_id
+			WHERE a.library_id = ?` + filterCond + `
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name
+			LIMIT ? OFFSET ?`
+		if err := db.Select(&authors, query, dataArgs...); err != nil {
+			return nil, err
+		}
+	} else {
+		// Language filter: use EXISTS subquery for count, JOIN for data
+		langJoin := buildLangJoinCond("b", langs)
+
+		countArgs := append([]interface{}{libraryID}, filterArgs...)
+		countArgs = append(countArgs, langArgs...)
+		countQuery := `SELECT COUNT(DISTINCT a.id) FROM author a
+			WHERE a.library_id = ?` + filterCond + `
+			AND EXISTS (
+				SELECT 1 FROM book_author ba
+				JOIN book b ON b.id = ba.book_id
+				WHERE ba.author_id = a.id AND b.deleted = 0` + langClause + `
+			)`
+		if err := db.Get(&total, countQuery, countArgs...); err != nil {
+			return nil, err
+		}
+
+		dataArgs := append(langArgs, libraryID)
+		dataArgs = append(dataArgs, filterArgs...)
+		dataArgs = append(dataArgs, limit, offset)
+		query := `
+			SELECT a.*, COUNT(DISTINCT b.id) as book_count
+			FROM author a
+			JOIN book_author ba ON a.id = ba.author_id
+			JOIN book b ON b.id = ba.book_id AND b.deleted = 0` + langJoin + `
+			WHERE a.library_id = ?` + filterCond + `
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name
+			LIMIT ? OFFSET ?`
+		if err := db.Select(&authors, query, dataArgs...); err != nil {
+			return nil, err
+		}
 	}
 
 	return &AuthorsResult{
@@ -185,39 +268,70 @@ func (db *DB) GetAuthorsFiltered(libraryID int64, filter string, limit, offset i
 	}, nil
 }
 
-func (db *DB) GetAuthorsByLetter(libraryID int64, letter string) ([]AuthorWithCount, error) {
+func (db *DB) GetAuthorsByLetter(libraryID int64, letter string, langs []string) ([]AuthorWithCount, error) {
 	var authors []AuthorWithCount
+	if len(langs) == 0 {
+		err := db.Select(&authors, `
+			SELECT a.*, COUNT(ba.book_id) as book_count
+			FROM author a
+			LEFT JOIN book_author ba ON a.id = ba.author_id
+			WHERE a.library_id = ? AND a.last_name LIKE ?
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name`,
+			libraryID, letter+"%",
+		)
+		return authors, err
+	}
+	_, langArgs := buildLangFilter("b", langs)
+	langJoin := buildLangJoinCond("b", langs)
+	args := append(langArgs, libraryID, letter+"%")
 	err := db.Select(&authors, `
-		SELECT a.*, COUNT(ba.book_id) as book_count
+		SELECT a.*, COUNT(DISTINCT b.id) as book_count
 		FROM author a
-		LEFT JOIN book_author ba ON a.id = ba.author_id
+		JOIN book_author ba ON a.id = ba.author_id
+		JOIN book b ON b.id = ba.book_id AND b.deleted = 0`+langJoin+`
 		WHERE a.library_id = ? AND a.last_name LIKE ?
 		GROUP BY a.id
 		ORDER BY a.last_name, a.first_name`,
-		libraryID, letter+"%",
+		args...,
 	)
 	return authors, err
 }
 
 // CountAuthorsByPrefix counts authors whose last_name starts with the given prefix
-func (db *DB) CountAuthorsByPrefix(libraryID int64, prefix string) (int, error) {
+func (db *DB) CountAuthorsByPrefix(libraryID int64, prefix string, langs []string) (int, error) {
 	var count int
+	if len(langs) == 0 {
+		err := db.Get(&count, `
+			SELECT COUNT(DISTINCT a.id) FROM author a
+			WHERE a.library_id = ? AND a.last_name LIKE ?`,
+			libraryID, prefix+"%",
+		)
+		return count, err
+	}
+	langClause, langArgs := buildLangFilter("b", langs)
+	args := append([]interface{}{libraryID, prefix + "%"}, langArgs...)
 	err := db.Get(&count, `
 		SELECT COUNT(DISTINCT a.id) FROM author a
-		WHERE a.library_id = ? AND a.last_name LIKE ?`,
-		libraryID, prefix+"%",
+		WHERE a.library_id = ? AND a.last_name LIKE ?
+		AND EXISTS (
+			SELECT 1 FROM book_author ba
+			JOIN book b ON b.id = ba.book_id
+			WHERE ba.author_id = a.id AND b.deleted = 0`+langClause+`
+		)`,
+		args...,
 	)
 	return count, err
 }
 
 // GetAuthorPrefixCounts returns counts for each possible next character after the given prefix
 // This is used for adaptive navigation to determine if we need to drill down further
-func (db *DB) GetAuthorPrefixCounts(libraryID int64, prefix string, alphabet string) (map[string]int, error) {
+func (db *DB) GetAuthorPrefixCounts(libraryID int64, prefix string, alphabet string, langs []string) (map[string]int, error) {
 	counts := make(map[string]int)
-	
+
 	for _, char := range alphabet {
 		nextPrefix := prefix + string(char)
-		count, err := db.CountAuthorsByPrefix(libraryID, nextPrefix)
+		count, err := db.CountAuthorsByPrefix(libraryID, nextPrefix, langs)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +339,7 @@ func (db *DB) GetAuthorPrefixCounts(libraryID int64, prefix string, alphabet str
 			counts[string(char)] = count
 		}
 	}
-	
+
 	return counts, nil
 }
 
@@ -238,23 +352,54 @@ func (db *DB) GetAuthor(id int64) (*Author, error) {
 	return &author, nil
 }
 
-func (db *DB) GetSeries(libraryID int64, limit, offset int) ([]SeriesWithCount, int64, error) {
+func (db *DB) GetSeries(libraryID int64, limit, offset int, langs []string) ([]SeriesWithCount, int64, error) {
 	var total int64
-	err := db.Get(&total, "SELECT COUNT(*) FROM series WHERE library_id = ?", libraryID)
-	if err != nil {
+	if len(langs) == 0 {
+		err := db.Get(&total, "SELECT COUNT(*) FROM series WHERE library_id = ?", libraryID)
+		if err != nil {
+			return nil, 0, err
+		}
+		var series []SeriesWithCount
+		err = db.Select(&series, `
+			SELECT s.*, COUNT(bs.book_id) as book_count
+			FROM series s
+			LEFT JOIN book_series bs ON s.id = bs.series_id
+			WHERE s.library_id = ?
+			GROUP BY s.id
+			ORDER BY s.name
+			LIMIT ? OFFSET ?`,
+			libraryID, limit, offset,
+		)
+		return series, total, err
+	}
+
+	langClause, langArgs := buildLangFilter("b", langs)
+	langJoin := buildLangJoinCond("b", langs)
+
+	countArgs := append([]interface{}{libraryID}, langArgs...)
+	if err := db.Get(&total, `
+		SELECT COUNT(DISTINCT s.id) FROM series s
+		WHERE s.library_id = ?
+		AND EXISTS (
+			SELECT 1 FROM book_series bs
+			JOIN book b ON b.id = bs.book_id
+			WHERE bs.series_id = s.id AND b.deleted = 0`+langClause+`
+		)`, countArgs...); err != nil {
 		return nil, 0, err
 	}
 
 	var series []SeriesWithCount
-	err = db.Select(&series, `
-		SELECT s.*, COUNT(bs.book_id) as book_count
+	dataArgs := append(langArgs, libraryID, limit, offset)
+	err := db.Select(&series, `
+		SELECT s.*, COUNT(DISTINCT b.id) as book_count
 		FROM series s
-		LEFT JOIN book_series bs ON s.id = bs.series_id
+		JOIN book_series bs ON s.id = bs.series_id
+		JOIN book b ON b.id = bs.book_id AND b.deleted = 0`+langJoin+`
 		WHERE s.library_id = ?
 		GROUP BY s.id
 		ORDER BY s.name
 		LIMIT ? OFFSET ?`,
-		libraryID, limit, offset,
+		dataArgs...,
 	)
 	return series, total, err
 }
@@ -267,38 +412,69 @@ type SeriesResult struct {
 	HasMore bool              `json:"has_more"`
 }
 
-func (db *DB) GetSeriesFiltered(libraryID int64, filter string, limit, offset int) (*SeriesResult, error) {
+func (db *DB) GetSeriesFiltered(libraryID int64, filter string, limit, offset int, langs []string) (*SeriesResult, error) {
 	var total int
 	var series []SeriesWithCount
 
 	// Build filter condition
 	filterCond := ""
-	args := []interface{}{libraryID}
+	filterArgs := []interface{}{}
 	if filter != "" {
 		filterCond = " AND s.name LIKE ?"
-		args = append(args, "%"+filter+"%")
+		filterArgs = append(filterArgs, "%"+filter+"%")
 	}
 
-	// Get total count
-	countQuery := `SELECT COUNT(*) FROM series s WHERE s.library_id = ?` + filterCond
-	err := db.Get(&total, countQuery, args...)
-	if err != nil {
-		return nil, err
-	}
+	langClause, langArgs := buildLangFilter("b", langs)
 
-	// Get paginated results
-	query := `
-		SELECT s.*, COUNT(bs.book_id) as book_count
-		FROM series s
-		LEFT JOIN book_series bs ON s.id = bs.series_id
-		WHERE s.library_id = ?` + filterCond + `
-		GROUP BY s.id
-		ORDER BY s.name
-		LIMIT ? OFFSET ?`
-	args = append(args, limit, offset)
-	err = db.Select(&series, query, args...)
-	if err != nil {
-		return nil, err
+	if len(langs) == 0 {
+		// No language filter: use existing LEFT JOIN approach
+		countArgs := append([]interface{}{libraryID}, filterArgs...)
+		if err := db.Get(&total, `SELECT COUNT(*) FROM series s WHERE s.library_id = ?`+filterCond, countArgs...); err != nil {
+			return nil, err
+		}
+		dataArgs := append([]interface{}{libraryID}, filterArgs...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&series, `
+			SELECT s.*, COUNT(bs.book_id) as book_count
+			FROM series s
+			LEFT JOIN book_series bs ON s.id = bs.series_id
+			WHERE s.library_id = ?`+filterCond+`
+			GROUP BY s.id
+			ORDER BY s.name
+			LIMIT ? OFFSET ?`, dataArgs...); err != nil {
+			return nil, err
+		}
+	} else {
+		// Language filter: use EXISTS subquery for count, JOIN for data
+		langJoin := buildLangJoinCond("b", langs)
+
+		countArgs := append([]interface{}{libraryID}, filterArgs...)
+		countArgs = append(countArgs, langArgs...)
+		if err := db.Get(&total, `
+			SELECT COUNT(DISTINCT s.id) FROM series s
+			WHERE s.library_id = ?`+filterCond+`
+			AND EXISTS (
+				SELECT 1 FROM book_series bs
+				JOIN book b ON b.id = bs.book_id
+				WHERE bs.series_id = s.id AND b.deleted = 0`+langClause+`
+			)`, countArgs...); err != nil {
+			return nil, err
+		}
+
+		dataArgs := append(langArgs, libraryID)
+		dataArgs = append(dataArgs, filterArgs...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&series, `
+			SELECT s.*, COUNT(DISTINCT b.id) as book_count
+			FROM series s
+			JOIN book_series bs ON s.id = bs.series_id
+			JOIN book b ON b.id = bs.book_id AND b.deleted = 0`+langJoin+`
+			WHERE s.library_id = ?`+filterCond+`
+			GROUP BY s.id
+			ORDER BY s.name
+			LIMIT ? OFFSET ?`, dataArgs...); err != nil {
+			return nil, err
+		}
 	}
 
 	return &SeriesResult{
@@ -319,14 +495,17 @@ func (db *DB) GetSeriesByID(id int64) (*Series, error) {
 	return &series, nil
 }
 
-func (db *DB) GetBooks(libraryID int64, limit, offset int) ([]Book, error) {
+func (db *DB) GetBooks(libraryID int64, limit, offset int, langs []string) ([]Book, error) {
 	var books []Book
+	langClause, langArgs := buildLangFilter("book", langs)
+	args := append([]interface{}{libraryID}, langArgs...)
+	args = append(args, limit, offset)
 	err := db.Select(&books, `
 		SELECT * FROM book
-		WHERE library_id = ? AND deleted = 0
+		WHERE library_id = ? AND deleted = 0`+langClause+`
 		ORDER BY title
 		LIMIT ? OFFSET ?`,
-		libraryID, limit, offset,
+		args...,
 	)
 	return books, err
 }
@@ -340,91 +519,102 @@ func (db *DB) GetBook(id int64) (*Book, error) {
 	return &book, nil
 }
 
-func (db *DB) GetBooksByAuthor(authorID int64, limit, offset int) ([]Book, int64, error) {
+func (db *DB) GetBooksByAuthor(authorID int64, limit, offset int, langs []string) ([]Book, int64, error) {
+	langClause, langArgs := buildLangFilter("b", langs)
+
+	countArgs := append([]interface{}{authorID}, langArgs...)
 	var total int64
-	err := db.Get(&total, `
+	if err := db.Get(&total, `
 		SELECT COUNT(*) FROM book b
 		JOIN book_author ba ON b.id = ba.book_id
-		WHERE ba.author_id = ? AND b.deleted = 0`,
-		authorID,
-	)
-	if err != nil {
+		WHERE ba.author_id = ? AND b.deleted = 0`+langClause,
+		countArgs...); err != nil {
 		return nil, 0, err
 	}
 
+	dataArgs := append([]interface{}{authorID}, langArgs...)
+	dataArgs = append(dataArgs, limit, offset)
 	var books []Book
-	err = db.Select(&books, `
+	err := db.Select(&books, `
 		SELECT b.* FROM book b
 		JOIN book_author ba ON b.id = ba.book_id
-		WHERE ba.author_id = ? AND b.deleted = 0
+		WHERE ba.author_id = ? AND b.deleted = 0`+langClause+`
 		ORDER BY b.title
 		LIMIT ? OFFSET ?`,
-		authorID, limit, offset,
+		dataArgs...,
 	)
 	return books, total, err
 }
 
-func (db *DB) GetBooksBySeries(seriesID int64) ([]Book, error) {
+func (db *DB) GetBooksBySeries(seriesID int64, langs []string) ([]Book, error) {
+	langClause, langArgs := buildLangFilter("b", langs)
+	args := append([]interface{}{seriesID}, langArgs...)
 	var books []Book
 	err := db.Select(&books, `
 		SELECT b.* FROM book b
 		JOIN book_series bs ON b.id = bs.book_id
-		WHERE bs.series_id = ? AND b.deleted = 0
+		WHERE bs.series_id = ? AND b.deleted = 0`+langClause+`
 		ORDER BY bs.seq_num, b.title`,
-		seriesID,
+		args...,
 	)
 	return books, err
 }
 
-func (db *DB) GetBooksBySeriesPaginated(seriesID int64, limit, offset int) ([]Book, int64, error) {
+func (db *DB) GetBooksBySeriesPaginated(seriesID int64, limit, offset int, langs []string) ([]Book, int64, error) {
+	langClause, langArgs := buildLangFilter("b", langs)
+
+	countArgs := append([]interface{}{seriesID}, langArgs...)
 	var total int64
-	err := db.Get(&total, `
+	if err := db.Get(&total, `
 		SELECT COUNT(*) FROM book b
 		JOIN book_series bs ON b.id = bs.book_id
-		WHERE bs.series_id = ? AND b.deleted = 0`,
-		seriesID,
-	)
-	if err != nil {
+		WHERE bs.series_id = ? AND b.deleted = 0`+langClause,
+		countArgs...); err != nil {
 		return nil, 0, err
 	}
 
+	dataArgs := append([]interface{}{seriesID}, langArgs...)
+	dataArgs = append(dataArgs, limit, offset)
 	var books []Book
-	err = db.Select(&books, `
+	err := db.Select(&books, `
 		SELECT b.* FROM book b
 		JOIN book_series bs ON b.id = bs.book_id
-		WHERE bs.series_id = ? AND b.deleted = 0
+		WHERE bs.series_id = ? AND b.deleted = 0`+langClause+`
 		ORDER BY bs.seq_num, b.title
 		LIMIT ? OFFSET ?`,
-		seriesID, limit, offset,
+		dataArgs...,
 	)
 	return books, total, err
 }
 
-func (db *DB) GetBooksByGenre(genreID int, libraryID int64, limit, offset int) ([]Book, int64, error) {
+func (db *DB) GetBooksByGenre(genreID int, libraryID int64, limit, offset int, langs []string) ([]Book, int64, error) {
+	langClause, langArgs := buildLangFilter("b", langs)
+
+	countArgs := append([]interface{}{genreID, libraryID}, langArgs...)
 	var total int64
-	err := db.Get(&total, `
+	if err := db.Get(&total, `
 		SELECT COUNT(*) FROM book b
 		JOIN book_genre bg ON b.id = bg.book_id
-		WHERE bg.genre_id = ? AND b.library_id = ? AND b.deleted = 0`,
-		genreID, libraryID,
-	)
-	if err != nil {
+		WHERE bg.genre_id = ? AND b.library_id = ? AND b.deleted = 0`+langClause,
+		countArgs...); err != nil {
 		return nil, 0, err
 	}
 
+	dataArgs := append([]interface{}{genreID, libraryID}, langArgs...)
+	dataArgs = append(dataArgs, limit, offset)
 	var books []Book
-	err = db.Select(&books, `
+	err := db.Select(&books, `
 		SELECT b.* FROM book b
 		JOIN book_genre bg ON b.id = bg.book_id
-		WHERE bg.genre_id = ? AND b.library_id = ? AND b.deleted = 0
+		WHERE bg.genre_id = ? AND b.library_id = ? AND b.deleted = 0`+langClause+`
 		ORDER BY b.title
 		LIMIT ? OFFSET ?`,
-		genreID, libraryID, limit, offset,
+		dataArgs...,
 	)
 	return books, total, err
 }
 
-func (db *DB) SearchBooks(libraryID int64, query string, limit, offset int) ([]Book, int64, error) {
+func (db *DB) SearchBooks(libraryID int64, query string, limit, offset int, langs []string) ([]Book, int64, error) {
 	// Use multiple case variants for Cyrillic support since SQLite LOWER() doesn't work with Cyrillic
 	pattern := "%" + query + "%"
 	patternLower := "%" + strings.ToLower(query) + "%"
@@ -432,25 +622,30 @@ func (db *DB) SearchBooks(libraryID int64, query string, limit, offset int) ([]B
 	// Title case: first letter of each word uppercase
 	patternTitle := "%" + toTitleCase(query) + "%"
 
+	langClause, langArgs := buildLangFilter("book", langs)
+
+	countArgs := []interface{}{libraryID, pattern, patternLower, patternUpper, patternTitle}
+	countArgs = append(countArgs, langArgs...)
 	var total int64
-	err := db.Get(&total, `
+	if err := db.Get(&total, `
 		SELECT COUNT(*) FROM book
-		WHERE library_id = ? AND deleted = 0 
-		AND (title LIKE ? OR title LIKE ? OR title LIKE ? OR title LIKE ?)`,
-		libraryID, pattern, patternLower, patternUpper, patternTitle,
-	)
-	if err != nil {
+		WHERE library_id = ? AND deleted = 0
+		AND (title LIKE ? OR title LIKE ? OR title LIKE ? OR title LIKE ?)`+langClause,
+		countArgs...); err != nil {
 		return nil, 0, err
 	}
 
+	dataArgs := []interface{}{libraryID, pattern, patternLower, patternUpper, patternTitle}
+	dataArgs = append(dataArgs, langArgs...)
+	dataArgs = append(dataArgs, limit, offset)
 	var books []Book
-	err = db.Select(&books, `
+	err := db.Select(&books, `
 		SELECT * FROM book
-		WHERE library_id = ? AND deleted = 0 
-		AND (title LIKE ? OR title LIKE ? OR title LIKE ? OR title LIKE ?)
+		WHERE library_id = ? AND deleted = 0
+		AND (title LIKE ? OR title LIKE ? OR title LIKE ? OR title LIKE ?)`+langClause+`
 		ORDER BY title
 		LIMIT ? OFFSET ?`,
-		libraryID, pattern, patternLower, patternUpper, patternTitle, limit, offset,
+		dataArgs...,
 	)
 	return books, total, err
 }
@@ -470,81 +665,156 @@ func toTitleCase(s string) string {
 	return string(runes)
 }
 
-func (db *DB) SearchAuthors(libraryID int64, query string, limit, offset int) ([]AuthorWithCount, int64, error) {
+func (db *DB) SearchAuthors(libraryID int64, query string, limit, offset int, langs []string) ([]AuthorWithCount, int64, error) {
 	// Use multiple case variants for Cyrillic support
 	pattern := "%" + query + "%"
 	patternLower := "%" + strings.ToLower(query) + "%"
 	patternUpper := "%" + strings.ToUpper(query) + "%"
 	patternTitle := "%" + toTitleCase(query) + "%"
 
-	var total int64
-	err := db.Get(&total, `
-		SELECT COUNT(DISTINCT a.id) FROM author a
-		WHERE a.library_id = ? 
-		AND (a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ?
+	namePatterns := []interface{}{
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+		pattern, patternLower, patternUpper, patternTitle,
+	}
+	nameCond := ` AND (a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ?
 		  OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ?
-		  OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ?)`,
-		libraryID,
-		pattern, patternLower, patternUpper, patternTitle,
-		pattern, patternLower, patternUpper, patternTitle,
-		pattern, patternLower, patternUpper, patternTitle,
-	)
-	if err != nil {
-		return nil, 0, err
+		  OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ?)`
+
+	langClause, langArgs := buildLangFilter("b", langs)
+
+	var total int64
+	if len(langs) == 0 {
+		countArgs := append([]interface{}{libraryID}, namePatterns...)
+		if err := db.Get(&total, `
+			SELECT COUNT(DISTINCT a.id) FROM author a
+			WHERE a.library_id = ?`+nameCond,
+			countArgs...); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		countArgs := append([]interface{}{libraryID}, namePatterns...)
+		countArgs = append(countArgs, langArgs...)
+		if err := db.Get(&total, `
+			SELECT COUNT(DISTINCT a.id) FROM author a
+			WHERE a.library_id = ?`+nameCond+`
+			AND EXISTS (
+				SELECT 1 FROM book_author ba
+				JOIN book b ON b.id = ba.book_id
+				WHERE ba.author_id = a.id AND b.deleted = 0`+langClause+`
+			)`,
+			countArgs...); err != nil {
+			return nil, 0, err
+		}
 	}
 
 	var authors []AuthorWithCount
-	err = db.Select(&authors, `
-		SELECT a.*, COUNT(ba.book_id) as book_count
-		FROM author a
-		LEFT JOIN book_author ba ON a.id = ba.author_id
-		WHERE a.library_id = ? 
-		AND (a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ? OR a.first_name LIKE ?
-		  OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ? OR a.last_name LIKE ?
-		  OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ? OR a.middle_name LIKE ?)
-		GROUP BY a.id
-		ORDER BY a.last_name, a.first_name
-		LIMIT ? OFFSET ?`,
-		libraryID,
-		pattern, patternLower, patternUpper, patternTitle,
-		pattern, patternLower, patternUpper, patternTitle,
-		pattern, patternLower, patternUpper, patternTitle,
-		limit, offset,
-	)
-	return authors, total, err
+	if len(langs) == 0 {
+		dataArgs := append([]interface{}{libraryID}, namePatterns...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&authors, `
+			SELECT a.*, COUNT(ba.book_id) as book_count
+			FROM author a
+			LEFT JOIN book_author ba ON a.id = ba.author_id
+			WHERE a.library_id = ?`+nameCond+`
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name
+			LIMIT ? OFFSET ?`,
+			dataArgs...); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		langJoin := buildLangJoinCond("b", langs)
+		dataArgs := append(langArgs, libraryID)
+		dataArgs = append(dataArgs, namePatterns...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&authors, `
+			SELECT a.*, COUNT(DISTINCT b.id) as book_count
+			FROM author a
+			JOIN book_author ba ON a.id = ba.author_id
+			JOIN book b ON b.id = ba.book_id AND b.deleted = 0`+langJoin+`
+			WHERE a.library_id = ?`+nameCond+`
+			GROUP BY a.id
+			ORDER BY a.last_name, a.first_name
+			LIMIT ? OFFSET ?`,
+			dataArgs...); err != nil {
+			return nil, 0, err
+		}
+	}
+	return authors, total, nil
 }
 
-func (db *DB) SearchSeries(libraryID int64, query string, limit, offset int) ([]SeriesWithCount, int64, error) {
+func (db *DB) SearchSeries(libraryID int64, query string, limit, offset int, langs []string) ([]SeriesWithCount, int64, error) {
 	// Use multiple case variants for Cyrillic support
 	pattern := "%" + query + "%"
 	patternLower := "%" + strings.ToLower(query) + "%"
 	patternUpper := "%" + strings.ToUpper(query) + "%"
 	patternTitle := "%" + toTitleCase(query) + "%"
 
+	namePatterns := []interface{}{pattern, patternLower, patternUpper, patternTitle}
+	nameCond := ` AND (s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ?)`
+
+	langClause, langArgs := buildLangFilter("b", langs)
+
 	var total int64
-	err := db.Get(&total, `
-		SELECT COUNT(*) FROM series
-		WHERE library_id = ? 
-		AND (name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?)`,
-		libraryID, pattern, patternLower, patternUpper, patternTitle,
-	)
-	if err != nil {
-		return nil, 0, err
+	if len(langs) == 0 {
+		countArgs := append([]interface{}{libraryID}, namePatterns...)
+		if err := db.Get(&total, `
+			SELECT COUNT(*) FROM series s
+			WHERE s.library_id = ?`+nameCond,
+			countArgs...); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		countArgs := append([]interface{}{libraryID}, namePatterns...)
+		countArgs = append(countArgs, langArgs...)
+		if err := db.Get(&total, `
+			SELECT COUNT(DISTINCT s.id) FROM series s
+			WHERE s.library_id = ?`+nameCond+`
+			AND EXISTS (
+				SELECT 1 FROM book_series bs
+				JOIN book b ON b.id = bs.book_id
+				WHERE bs.series_id = s.id AND b.deleted = 0`+langClause+`
+			)`,
+			countArgs...); err != nil {
+			return nil, 0, err
+		}
 	}
 
 	var series []SeriesWithCount
-	err = db.Select(&series, `
-		SELECT s.*, COUNT(bs.book_id) as book_count
-		FROM series s
-		LEFT JOIN book_series bs ON s.id = bs.series_id
-		WHERE s.library_id = ? 
-		AND (s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ? OR s.name LIKE ?)
-		GROUP BY s.id
-		ORDER BY s.name
-		LIMIT ? OFFSET ?`,
-		libraryID, pattern, patternLower, patternUpper, patternTitle, limit, offset,
-	)
-	return series, total, err
+	if len(langs) == 0 {
+		dataArgs := append([]interface{}{libraryID}, namePatterns...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&series, `
+			SELECT s.*, COUNT(bs.book_id) as book_count
+			FROM series s
+			LEFT JOIN book_series bs ON s.id = bs.series_id
+			WHERE s.library_id = ?`+nameCond+`
+			GROUP BY s.id
+			ORDER BY s.name
+			LIMIT ? OFFSET ?`,
+			dataArgs...); err != nil {
+			return nil, 0, err
+		}
+	} else {
+		langJoin := buildLangJoinCond("b", langs)
+		dataArgs := append(langArgs, libraryID)
+		dataArgs = append(dataArgs, namePatterns...)
+		dataArgs = append(dataArgs, limit, offset)
+		if err := db.Select(&series, `
+			SELECT s.*, COUNT(DISTINCT b.id) as book_count
+			FROM series s
+			JOIN book_series bs ON s.id = bs.series_id
+			JOIN book b ON b.id = bs.book_id AND b.deleted = 0`+langJoin+`
+			WHERE s.library_id = ?`+nameCond+`
+			GROUP BY s.id
+			ORDER BY s.name
+			LIMIT ? OFFSET ?`,
+			dataArgs...); err != nil {
+			return nil, 0, err
+		}
+	}
+	return series, total, nil
 }
 
 func (db *DB) GetBookAuthors(bookID int64) ([]Author, error) {
@@ -709,5 +979,57 @@ func (db *DB) DeleteOIDCSession(sessionID string) error {
 
 func (db *DB) DeleteExpiredOIDCSessions() error {
 	_, err := db.Exec("DELETE FROM oidc_session WHERE expires_at < CURRENT_TIMESTAMP")
+	return err
+}
+
+// Language settings queries
+
+// GetAvailableLanguages returns all distinct non-empty language codes in the catalog.
+func (db *DB) GetAvailableLanguages() ([]string, error) {
+	var langs []string
+	err := db.Select(&langs, "SELECT DISTINCT lang FROM book WHERE lang != '' AND deleted = 0 ORDER BY lang")
+	if err != nil {
+		return nil, err
+	}
+	if langs == nil {
+		langs = []string{}
+	}
+	return langs, nil
+}
+
+// GetSelectedLanguages returns the admin-configured language filter (from setting table).
+// Returns empty slice if no languages are selected (meaning "show all").
+func (db *DB) GetSelectedLanguages() ([]string, error) {
+	var value string
+	err := db.Get(&value, "SELECT value FROM setting WHERE key = 'selected_languages'")
+	if err != nil {
+		// No row means no filter configured
+		return []string{}, nil
+	}
+	var langs []string
+	if err := json.Unmarshal([]byte(value), &langs); err != nil {
+		return []string{}, nil
+	}
+	if langs == nil {
+		langs = []string{}
+	}
+	return langs, nil
+}
+
+// SaveSelectedLanguages stores the language filter setting.
+// Pass empty slice to clear the filter (show all).
+func (db *DB) SaveSelectedLanguages(langs []string) error {
+	if langs == nil {
+		langs = []string{}
+	}
+	data, err := json.Marshal(langs)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`
+		INSERT INTO setting (key, value) VALUES ('selected_languages', ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		string(data),
+	)
 	return err
 }

@@ -347,7 +347,8 @@ func (s *Server) apiGetAuthors(w http.ResponseWriter, r *http.Request, libID int
 		}
 	}
 
-	result, err := s.db.GetAuthorsFiltered(libID, filter, limit, offset)
+	langs := s.getSelectedLanguages()
+	result, err := s.db.GetAuthorsFiltered(libID, filter, limit, offset, langs)
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -374,7 +375,8 @@ func (s *Server) apiGetSeries(w http.ResponseWriter, r *http.Request, libID int6
 		}
 	}
 
-	result, err := s.db.GetSeriesFiltered(libID, filter, limit, offset)
+	langs := s.getSelectedLanguages()
+	result, err := s.db.GetSeriesFiltered(libID, filter, limit, offset, langs)
 	if err != nil {
 		s.jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -727,4 +729,39 @@ func (b *bytesReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 		err = fmt.Errorf("short read")
 	}
 	return n, err
+}
+
+// Language settings handlers
+
+func (s *Server) apiGetAvailableLanguages(w http.ResponseWriter, r *http.Request) {
+	langs, err := s.db.GetAvailableLanguages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.jsonResponse(w, langs)
+}
+
+func (s *Server) apiGetSelectedLanguages(w http.ResponseWriter, r *http.Request) {
+	langs, err := s.db.GetSelectedLanguages()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.jsonResponse(w, langs)
+}
+
+func (s *Server) apiSaveSelectedLanguages(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Languages []string `json:"languages"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.db.SaveSelectedLanguages(body.Languages); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

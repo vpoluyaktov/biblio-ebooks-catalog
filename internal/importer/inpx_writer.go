@@ -48,7 +48,7 @@ func (w *INPXWriter) ExportLibraryToINPX(libraryID int64, outputPath string) err
 	offset := 0
 
 	for {
-		books, err := w.db.GetBooks(libraryID, batchSize, offset)
+		books, err := w.db.GetBooks(libraryID, batchSize, offset, nil)
 		if err != nil {
 			return fmt.Errorf("failed to get books: %w", err)
 		}
