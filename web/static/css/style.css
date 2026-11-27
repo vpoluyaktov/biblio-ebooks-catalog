@@ -596,7 +596,7 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg) 100%);
 }
 
 .login-card {
@@ -1175,7 +1175,7 @@ a:hover {
   }
 }
 
-/* Modal - Dark Theme Style */
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1191,37 +1191,39 @@ a:hover {
 }
 
 .modal-dialog {
-  background: #1e293b;
+  background: var(--bg-card);
+  color: var(--text);
   border-radius: 12px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   width: 90%;
   max-width: 420px;
   max-height: 90vh;
   overflow: hidden;
-  border: 1px solid #475569;
+  border: 1px solid var(--border);
 }
 
 .modal-header {
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #475569;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #1e293b;
+  background: var(--bg-card);
+  color: var(--text);
 }
 
 .modal-title {
   font-size: 1.125rem;
   font-weight: 600;
   margin: 0;
-  color: #f8fafc;
+  color: inherit;
 }
 
 .modal-close {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: #64748b;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0;
   line-height: 1;
@@ -1229,13 +1231,13 @@ a:hover {
 }
 
 .modal-close:hover {
-  color: #f8fafc;
+  color: var(--text);
 }
 
 .modal-body {
   padding: 1.5rem;
   overflow-y: auto;
-  background: #1e293b;
+  background: var(--bg-card);
   max-height: calc(90vh - 70px);
 }
 
@@ -1250,27 +1252,27 @@ a:hover {
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .modal-body .form-control {
   width: 100%;
   padding: 0.75rem 1rem;
-  background: #334155;
-  border: 1px solid #475569;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 1rem;
-  color: #f8fafc;
+  color: var(--text);
   transition: border-color 0.2s ease;
 }
 
 .modal-body .form-control::placeholder {
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .modal-body .form-control:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--primary);
 }
 
 .modal-body select.form-control {
@@ -1283,7 +1285,7 @@ a:hover {
   justify-content: flex-end;
   margin-top: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid #475569;
+  border-top: 1px solid var(--border);
 }
 
 .modal-actions .btn {
@@ -1296,23 +1298,23 @@ a:hover {
 }
 
 .modal-actions .btn-outline {
-  background: #334155;
-  color: #f8fafc;
-  border: 1px solid #475569;
+  background: var(--bg-tertiary);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .modal-actions .btn-outline:hover {
-  background: #475569;
+  background: var(--border);
 }
 
 .modal-actions .btn-primary {
-  background: #3b82f6;
+  background: var(--primary);
   color: white;
   border: none;
 }
 
 .modal-actions .btn-primary:hover {
-  background: #2563eb;
+  background: var(--primary-dark);
 }
 
 .form-error {
